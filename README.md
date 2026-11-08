@@ -4,6 +4,12 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **Product direction:** a precise 3D editor that feels approachable from the first session. Model, paint, inspect, and export in one coherent workspace, with Minecraft compatibility built into the editing experience.
 
+## Web app
+
+**GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
+
+The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.
+
 ## Project status
 
 **An executable editor is on the main branch.** It provides a React/Three.js viewport, cuboid authoring, texture painting, undo/redo, project files and local recovery. Per-face UV rectangles, four quarter-turn rotations and native project schema v2 are now implemented. The current reliability slice adds **atomic painting gestures and generation-fenced local recovery across tabs**. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. A **Java 1.21.4 experimental resource-pack pipeline** now exports model/blockstate JSON, PNGs and ZIPs, and can import the exact subset of packs it generates for further editing. It performs strict file and schema checks and shows a preflight before replacing the workspace. The experimental Java pack codec now also round-trips supported face UV rectangles and quarter-turn rotations. It has **not** been verified in-game, does not register new block behavior, and does not claim arbitrary third-party pack import.
