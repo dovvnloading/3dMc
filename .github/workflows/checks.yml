@@ -30,6 +30,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser workflow smoke
         run: npm run test:e2e
+      - name: Record browser texture resource baseline
+        run: |
+          test -s test-results/performance/texture-lifecycle.json
+          cat test-results/performance/texture-lifecycle.json
       - name: Build GitHub Pages production bundle
         run: npm run build -- --mode github-pages
       - name: Test production site at /3dMc/ (not Vite dev)

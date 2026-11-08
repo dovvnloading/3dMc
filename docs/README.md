@@ -16,7 +16,7 @@ For implementation, start with the [decision register](decisions/DECISIONS.md), 
 
 For design, pair the workspace specification with the [design system](design/DESIGN_SYSTEM.md). Evaluate complete task flows, including empty, interrupted, unsupported, and recovery states.
 
-For portable editable source projects, use the [native project archive contract](architecture/NATIVE_PROJECT_ARCHIVE.md). For pixel asset import/export, use the [PNG texture workflow](delivery/TEXTURE_WORKFLOW.md). For scene creation and keyboard editing, use [creator tools](delivery/CREATOR_TOOLS.md). For the publicly hosted application, use the [GitHub Pages deployment guide](delivery/PAGES_DEPLOYMENT.md) to check the production build and the repository's Pages source settings. Our normal editor smoke tests use Vite's dev server; a second suite now verifies the compiled site under the `/3dMc/` URL.
+For portable editable source projects, use the [native project archive contract](architecture/NATIVE_PROJECT_ARCHIVE.md). Evaluate GPU resource cleanup and recovery failure evidence in the [resource and recovery baseline](delivery/RESOURCE_AND_RECOVERY_BASELINE.md). For pixel asset import/export, use the [PNG texture workflow](delivery/TEXTURE_WORKFLOW.md). For scene creation and keyboard editing, use [creator tools](delivery/CREATOR_TOOLS.md). For the publicly hosted application, use the [GitHub Pages deployment guide](delivery/PAGES_DEPLOYMENT.md) to check the production build and the repository's Pages source settings. Our normal editor smoke tests use Vite's dev server; a second suite now verifies the compiled site under the `/3dMc/` URL.
 
 ## Workspace direction
 
