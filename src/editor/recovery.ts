@@ -137,6 +137,7 @@ function publish(entry: Checkpoint, lease: RecoveryLease): Promise<void> {
     const ownerStore = tx.objectStore(OWNERS);
     const checkpointStore = tx.objectStore(STORE);
     let lostOwnership = false;
+    let writeFailure: unknown;
     const owner = ownerStore.get(OWNER_KEY);
     owner.onsuccess = () => {
       if (!sameLease(owner.result as OwnershipRow | undefined, lease, Date.now())) {
@@ -145,9 +146,16 @@ function publish(entry: Checkpoint, lease: RecoveryLease): Promise<void> {
       }
       const old = checkpointStore.get("latest");
       old.onsuccess = () => {
-        const previous = old.result as Checkpoint | undefined;
-        if (previous) checkpointStore.put({ ...previous, key: "previous" });
-        checkpointStore.put(entry);
+        try {
+          const previous = old.result as Checkpoint | undefined;
+          if (previous) checkpointStore.put({ ...previous, key: "previous" });
+          checkpointStore.put(entry);
+        } catch (error) {
+          // A quota or storage exception must abort the entire transaction,
+          // preserving both acknowledged checkpoints and surfacing failure.
+          writeFailure = error;
+          tx.abort();
+        }
       };
     };
     tx.oncomplete = () => {
@@ -156,7 +164,10 @@ function publish(entry: Checkpoint, lease: RecoveryLease): Promise<void> {
       else resolve();
     };
     tx.onerror = () => { db.close(); reject(tx.error ?? new Error("Recovery write failed.")); };
-    tx.onabort = () => { db.close(); reject(tx.error ?? new Error("Recovery transaction aborted.")); };
+    tx.onabort = () => {
+      db.close();
+      reject(writeFailure ?? tx.error ?? new Error("Recovery transaction aborted."));
+    };
   }));
 }
 

@@ -352,3 +352,28 @@ test("stale checkpoint generations fail atomically and the last good backup surv
     fallback: true
   });
 });
+
+
+test("a storage write failure is reported and native backup download stays available", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "X size" })).toBeVisible();
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function(...args: Parameters<typeof original>) {
+      if (this.name === "checkpoints") {
+        throw new DOMException("Simulated quota exhausted", "QuotaExceededError");
+      }
+      return original.apply(this, args);
+    };
+  });
+  const width = page.getByRole("textbox", { name: "X size" });
+  await width.fill("12");
+  await width.press("Enter");
+  await expect(page.getByText("Local save unavailable")).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toMatch(/\.3dmc\.json$/);
+  expect(await file.path()).toBeTruthy();
+  await expect(width).toHaveValue("12");
+});
