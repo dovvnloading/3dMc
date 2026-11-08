@@ -23,6 +23,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - Open a contextual **Add shape** primitive library: full block, half slab, narrow column, thin panel, or small cube. Switch between solid-color and painted material and arrange the scene's element order.
 - Use shared document undo/redo for geometry and pixel changes, including material conversion and scene order. Desktop Ctrl/Cmd+N opens New Project, Ctrl/Cmd+S downloads a native source, and Ctrl/Cmd+D duplicates the selected unlocked element.
 - Paint actual RGBA texels in a 2D panel or by hitting a textured cuboid face in 3D, using face-specific UV mapping.
+- Import external PNG textures through a preflight that offers nearest-neighbor scaling into the existing sheet or adoption of a square 16/32/64px PNG; export the editable texture as a standalone PNG. Both dimensions and pixels are one undoable edit.
 - Select any cuboid face in Paint, edit its four UV edges and quarter-turn texture rotation, reset face UVs, and inspect the highlighted pixel region.
 - Inspect a clean Preview mode.
 - Download and reopen the self-contained native `.3dmc` ZIP source archive (manifest, document JSON, and editable PNG) with SHA-256 validation. Legacy `.3dmc.json` files and schema-v1→v2 migration remain supported.
