@@ -1,6 +1,6 @@
 # PNG import, replacement and export — first texture workflow
 
-**Status:** Implemented for a single shared RGBA texture. Exact Java resource-pack rendering still requires independent Minecraft 1.21.4 verification in Issue #4.
+**Status:** Implemented for up to 16 named, independently editable RGBA textures. Exact Java resource-pack rendering still requires independent Minecraft 1.21.4 verification in Issue #4.
 
 ## Creator workflow
 
@@ -10,7 +10,7 @@
 4. Choose one policy:
    - **Keep the current canvas** (default). The image is mapped into the existing width and height using **integer nearest-neighbor** sampling, with no blur. A non-square source will stretch to the existing aspect ratio.
    - **Use the PNG dimensions**. Available only for square **16×16, 32×32 or 64×64** PNGs. Preserves all decoded texels and changes the project's source image resolution.
-5. Confirm to replace the **one shared texture**; all painted cuboids that use it update together. The operation creates **one undo entry**, and its old pixels and dimensions remain in history until its bounded session history expires.
+5. Choose **Replace PNG** for the currently selected sheet or **Add texture from PNG** to create another named asset (up to 16). The latter does not change existing faces; select a cuboid face in the Paint inspector and choose the intended texture asset. Confirmed replacements update every face referencing that sheet. The operation creates **one undo entry**, and its old pixels and dimensions remain in history until its bounded session history expires.
 6. Choose **Export PNG** to download just the current source texture, or **Save project** to download a full editable .3dmc archive.
 
 Both policies preserve logical per-face UV edges from 0–16 and their rotations, so the selected texture region scales with the sheet dimensions rather than silently changing authored UV values.
@@ -31,4 +31,4 @@ Unit tests verify header CRC/dimensions, exact nearest-neighbor channel output, 
 
 The next paint slice includes an opaque pencil (B), transparent eraser (E), exact four-connected RGBA fill (G) and eyedropper (I). Pencil and eraser draw at 1/2/4-pixel brush sizes, capturing the mode at the beginning of a gesture. Escape, lost pointer capture or focus loss cancels previews; a completed stroke or fill makes at most one undo entry. Fill treats alpha as part of region membership, so a partly transparent area is not merged with an otherwise identical opaque area. The 2D canvas supports Arrow keys for pixel focus and Space to use a brush or fill. The 3D viewport uses the same baked face UV-to-texel mapping. Painted meshes display alpha in the editor preview, while Java 1.21.4 export remains blocked for non-opaque source textures.
 
-Future texture milestones include explicit alpha-aware eyedropper controls, selection/masks, improved non-square atlas workflows, per-face texture references and multi-texture native archive versioning. The current editor intentionally owns **one** shared texture; importing a PNG doesn't create a new independent texture slot.
+Future texture milestones include explicit alpha-aware eyedropper controls, selection/masks, improved non-square atlas workflows, per-face texture references and multi-texture native archive versioning. The native editor now owns **up to 16 independent source textures** with per-face bindings. Delete is a separate explicit remapping action that shows affected faces and has one undo step.

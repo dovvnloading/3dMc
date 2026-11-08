@@ -40,7 +40,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 
 - **Java 1.21.4 export is experimental, not game-verified.** It has deterministic structure and pixel tests, but the actual generated pack has not yet been checked in Minecraft. Do not label it compatible or ready for production use.
 - Existing 26.3 candidate project files still open, but require an explicit target change before attempting this 1.21.4 export.
-- The new **.3dmc native archive** uses a versioned, integrity-checked ZIP layout. It supports one shared RGBA texture (up to 64×64), explicit cuboid face UVs and editor-only flags. This is the first portable source version, not an unlimited multi-texture or animation format. Legacy `.3dmc.json` is an opt-in compatibility backup.
+- The new **.3dmc native archive** uses a versioned, integrity-checked ZIP layout. Container v2 supports up to 16 named RGBA textures (each at most 64×64), explicit per-face source IDs/UVs and editor-only flags, while retaining validated container v1 support. This is the first portable source version, not an unlimited multi-texture or animation format. Legacy `.3dmc.json` is an opt-in compatibility backup.
 - The exporter now writes explicit supported UV rectangles and quarter-turn face rotations. The first ZIP importer accepts only these generated structures. Third-party pack import, element transforms/rotation, dependency graphs, and renderer/game parity remain future work. The source project keeps richer metadata than the game output.
 - Rotation editing is hidden until the selected profile is verified. Scale/translation gizmos are an integration proof, not an exhaustive interaction implementation.
 - IndexedDB checkpoints now use **a single-tab lease and a monotonic generation** checked in the same transaction as publication. Another tab opens read-only and must explicitly take over; an older writer cannot publish new checkpoints after takeover. Browser storage is not a portable backup.
@@ -55,7 +55,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 2. Extend the now-tested gesture controller to more browser/input devices and lost-capture/interrupted gizmo stress cases.
 3. Extend the now-atomic writer-generation fence with explicit fault injection for quota exhaustion, upgrade blocking, corruption and checkpoint garbage collection.
 4. Complete the [pinned Java 1.21.4 compatibility proof](../compatibility/JAVA_1214_EXPORT.md): independently check the blockstate/model and six-face texture directions in-game, record evidence, then decide whether to promote the profile.
-5. Expand the new native archive beyond one shared texture only after validating source-asset references, transactional imports, and migration fixtures. The initial `.3dmc` layout and manifest are documented in [Native archive](../architecture/NATIVE_PROJECT_ARCHIVE.md).
+5. Expand the v3 multi-texture workflow with GPU/device performance evidence and independently verified Minecraft render parity; the first migration and per-asset hashes are covered by tests. The initial `.3dmc` layout and manifest are documented in [Native archive](../architecture/NATIVE_PROJECT_ARCHIVE.md).
 6. Run the creator task study and device baseline before any claim of polished release readiness.
 
 Follow the dependency and acceptance rules in [BACKLOG.md](BACKLOG.md) and [QUALITY_GATES.md](QUALITY_GATES.md).
