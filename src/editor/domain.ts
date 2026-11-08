@@ -48,7 +48,7 @@ export function isValidFaces(value: unknown): value is CuboidFaces {
 export function copyFaces(value: CuboidFaces): CuboidFaces {
   return Object.fromEntries(FACE_DIRECTIONS.map((key) => [
     key, { uv: [...value[key].uv] as [number, number, number, number], rotation: value[key].rotation }
-  ])) as CuboidFaces;
+  ])) as unknown as CuboidFaces;
 }
 
 
