@@ -96,7 +96,8 @@ test("compiled site can preflight a user PNG and keep the current workspace on c
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("32 × 32 pixels")).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(page.locator(".asset-entry")).toContainText("lantern.png");
+  await expect(page.getByRole("group", { name: "Texture assets" })
+    .getByRole("button", { name: "Select texture lantern.png" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
 });
 

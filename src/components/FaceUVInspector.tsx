@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import {
-  FACE_DIRECTIONS, assignFaceTexture, updateCuboid, updateFaceRotation, updateFaceUV
+  FACE_DIRECTIONS, assignFaceTexture, selectTexture, updateCuboid, updateFaceRotation, updateFaceUV
 } from "../editor/domain";
 import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV, PixelTexture } from "../editor/domain";
 import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
@@ -78,7 +78,8 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
       <select aria-label="Face texture asset" className="select-control"
         value={mapping.textureId} disabled={selected.locked}
         onChange={(event) => commitDocument((doc) =>
-          assignFaceTexture(doc, selected.id, face, event.target.value))}>
+          selectTexture(assignFaceTexture(doc, selected.id, face, event.target.value),
+            event.target.value))}>
         {textures.map(asset => <option key={asset.id} value={asset.id}>
           {asset.name} · {asset.width}×{asset.height}
         </option>)}

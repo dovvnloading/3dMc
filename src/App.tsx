@@ -878,7 +878,13 @@ export function App() {
               <button type="button" aria-label={"Select texture " + asset.name}
                 aria-pressed={doc.activeTextureId === asset.id}
                 className="texture-slot-select"
-                onClick={() => commitDocument(current => selectTexture(current, asset.id))}>
+                onClick={() => {
+                  clearStroke();
+                  setHistory(state => {
+                    const next = selectTexture(state.present, asset.id);
+                    return next === state.present ? state : { ...state, present: next };
+                  });
+                }}>
                 <Paintbrush size={16}/>
                 <span><strong>{asset.name}</strong>
                   <small>{asset.width}×{asset.height} · {asset.id === "main" ? "Main" : asset.id.slice(-5)}</small>
@@ -987,7 +993,15 @@ export function App() {
             <div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.material === "texture" ? "Textured surface" : "Solid material"}</p></div></div>
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace}
-              setFace={setSelectedFace} commitDocument={commitDocument}
+              setFace={(direction) => {
+                clearStroke();
+                setSelectedFace(direction);
+                setHistory(state => {
+                  const nextTextureId = selected.faces[direction].textureId;
+                  const next = selectTexture(state.present, nextTextureId);
+                  return next === state.present ? state : { ...state, present: next };
+                });
+              }} commitDocument={commitDocument}
               textures={doc.textures}
               textureWidth={faceAsset?.width ?? texture.width}
               textureHeight={faceAsset?.height ?? texture.height}/>}

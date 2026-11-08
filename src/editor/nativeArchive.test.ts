@@ -149,6 +149,45 @@ describe("native .3dmc source archives", () => {
     await expect(encodeNativeProject(wrong)).rejects.toThrow(/dangling/);
   });
 
+
+  it("reads an authentic v1 container with its original v2 source and PNG bytes", async () => {
+    const sample = createSampleDocument();
+    const file = (value:unknown) => strToU8(JSON.stringify(value,null,2)+"\n");
+    const png = (await import("../export/png")).encodeRgbaPng(
+      sample.textures[0]!.width, sample.textures[0]!.height, sample.textures[0]!.pixels
+    );
+    const legacy = file({
+      schemaVersion: 2, id: sample.id, name: sample.name, target: sample.target,
+      cuboids: sample.cuboids.map(node => ({
+        ...node,
+        faces: Object.fromEntries(Object.entries(node.faces).map(([direction,binding]) => [
+          direction, { uv: binding.uv, rotation: binding.rotation }
+        ]))
+      })),
+      texture: {
+        id:"main", name:sample.textures[0]!.name,
+        width:sample.textures[0]!.width, height:sample.textures[0]!.height,
+        path:"textures/main.png"
+      }
+    });
+    const sha = async (bytes:Uint8Array) =>
+      [...new Uint8Array(await crypto.subtle.digest("SHA-256",new Uint8Array(bytes).buffer))]
+        .map(n=>n.toString(16).padStart(2,"0")).join("");
+    const manifest = file({
+      format:"3dmc-native",containerVersion:1,documentSchemaVersion:2,
+      document:"document.json",texture:"textures/main.png",
+      sha256:{ "document.json":await sha(legacy),"textures/main.png":await sha(png) }
+    });
+    const archive = zipSync({
+      "manifest.json":manifest,"document.json":legacy,"textures/main.png":png
+    },{level:0,mtime:new Date(1980,0,1)});
+    const migrated = await decodeNativeProject(archive);
+    expect(migrated).toEqual(sample);
+    expect(migrated.schemaVersion).toBe(3);
+    const currentArchive = await encodeNativeProject(migrated);
+    expect(await decodeNativeProject(currentArchive)).toEqual(sample);
+  });
+
   it("sanitizes portable filenames", () => {
     expect(nativeFilename("../Copper Lantern : main")).toBe("copper-lantern-main.3dmc");
     expect(nativeFilename("?!!")).toBe("untitled.3dmc");
