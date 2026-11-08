@@ -675,3 +675,59 @@ test("PNG texture export downloads a separate editable image without changing th
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
 });
+
+
+test("eraser changes alpha, makes one undo entry and cancels a dragged erase with Escape", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await page.getByRole("button", { name: "Pixel eraser (E)" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const rgba = () => canvas.evaluate((node) => {
+    const target = node as HTMLCanvasElement;
+    return Array.from(target.getContext("2d")!.getImageData(0, 0, target.width, target.height).data);
+  });
+  const original = await rgba();
+  await canvas.click({ position: { x: 9, y: 9 } });
+  await expect.poll(async () => (await rgba())[3]).toBe(0);
+  await page.screenshot({ path: "test-results/eraser-undo.png" });
+
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect.poll(rgba).toEqual(original);
+  await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
+  const erased = await rgba();
+  expect(erased[3]).toBe(0);
+
+  const rect = await canvas.boundingBox();
+  if (!rect) throw new Error("Paint canvas not visible.");
+  await page.mouse.move(rect.x + 50, rect.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 125, rect.y + 125, { steps: 6 });
+  await page.keyboard.press("Escape");
+  await expect.poll(rgba).toEqual(erased);
+  await page.mouse.up();
+  await expect.poll(rgba).toEqual(erased);
+});
+
+test("bucket fill respects contiguous RGBA boundaries, leaves one history entry, and supports 2D keyboard focus", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await page.getByRole("button", { name: "Fill connected area (G)" }).click();
+  await page.getByRole("button", { name: "Choose color #f5d184" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const sample = (x: number, y: number) => canvas.evaluate((node, coordinates) => {
+    const target = node as HTMLCanvasElement;
+    return Array.from(target.getContext("2d")!
+      .getImageData(coordinates.x, coordinates.y, 1, 1).data);
+  }, { x, y });
+  const rimBefore = await sample(0, 0);
+  const centerBefore = await sample(8, 8);
+  await canvas.click({ position: { x: 8, y: 8 } });
+  await expect.poll(() => sample(0, 0)).toEqual([245, 209, 132, 255]);
+  expect(await sample(1, 1)).toEqual([245, 209, 132, 255]);
+  expect(await sample(8, 8)).toEqual(centerBefore);
+  await page.screenshot({ path: "test-results/contiguous-fill.png" });
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect.poll(() => sample(0, 0)).toEqual(rimBefore);
+  await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
+  await expect.poll(() => sample(0, 0)).toEqual([245, 209, 132, 255]);
+});

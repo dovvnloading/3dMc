@@ -20,6 +20,7 @@ interface Props {
   onEnd: () => void;
   onCancel: () => void;
   onSample: (texel: Texel) => void;
+  onFill: (texel: Texel) => void;
 }
 
 const FACE = "texture-canvas";
@@ -54,7 +55,8 @@ export function TextureSurface(props: Props) {
     const point = pointAt(event);
     setCursor(point);
     if (props.tool === "eyedropper") { props.onSample(point); return; }
-    if (props.tool !== "pencil") return;
+    if (props.tool === "fill") { props.onFill(point); return; }
+    if (props.tool !== "pencil" && props.tool !== "eraser") return;
     strokePointer.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
     props.onBegin(point, FACE);
@@ -99,10 +101,14 @@ export function TextureSurface(props: Props) {
         Math.max(0, Math.min(props.width - 1, x + movement[0])),
         Math.max(0, Math.min(props.height - 1, y + movement[1]))
       ]);
-    } else if (event.key === " " && props.tool === "pencil") {
+    } else if (event.key === " " &&
+      (props.tool === "pencil" || props.tool === "eraser")) {
       event.preventDefault();
       props.onBegin(cursor, FACE);
       props.onEnd();
+    } else if (event.key === " " && props.tool === "fill") {
+      event.preventDefault();
+      props.onFill(cursor);
     } else if (event.key === "Enter" && props.tool === "eyedropper") {
       event.preventDefault();
       props.onSample(cursor);
@@ -146,8 +152,9 @@ export function TextureSurface(props: Props) {
     </div>
     <div className="texture-footer">
       <span>Texel {cursor[0] + 1}, {cursor[1] + 1}</span>
+      <span>Alpha {Math.round((props.pixels[(cursor[1] * props.width + cursor[0]) * 4 + 3] ?? 255) / 255 * 100)}%</span>
       <span>Color <i className="color-dot" style={{ background: props.color }}/>{props.color.toUpperCase()}</span>
     </div>
-    <p className="texture-note">The outlined region is read by the selected face. Painting these pixels can affect every face sharing that region. Select another face or edit its UV edges in the inspector.</p>
+    <p className="texture-note">Pencil, eraser and contiguous fill edit the same shared RGBA sheet used by painted 3D faces. The outlined region is sampled by the selected face; changes can affect other faces sharing those pixels. Arrow keys move the focus; Space uses the active brush or fill.</p>
   </section>;
 }

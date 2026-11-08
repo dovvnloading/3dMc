@@ -894,3 +894,19 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
   .png-import-heading h2 {font-size:17px;}
   .png-import-actions button { flex:1; }
 }
+
+
+/* Opacity-aware paint controls and four-connected fill status. */
+.paint-tool-note {
+  margin:11px 0 15px;padding:11px 12px;
+  background:#273830;border:1px solid #45665a;border-radius:7px;
+  color:#c7e7d7;line-height:1.55;font-size:11px;
+}
+.texture-footer { flex-wrap:wrap; gap:6px 11px; }
+.texture-footer span { white-space:nowrap; }
+.tool-rail .icon-button:focus-visible {
+  outline:2px solid #80dbbf;outline-offset:2px;
+}
+.paint-options .segmented button:disabled {
+  cursor:not-allowed;opacity:.45;
+}

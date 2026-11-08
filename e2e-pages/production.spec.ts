@@ -99,3 +99,23 @@ test("compiled site can preflight a user PNG and keep the current workspace on c
   await expect(page.locator(".asset-entry")).toContainText("lantern.png");
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
 });
+
+
+test("published paint tools erase and fill source RGBA pixels", async ({ page }) => {
+  await page.goto("/3dMc/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const alpha = () => canvas.evaluate((node) =>
+    (node as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data[3]);
+  await page.getByRole("button", { name: "Pixel eraser (E)" }).click();
+  await canvas.click({ position: { x: 8, y: 8 } });
+  await expect.poll(alpha).toBe(0);
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect.poll(alpha).toBe(255);
+  await page.getByRole("button", { name: "Fill connected area (G)" }).click();
+  await page.getByRole("button", { name: "Choose color #f5d184" }).click();
+  await canvas.click({ position: { x: 8, y: 8 } });
+  const red = () => canvas.evaluate((node) =>
+    (node as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data[0]);
+  await expect.poll(red).toBe(245);
+});
