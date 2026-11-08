@@ -26,6 +26,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - Download and reopen a constrained `.3dmc.json` prototype project.
 - Save small local IndexedDB checkpoints atomically with a previous-candidate fallback.
 - Create an explicitly **experimental Java Edition 1.21.4 pack** (resource-pack format 46), including an override for `minecraft:diamond_block`, six face references per cuboid, a source texture PNG, solid-color PNGs, and a ZIP archive.
+- Re-import this exact generated resource-pack ZIP subset, with strict archive and PNG validation, a reviewable preflight, explicit native-metadata loss notices, and an editable recovered geometry/texture document.
 - Review blockers and warnings before export; unsupported targets, out-of-range cuboids, and alpha prevent a misleading ZIP.
 - Reject unrecognized project schemas, invalid sizes, unsupported profiles, and invalid texture bytes.
 
@@ -34,7 +35,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - **Java 1.21.4 export is experimental, not game-verified.** It has deterministic structure and pixel tests, but the actual generated pack has not yet been checked in Minecraft. Do not label it compatible or ready for production use.
 - Existing 26.3 candidate project files still open, but require an explicit target change before attempting this 1.21.4 export.
 - The `.3dmc.json` file is a **transitional source format**. It is not the planned versioned ZIP `.3dmc` archive, and it supports one shared texture with a 64×64 ceiling.
-- The exporter uses a full 0–16 UV rectangle on every face and replaces the blockstate mapping. Per-face UV editing, rotation, dependency imports, and renderer/game parity remain future work. The source project keeps richer metadata than the game output.
+- The exporter uses a full 0–16 UV rectangle on every face and replaces the blockstate mapping. The first ZIP importer accepts only these generated structures. Third-party pack import, per-face UV editing, rotation, dependency graphs, and renderer/game parity remain future work. The source project keeps richer metadata than the game output.
 - Rotation editing is hidden until the selected profile is verified. Scale/translation gizmos are an integration proof, not an exhaustive interaction implementation.
 - Local checkpoint publication is serialized within one tab. **A multi-tab ownership-generation fence is not yet implemented.** Work in one active tab; save a portable project file before risky operations. Browser storage is not a portable backup.
 - The current history stores document snapshots (up to 50 operations) for small samples. Tiled texture history and larger workloads come later.
