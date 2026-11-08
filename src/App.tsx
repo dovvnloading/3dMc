@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
+  AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
   FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
-  MousePointer2, Move3D, Paintbrush, Pipette, Plus, Redo2, RotateCcw,
+  MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
 import {
   addCuboid, createSampleDocument, deleteCuboid, duplicateCuboid,
   renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor,
-  toggleFlag
+  setTexturePixels, toggleFlag
 } from "./editor/domain";
 import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domain";
 import { commit, createHistory, redo, undo } from "./editor/history";
@@ -25,7 +25,7 @@ import {
   saveRecovery, RecoveryOwnershipLost
 } from "./editor/recovery";
 import type { RecoveryCandidate, RecoveryLease } from "./editor/recovery";
-import { readHex } from "./editor/pixels";
+import { floodFill, readHex } from "./editor/pixels";
 import {
   beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture
 } from "./editor/gestures";
@@ -227,10 +227,11 @@ export function App() {
 
   const beginPaint = useCallback((texel: Texel, face: string) => {
     if (!writerRef.current || awaitingRecoveryRef.current || drag.current) return;
-    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize);
+    if (tool !== "pencil" && tool !== "eraser") return;
+    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool);
     drag.current = started;
     setDraftPixels(started.pixels);
-  }, [color, brushSize]);
+  }, [color, brushSize, tool]);
 
   const continuePaint = useCallback((texel: Texel, face: string) => {
     const current = drag.current;
@@ -252,6 +253,16 @@ export function App() {
     const texture = historyRef.current.present.texture;
     setColor(readHex(texture.pixels, texture.width, texel));
   }, []);
+
+  const fillPaint = useCallback((texel: Texel) => {
+    if (tool !== "fill" || !writerRef.current || awaitingRecoveryRef.current) return;
+    commitDocument((current) => {
+      const texture = current.texture;
+      return setTexturePixels(current, floodFill(
+        texture.pixels, texture.width, texture.height, texel, color
+      ));
+    });
+  }, [color, tool, commitDocument]);
 
   const changeMode = (next: Mode) => {
     clearStroke();
@@ -443,6 +454,8 @@ export function App() {
       if (key === "w" && mode === "model") switchTool("move");
       if (key === "r" && mode === "model") switchTool("resize");
       if (key === "b" && mode === "paint") switchTool("pencil");
+      if (key === "e" && mode === "paint") switchTool("eraser");
+      if (key === "g" && mode === "paint") switchTool("fill");
       if (key === "i" && mode === "paint") switchTool("eyedropper");
       if (key === "f") navigate("iso");
       if ((key === "delete" || key === "backspace") && selectedId && mode === "model") {
@@ -864,7 +877,7 @@ export function App() {
             cancelToken={cancelToken}
             onSelect={setSelectedId} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
             onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint}
-            onTransform={transform}/>
+            onFill={fillPaint} onTransform={transform}/>
           {mode !== "preview" && <div className="tool-rail" aria-label="Editor tools">
             {mode === "model" ? <>
               <IconButton active={tool === "select"} label="Select (V)" onClick={() => switchTool("select")}><MousePointer2 size={18}/></IconButton>
@@ -874,11 +887,15 @@ export function App() {
               <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
             </> : <>
               <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
+              <IconButton active={tool === "eraser"} label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
+              <IconButton active={tool === "fill"} label="Fill connected area (G)" onClick={() => switchTool("fill")}><PaintBucket size={18}/></IconButton>
               <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
             </>}
           </div>}
           <div className="view-bottom">
             <div className="view-tool-caption">{mode === "paint" ?
+              tool === "fill" ? "Fill a four-connected RGBA region · one undo step" :
+              tool === "eraser" ? "Erase RGBA pixels in 3D or 2D · Esc cancels" :
               "Paint in 3D or on the texture sheet · Esc cancels stroke" :
               mode === "preview" ? "Preview only · No edits are applied in this mode" :
               tool === "select" ? "Select an element to inspect and edit · V" :
@@ -896,7 +913,7 @@ export function App() {
           face={selected?.material === "texture" ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" ? selectedFace : null}
           onBegin={beginPaint} onMove={continuePaint} onEnd={finishPaint} onCancel={clearStroke}
-          onSample={samplePaint}/>}
+          onSample={samplePaint} onFill={fillPaint}/>}
       </main>
 
       <aside className="inspector-panel" aria-label="Properties inspector">
@@ -995,9 +1012,15 @@ export function App() {
               onClick={() => setColor(swatch)}>{swatch === color && <Check size={14}/>}</button>)}</div>
           <div className="color-control"><input type="color" aria-label="Custom paint color"
             value={color} onChange={(event) => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
-          <div className="form-caption">Pencil size</div>
+          <div className="paint-tool-note" role="status">
+            {tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." :
+              tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." :
+              "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}
+          </div>
+          <div className="form-caption">Brush size</div>
           <div className="segmented">{([1, 2, 4] as const).map((size) =>
-            <button key={size} aria-pressed={brushSize === size} onClick={() => setBrushSize(size)}>
+            <button key={size} aria-pressed={brushSize === size} disabled={tool === "fill" || tool === "eyedropper"}
+              onClick={() => setBrushSize(size)}>
               {size} px</button>)}</div>
         </div>}
         <div className="inspector-bottom"><Info size={15}/>

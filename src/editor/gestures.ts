@@ -4,6 +4,7 @@ import type { Texel } from "./pixels";
 import { drawStroke } from "./pixels";
 
 export type BrushSize = 1 | 2 | 4;
+export type BrushMode = "pencil" | "eraser";
 export interface PaintGesture {
   /** One immutable source document, captured before any preview pixels. */
   readonly source: EditorDocument;
@@ -12,17 +13,19 @@ export interface PaintGesture {
   readonly previous: Texel;
   readonly color: string;
   readonly size: BrushSize;
+  readonly alpha: 0 | 255;
 }
 
 /** Pure preview state: starting a gesture does not mutate the document. */
 export function beginPaintGesture(
   source: EditorDocument, texel: Texel, face: string,
-  color: string, size: BrushSize
+  color: string, size: BrushSize, brush: BrushMode = "pencil"
 ): PaintGesture {
+  const alpha: 0 | 255 = brush === "eraser" ? 0 : 255;
   return {
     source, pixels: drawStroke(source.texture.pixels, source.texture.width,
-      source.texture.height, texel, texel, color, size),
-    previous: texel, face, color, size
+      source.texture.height, texel, texel, color, size, alpha),
+    previous: texel, face, color, size, alpha
   };
 }
 
@@ -34,7 +37,7 @@ export function continuePaintGesture(
   const from = face === gesture.face ? gesture.previous : texel;
   return { ...gesture,
     pixels: drawStroke(gesture.pixels, source.width, source.height,
-      from, texel, gesture.color, gesture.size),
+      from, texel, gesture.color, gesture.size, gesture.alpha),
     previous: texel, face
   };
 }

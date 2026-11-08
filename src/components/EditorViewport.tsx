@@ -9,7 +9,7 @@ import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 
 export type Mode = "model" | "paint" | "preview";
-export type Tool = "select" | "move" | "resize" | "pencil" | "eyedropper";
+export type Tool = "select" | "move" | "resize" | "pencil" | "eraser" | "fill" | "eyedropper";
 export type ViewKind = "iso" | "front" | "right" | "top";
 export type ViewRequest = { kind: ViewKind; count: number };
 
@@ -31,6 +31,7 @@ interface ViewportProps {
   onFinishPaint: () => void;
   onCancelPaint: () => void;
   onSample: (texel: Texel) => void;
+  onFill: (texel: Texel) => void;
   onTransform: (id: string, position: Vec3, scale: Vec3) => void;
 }
 
@@ -94,7 +95,7 @@ function useTextureMap({ width, height, pixels }: {
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
 "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
-"onCancelPaint" | "onSample" | "onTransform" | "cancelToken"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
+"onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
 
 function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
   const [sx, sy, sz] = dimensions(node);
@@ -172,18 +173,22 @@ function AssetMesh(props: MeshProps) {
     const direction = faceFromTriangle(event.faceIndex ?? -1);
     if (direction) props.onSelectFace(direction);
     if (tool === "eyedropper") { props.onSample(hit.texel); return; }
-    if (tool !== "pencil" || node.locked) return;
+    if (node.locked) return;
+    if (tool === "fill") { props.onFill(hit.texel); return; }
+    if (tool !== "pencil" && tool !== "eraser") return;
     const capture = event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null;
     capture?.setPointerCapture?.(event.pointerId);
     props.onBeginPaint(hit.texel, hit.face);
   };
   const handleMove = (event: ThreeEvent<PointerEvent>) => {
-    if (mode !== "paint" || tool !== "pencil" || (event.buttons & 1) === 0) return;
+    if (mode !== "paint" || (tool !== "pencil" && tool !== "eraser") ||
+        (event.buttons & 1) === 0) return;
     const hit = onHit(event);
     if (hit) props.onContinuePaint(hit.texel, hit.face);
   };
   const handleUp = (event: ThreeEvent<PointerEvent>) => {
-    if (event.button !== 0 || mode !== "paint" || tool !== "pencil") return;
+    if (event.button !== 0 || mode !== "paint" ||
+        (tool !== "pencil" && tool !== "eraser")) return;
     event.stopPropagation();
     const capture = event.target as (EventTarget & {
       hasPointerCapture?: (id: number) => boolean;
@@ -209,6 +214,8 @@ function AssetMesh(props: MeshProps) {
         
         <primitive object={geometry} attach="geometry" />
         <meshStandardMaterial color={node.color} map={node.material === "texture" ? props.texture : null}
+          transparent={node.material === "texture"}
+          depthWrite={node.material !== "texture"}
           roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0} />
         {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
       </mesh>

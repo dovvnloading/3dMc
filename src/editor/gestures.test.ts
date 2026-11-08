@@ -67,3 +67,30 @@ describe("atomic gizmo transform", () => {
     expect(commitGizmoTransform(doc, "body", [0, 0.46875, 0], [0, 1, 1])).toBe(doc);
   });
 });
+
+
+describe("transparent eraser gestures", () => {
+  it("sets all four RGBA channels to zero and remains one exact undo action", () => {
+    const source = createSampleDocument();
+    let gesture = beginPaintGesture(source, [4, 4], "body:north", "#123456", 2, "eraser");
+    gesture = continuePaintGesture(gesture, [6, 5], "body:north");
+    const changed = commitPaintGesture(source, gesture);
+    const index = (4 * source.texture.width + 4) * 4;
+    expect(changed.texture.pixels.slice(index, index + 4)).toEqual([0, 0, 0, 0]);
+    const history = commit(createHistory(source), changed);
+    expect(history.past).toHaveLength(1);
+    expect(undo(history).present).toBe(source);
+    expect(cancelPaintGesture(gesture)).toBe(source);
+  });
+
+  it("keeps the eraser mode while crossing UV seams without joining disconnected areas", () => {
+    const source = createSampleDocument();
+    let gesture = beginPaintGesture(source, [4, 4], "body:north", "#ffffff", 1, "eraser");
+    gesture = continuePaintGesture(gesture, [26, 26], "body:east");
+    const result = commitPaintGesture(source, gesture);
+    const alpha = (x: number, y: number) => result.texture.pixels[(y * 32 + x) * 4 + 3];
+    expect(alpha(4, 4)).toBe(0);
+    expect(alpha(26, 26)).toBe(0);
+    expect(alpha(15, 15)).toBe(255);
+  });
+});
