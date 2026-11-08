@@ -14,15 +14,16 @@ export interface FaceUV {
   uv: FaceUVRect;
   /** Clockwise quarter turns in the model's Java face binding. */
   rotation: FaceRotation;
+  textureId: string;
 }
 export type CuboidFaces = Record<FaceDirection, FaceUV>;
 
 export const FACE_DIRECTIONS: readonly FaceDirection[] =
   ["down", "up", "north", "south", "west", "east"] as const;
 
-export function createDefaultFaces(): CuboidFaces {
+export function createDefaultFaces(textureId = "main"): CuboidFaces {
   return Object.fromEntries(FACE_DIRECTIONS.map((face) => [
-    face, { uv: [0, 0, 16, 16] as FaceUVRect, rotation: 0 as FaceRotation }
+    face, { uv: [0, 0, 16, 16] as FaceUVRect, rotation: 0 as FaceRotation, textureId }
   ])) as CuboidFaces;
 }
 
@@ -34,7 +35,8 @@ function validFaceUV(value: unknown): value is FaceUV {
     face.uv[0] !== face.uv[2] && face.uv[1] !== face.uv[3] &&
     (face.rotation === 0 || face.rotation === 90 ||
       face.rotation === 180 || face.rotation === 270) &&
-    Object.keys(value).every((key) => key === "uv" || key === "rotation");
+    typeof face.textureId === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(face.textureId) &&
+    Object.keys(value).every((key) => key === "uv" || key === "rotation" || key === "textureId");
 }
 
 export function isValidFaces(value: unknown): value is CuboidFaces {
@@ -47,7 +49,7 @@ export function isValidFaces(value: unknown): value is CuboidFaces {
 
 export function copyFaces(value: CuboidFaces): CuboidFaces {
   return Object.fromEntries(FACE_DIRECTIONS.map((key) => [
-    key, { uv: [...value[key].uv] as [number, number, number, number], rotation: value[key].rotation }
+    key, { uv: [...value[key].uv] as [number, number, number, number], rotation: value[key].rotation, textureId: value[key].textureId }
   ])) as unknown as CuboidFaces;
 }
 
@@ -74,7 +76,7 @@ export interface PixelTexture {
 }
 
 export interface EditorDocument {
-  schemaVersion: 2;
+  schemaVersion: 3;
   id: string;
   name: string;
   target: {
@@ -84,8 +86,20 @@ export interface EditorDocument {
     status: "unverified";
   };
   cuboids: Cuboid[];
-  texture: PixelTexture;
+  textures: PixelTexture[];
+  activeTextureId: string;
 }
+
+export const MAX_TEXTURE_SLOTS = 16;
+export function textureById(doc: EditorDocument, id: string): PixelTexture | undefined {
+  return doc.textures.find(t => t.id === id);
+}
+export function activeTexture(doc: EditorDocument): PixelTexture {
+  const texture = textureById(doc, doc.activeTextureId);
+  if (!texture) throw new Error("The active source texture is missing.");
+  return texture;
+}
+
 
 const int = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value);
@@ -120,7 +134,7 @@ export function parseDocument(input: unknown): EditorDocument {
   const value = input as Omit<Partial<EditorDocument>, "schemaVersion"> & {
     schemaVersion?: number;
   };
-  if (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3)
     throw new Error("Unsupported project version. The original file was not changed.");
   if (typeof value.id !== "string" || value.id.length < 1 || value.id.length > 100 ||
       typeof value.name !== "string" || value.name.length < 1 || value.name.length > 100) {
@@ -130,43 +144,70 @@ export function parseDocument(input: unknown): EditorDocument {
       !(value.target.candidateRelease === "1.21.4" || value.target.candidateRelease === "26.3") || value.target.status !== "unverified") {
     throw new Error("This project targets an unsupported prototype profile.");
   }
-  // A v1 cuboid has no face mapping. Migrate a copy to the exact legacy
-  // full-sheet mapping; do not invent face-specific values in a v1 file.
-  const migrated = Array.isArray(value.cuboids) && value.cuboids.length <= 2000
-    ? value.cuboids.map((node: Cuboid) =>
-      value.schemaVersion === 1
-        ? { ...node, faces: createDefaultFaces() }
-        : node)
-    : null;
-  if (!migrated || !migrated.every(isValidCuboid) ||
-      new Set(migrated.map((item) => item.id)).size !== migrated.length) {
-    throw new Error("The project contains invalid or duplicate cuboids.");
+  const inputRecord = input as Record<string, unknown>;
+  const isLegacy = value.schemaVersion !== 3;
+  if (!isLegacy && Object.keys(inputRecord).some(key =>
+    !["schemaVersion", "id", "name", "target", "cuboids", "textures", "activeTextureId"].includes(key)))
+    throw new Error("Unsupported source document metadata cannot be silently removed.");
+
+  const textures = isLegacy ? [inputRecord.texture] : inputRecord.textures;
+  if (!Array.isArray(textures) || textures.length < 1 || textures.length > MAX_TEXTURE_SLOTS)
+    throw new Error("A project requires 1–16 texture assets.");
+
+  function validTexture(candidate: unknown): candidate is PixelTexture {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return false;
+    const t = candidate as Partial<PixelTexture>;
+    return typeof t.id === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(t.id) &&
+      typeof t.name === "string" && t.name.length > 0 && t.name.length <= 100 &&
+      int(t.width) && int(t.height) &&
+      t.width > 0 && t.height > 0 && t.width <= 64 && t.height <= 64 &&
+      Array.isArray(t.pixels) && t.pixels.length === t.width * t.height * 4 &&
+      t.pixels.every(n => int(n) && n >= 0 && n <= 255) &&
+      Object.keys(candidate).every(key => ["id", "name", "width", "height", "pixels"].includes(key));
   }
-  const texture = value.texture as Partial<PixelTexture> | undefined;
-  if (!texture || texture.id !== "main" || typeof texture.name !== "string" ||
-      texture.name.length < 1 || texture.name.length > 100 ||
-      !int(texture.width) || !int(texture.height) ||
-      texture.width < 1 || texture.height < 1 ||
-      texture.width > 64 || texture.height > 64 ||
-      !Array.isArray(texture.pixels) ||
-      texture.pixels.length !== texture.width * texture.height * 4 ||
-      !texture.pixels.every((part) => int(part) && part >= 0 && part <= 255)) {
-    throw new Error("The texture is invalid or exceeds the 64×64 prototype limit.");
-  }
-  // Reconstruct only known fields. Prototypes, unknown metadata and forged
-  // rendering objects never enter the live document.
+  if (!textures.every(validTexture) ||
+      new Set(textures.map(t => t.id)).size !== textures.length)
+    throw new Error("Invalid texture pixels, IDs or duplicated texture assets.");
+
+  const ids = new Set<string>(textures.map(t => t.id));
+  const activeId = isLegacy ? "main" : inputRecord.activeTextureId;
+  if (typeof activeId !== "string" || !ids.has(activeId))
+    throw new Error("Active texture is missing from this project.");
+
+  const cuboids = Array.isArray(value.cuboids) && value.cuboids.length <= 2000
+    ? value.cuboids.map((node) => {
+      if (!node || typeof node !== "object") return node;
+      const item = node as Cuboid;
+      const faces = value.schemaVersion === 1 ? createDefaultFaces("main") :
+        value.schemaVersion === 2 && item.faces && typeof item.faces === "object"
+          ? Object.fromEntries(FACE_DIRECTIONS.map((direction) => {
+            const face = item.faces[direction];
+            return [direction, { ...face, textureId: "main" }];
+          })) as CuboidFaces
+          : item.faces;
+      return { ...item, faces };
+    }) : null;
+  if (!cuboids || !cuboids.every(isValidCuboid) ||
+      new Set(cuboids.map(node => node.id)).size !== cuboids.length ||
+      cuboids.some(node => FACE_DIRECTIONS.some(direction =>
+        !ids.has(node.faces[direction].textureId))))
+    throw new Error("Invalid cuboid data or dangling per-face texture references.");
+
   return {
-    schemaVersion: 2, id: value.id, name: value.name,
+    schemaVersion: 3, id: value.id, name: value.name,
     target: { edition: "java", family: "static-block", candidateRelease: value.target.candidateRelease, status: "unverified" },
-    cuboids: migrated.map((node) => ({
+    cuboids: cuboids.map((node) => ({
       id: node.id, name: node.name,
       from: [...node.from] as [number, number, number],
       to: [...node.to] as [number, number, number],
       material: node.material, color: node.color,
       faces: copyFaces(node.faces), visible: node.visible, locked: node.locked
     })),
-    texture: { id: "main", name: texture.name, width: texture.width,
-      height: texture.height, pixels: [...texture.pixels] }
+    textures: textures.map(t => ({
+      id: t.id, name: t.name, width: t.width, height: t.height,
+      pixels: [...t.pixels]
+    })),
+    activeTextureId: activeId
   };
 }
 
@@ -194,7 +235,7 @@ function lanternPixels(): number[] {
 
 export function createSampleDocument(): EditorDocument {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "starter-lantern",
     name: "Copper Lantern",
     target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },
@@ -207,7 +248,8 @@ export function createSampleDocument(): EditorDocument {
       base("handle-top", "Handle · bridge", [6, 17, 6], [10, 18, 7], "#b5c5b9"),
       base("handle-right", "Handle · right", [9, 15, 6], [10, 18, 7], "#b5c5b9")
     ],
-    texture: { id: "main", name: "lantern.png", width: 32, height: 32, pixels: lanternPixels() }
+    textures: [{ id: "main", name: "lantern.png", width: 32, height: 32, pixels: lanternPixels() }],
+    activeTextureId: "main"
   };
 }
 
@@ -245,7 +287,8 @@ export function setAxisValue(
 
 export function addCuboid(doc: EditorDocument, id: string): EditorDocument {
   if (doc.cuboids.some((node) => node.id === id) || doc.cuboids.length >= 2000) return doc;
-  return { ...doc, cuboids: [...doc.cuboids, base(id, "New element", [5, 5, 5], [11, 11, 11], "#8ca794")] };
+  return { ...doc, cuboids: [...doc.cuboids, { ...base(id, "New element", [5, 5, 5], [11, 11, 11], "#8ca794"),
+    faces: createDefaultFaces(doc.activeTextureId) }] };
 }
 
 export function duplicateCuboid(doc: EditorDocument, id: string, newId: string): EditorDocument {
@@ -281,11 +324,15 @@ export function toggleFlag(doc: EditorDocument, id: string, field: "visible" | "
     ? { ...node, [field]: !node[field] } : node) };
 }
 
-export function setTexturePixels(doc: EditorDocument, pixels: number[]): EditorDocument {
-  if (pixels.length !== doc.texture.pixels.length ||
-      !pixels.every((value) => int(value) && value >= 0 && value <= 255)) return doc;
-  if (pixels.every((pixel, index) => pixel === doc.texture.pixels[index])) return doc;
-  return { ...doc, texture: { ...doc.texture, pixels: [...pixels] } };
+export function setTexturePixels(
+  doc: EditorDocument, pixels: number[], textureId = doc.activeTextureId
+): EditorDocument {
+  const t = textureById(doc, textureId);
+  if (!t || pixels.length !== t.pixels.length ||
+      !pixels.every(n => int(n) && n >= 0 && n <= 255)) return doc;
+  if (pixels.every((value, i) => value === t.pixels[i])) return doc;
+  return { ...doc, textures: doc.textures.map(item =>
+    item.id === textureId ? { ...item, pixels: [...pixels] } : item) };
 }
 
 export function renameProject(doc: EditorDocument, name: string): EditorDocument {
@@ -325,4 +372,59 @@ export function updateFaceRotation(
     return current.rotation === rotation ? node :
       { ...node, faces: { ...node.faces, [face]: { ...current, rotation } } };
   });
+}
+
+
+/** A clicked texture changes the paint target without changing its pixels. */
+export function selectTexture(doc: EditorDocument, id: string): EditorDocument {
+  return !textureById(doc, id) || doc.activeTextureId === id ? doc :
+    { ...doc, activeTextureId: id };
+}
+
+export function renameTexture(doc: EditorDocument, id: string, name: string): EditorDocument {
+  const label = name.trim().slice(0, 100);
+  if (!label || !textureById(doc, id) || textureById(doc, id)?.name === label) return doc;
+  return { ...doc, textures: doc.textures.map(t => t.id === id ? { ...t, name: label } : t) };
+}
+
+export function addTexture(doc: EditorDocument, texture: PixelTexture): EditorDocument {
+  if (doc.textures.length >= MAX_TEXTURE_SLOTS ||
+      doc.textures.some(t => t.id === texture.id)) return doc;
+  try { return parseDocument({
+    ...doc, textures: [...doc.textures, texture], activeTextureId: texture.id
+  }); } catch { return doc; }
+}
+
+export function assignFaceTexture(
+  doc: EditorDocument, nodeId: string, face: FaceDirection, textureId: string
+): EditorDocument {
+  if (!textureById(doc, textureId)) return doc;
+  return updateCuboid(doc, nodeId, node => node.faces[face].textureId === textureId
+    ? node : { ...node, faces: { ...node.faces,
+      [face]: { ...node.faces[face], textureId } } });
+}
+
+export function affectedFaces(doc: EditorDocument, textureId: string):
+  Array<{ nodeId: string; name: string; face: FaceDirection }> {
+  return doc.cuboids.flatMap(node => FACE_DIRECTIONS.filter(face =>
+    node.faces[face].textureId === textureId).map(face => ({
+      nodeId: node.id, name: node.name, face
+    })));
+}
+
+/** The caller shows impacted faces and chooses a destination before deleting. */
+export function removeTexture(doc: EditorDocument, id: string, replacementId: string): EditorDocument {
+  if (doc.textures.length <= 1 || id === replacementId ||
+      !textureById(doc, id) || !textureById(doc, replacementId)) return doc;
+  return {
+    ...doc, textures: doc.textures.filter(t => t.id !== id),
+    activeTextureId: doc.activeTextureId === id ? replacementId : doc.activeTextureId,
+    cuboids: doc.cuboids.map(node => ({
+      ...node,
+      faces: Object.fromEntries(FACE_DIRECTIONS.map(face => [face,
+        node.faces[face].textureId === id
+          ? { ...node.faces[face], textureId: replacementId } : node.faces[face]
+      ])) as CuboidFaces
+    }))
+  };
 }
