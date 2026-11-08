@@ -30,10 +30,6 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser workflow smoke
         run: npm run test:e2e
-      - name: Non-Chromium browser engines
-        run: npx playwright install --with-deps firefox webkit
-      - name: Firefox and WebKit core creator smoke
-        run: npx playwright test --config playwright.matrix.config.ts
       - name: Record browser texture resource baseline
         run: |
           test -s test-results/performance/texture-lifecycle.json
@@ -53,6 +49,30 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: editor-workspace-smoke
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cross_browser:
+    name: Firefox and WebKit creator smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Firefox and WebKit engines
+        run: npx playwright install --with-deps firefox webkit
+      - name: Run non-Chromium creator smoke
+        run: npx playwright test --config playwright.matrix.config.ts
+      - name: Upload non-Chromium failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-browser-matrix
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
