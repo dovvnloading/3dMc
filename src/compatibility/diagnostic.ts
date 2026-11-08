@@ -85,7 +85,7 @@ export function makeSixFaceDiagnosticDocument(): EditorDocument {
   }
 
   return parseDocument({
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "java-1214-six-face-diagnostic",
     name: "Six-face UV diagnostic",
     target: {
@@ -98,9 +98,10 @@ export function makeSixFaceDiagnosticDocument(): EditorDocument {
       color: "#ffffff", material: "texture",
       faces, visible: true, locked: false
     }],
-    texture: {
+    textures: [{
       id: "main", name: "six-face-asymmetric.png",
       width: FACE_TEXTURE_SIZE, height: FACE_TEXTURE_SIZE, pixels
-    }
+    }],
+    activeTextureId: "main"
   });
 }

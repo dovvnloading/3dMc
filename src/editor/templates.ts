@@ -69,11 +69,12 @@ export function makeNewProject(options: NewProjectOptions): EditorDocument {
   }] : [];
 
   return parseDocument({
-    schemaVersion: 2, id, name,
+    schemaVersion: 3, id, name,
     target: { edition: "java", family: "static-block",
       candidateRelease: "1.21.4", status: "unverified" },
     cuboids,
-    texture: { id: "main", name: "albedo.png", width: options.resolution,
-      height: options.resolution, pixels: starterPixels(options.resolution) }
+    textures: [{ id: "main", name: "albedo.png", width: options.resolution,
+      height: options.resolution, pixels: starterPixels(options.resolution) }],
+    activeTextureId: "main"
   });
 }

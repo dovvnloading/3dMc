@@ -3,8 +3,8 @@ import { Canvas, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
 import * as THREE from "three";
-import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "../editor/domain";
-import { applyFaceUvs, faceFromTriangle } from "../editor/uv";
+import type { Cuboid, EditorDocument, FaceDirection, Vec3, PixelTexture } from "../editor/domain";
+import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 
@@ -16,6 +16,7 @@ export type ViewRequest = { kind: ViewKind; count: number };
 interface ViewportProps {
   document: EditorDocument;
   pixels: number[];
+  draftTextureId: string | null;
   selectedId: string | null;
   selectedFace: FaceDirection;
   mode: Mode;
@@ -26,12 +27,12 @@ interface ViewportProps {
   cancelToken: number;
   onSelect: (id: string | null) => void;
   onSelectFace: (face: FaceDirection) => void;
-  onBeginPaint: (texel: Texel, face: string) => void;
-  onContinuePaint: (texel: Texel, face: string) => void;
+  onBeginPaint: (texel: Texel, face: string, textureId: string) => void;
+  onContinuePaint: (texel: Texel, face: string, textureId: string) => void;
   onFinishPaint: () => void;
   onCancelPaint: () => void;
-  onSample: (texel: Texel) => void;
-  onFill: (texel: Texel) => void;
+  onSample: (texel: Texel, textureId: string) => void;
+  onFill: (texel: Texel, textureId: string) => void;
   onTransform: (id: string, position: Vec3, scale: Vec3) => void;
 }
 
@@ -67,35 +68,43 @@ function CameraControls({ view }: { view: ViewRequest }) {
     enablePan screenSpacePanning />;
 }
 
-function useTextureMap({ width, height, pixels }: {
-  width: number; height: number; pixels: number[];
-}): THREE.CanvasTexture {
+function useTextureMaps(textures: PixelTexture[], draftPixels: number[],
+  draftTextureId: string | null, activeTextureId: string): Record<string, THREE.CanvasTexture> {
   const { invalidate } = useThree();
-  const resource = useMemo(() => {
-    const canvas = globalThis.document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    return { canvas, texture };
-  }, [width, height]);
-
+  const signature = textures.map(t => t.id + ":" + t.width + "x" + t.height).join("|");
+  const resources = useMemo(() => {
+    const resources: Record<string, { canvas: HTMLCanvasElement; map: THREE.CanvasTexture }> = {};
+    textures.forEach(t => {
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = t.width; canvas.height = t.height;
+      const map = new THREE.CanvasTexture(canvas);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.magFilter = THREE.NearestFilter; map.minFilter = THREE.NearestFilter;
+      map.wrapS = THREE.ClampToEdgeWrapping; map.wrapT = THREE.ClampToEdgeWrapping;
+      resources[t.id] = { canvas, map };
+    });
+    return resources;
+    // Width/height/ID are intentionally the resource ownership key. RGB
+    // updates below never allocate a new GPU map.
+  }, [signature]);
   useEffect(() => {
-    const context = resource.canvas.getContext("2d");
-    if (context) context.putImageData(new ImageData(new Uint8ClampedArray(pixels), width, height), 0, 0);
-    resource.texture.needsUpdate = true;
+    textures.forEach(t => {
+      const resource = resources[t.id];
+      const source = t.id === (draftTextureId ?? activeTextureId) ? draftPixels : t.pixels;
+      if (!resource || source.length !== t.width * t.height * 4) return;
+      const context = resource.canvas.getContext("2d");
+      context?.putImageData(new ImageData(new Uint8ClampedArray(source), t.width, t.height), 0, 0);
+      resource.map.needsUpdate = true;
+    });
     invalidate();
-  }, [resource, pixels, width, height, invalidate]);
-
-  useEffect(() => () => resource.texture.dispose(), [resource]);
-  return resource.texture;
+  }, [resources, textures, draftPixels, draftTextureId, activeTextureId, invalidate]);
+  useEffect(() => () => Object.values(resources).forEach(r => r.map.dispose()), [resources]);
+  return Object.fromEntries(Object.entries(resources).map(([id, r]) => [id, r.map]));
 }
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
 "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
-"onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
+"onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & { node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[] };
 
 function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
   const [sx, sy, sz] = dimensions(node);
@@ -155,12 +164,17 @@ function AssetMesh(props: MeshProps) {
     };
   }, [node]);
 
-  const onHit = (event: ThreeEvent<PointerEvent>): { texel: Texel; face: string } | null => {
+  const onHit = (event: ThreeEvent<PointerEvent>): {
+    texel: Texel; face: string; textureId: string
+  } | null => {
     const direction = faceFromTriangle(event.faceIndex ?? -1);
     if (node.material !== "texture" || !event.uv || !direction) return null;
+    const textureId = node.faces[direction].textureId;
+    const texture = props.textures.find(t => t.id === textureId);
+    if (!texture) return null;
     return {
-      texel: uvToTexel(event.uv.x, event.uv.y, props.width, props.height),
-      face: node.id + ":" + direction
+      texel: uvToTexel(event.uv.x, event.uv.y, texture.width, texture.height),
+      face: node.id + ":" + direction, textureId
     };
   };
 
@@ -172,19 +186,19 @@ function AssetMesh(props: MeshProps) {
     props.onSelect(node.id);
     const direction = faceFromTriangle(event.faceIndex ?? -1);
     if (direction) props.onSelectFace(direction);
-    if (tool === "eyedropper") { props.onSample(hit.texel); return; }
+    if (tool === "eyedropper") { props.onSample(hit.texel, hit.textureId); return; }
     if (node.locked) return;
-    if (tool === "fill") { props.onFill(hit.texel); return; }
+    if (tool === "fill") { props.onFill(hit.texel, hit.textureId); return; }
     if (tool !== "pencil" && tool !== "eraser") return;
     const capture = event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null;
     capture?.setPointerCapture?.(event.pointerId);
-    props.onBeginPaint(hit.texel, hit.face);
+    props.onBeginPaint(hit.texel, hit.face, hit.textureId);
   };
   const handleMove = (event: ThreeEvent<PointerEvent>) => {
     if (mode !== "paint" || (tool !== "pencil" && tool !== "eraser") ||
         (event.buttons & 1) === 0) return;
     const hit = onHit(event);
-    if (hit) props.onContinuePaint(hit.texel, hit.face);
+    if (hit) props.onContinuePaint(hit.texel, hit.face, hit.textureId);
   };
   const handleUp = (event: ThreeEvent<PointerEvent>) => {
     if (event.button !== 0 || mode !== "paint" ||
@@ -213,10 +227,13 @@ function AssetMesh(props: MeshProps) {
         onPointerUp={handleUp} onPointerCancel={() => props.onCancelPaint()}>
         
         <primitive object={geometry} attach="geometry" />
-        <meshStandardMaterial color={node.color} map={node.material === "texture" ? props.texture : null}
-          transparent={node.material === "texture"}
-          depthWrite={node.material !== "texture"}
-          roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0} />
+        {BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial
+          key={direction} attach={`material-${index}`}
+          color={node.color}
+          map={node.material === "texture" ? props.textureMaps[node.faces[direction].textureId] ?? null : null}
+          transparent={node.material === "texture"} depthWrite={node.material !== "texture"}
+          roughness={node.material === "solid" ? 0.48 : 0.95}
+          metalness={node.material === "solid" ? 0.18 : 0}/>)}
         {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
       </mesh>
       {isSelected && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
@@ -244,8 +261,9 @@ function AssetMesh(props: MeshProps) {
 }
 
 function Scene(props: ViewportProps) {
-  const texture = useTextureMap({ width: props.document.texture.width,
-    height: props.document.texture.height, pixels: props.pixels });
+  const textureMaps = useTextureMaps(
+    props.document.textures, props.pixels, props.draftTextureId, props.document.activeTextureId
+  );
   return <>
     <color attach="background" args={["#141619"]} />
     <ambientLight intensity={1.35} />
@@ -255,8 +273,8 @@ function Scene(props: ViewportProps) {
     <directionalLight position={[-3, 2, -4]} intensity={0.85} color="#a3c8be" />
     {props.mode !== "preview" && <gridHelper args={[10, 20, "#33483f", "#242c2b"]} position={[0, 0, 0]} />}
     {props.document.cuboids.filter((node) => node.visible).map((node) =>
-      <AssetMesh key={node.id} {...props} node={node} texture={texture}
-        width={props.document.texture.width} height={props.document.texture.height} />)}
+      <AssetMesh key={node.id} {...props} node={node}
+        textureMaps={textureMaps} textures={props.document.textures}/>)}
     <CameraControls view={props.view} />
   </>;
 }

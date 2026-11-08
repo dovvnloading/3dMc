@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import {
-  FACE_DIRECTIONS, updateCuboid, updateFaceRotation, updateFaceUV
+  FACE_DIRECTIONS, assignFaceTexture, updateCuboid, updateFaceRotation, updateFaceUV
 } from "../editor/domain";
-import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV } from "../editor/domain";
+import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV, PixelTexture } from "../editor/domain";
 import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
 
 function UVField({ label, value, opposite, disabled, onCommit }: {
@@ -41,11 +41,12 @@ function UVField({ label, value, opposite, disabled, onCommit }: {
   </label>;
 }
 
-export function FaceUVInspector({ selected, face, setFace, commitDocument, textureWidth, textureHeight }: {
+export function FaceUVInspector({ selected, face, setFace, commitDocument, textures, textureWidth, textureHeight }: {
   selected: Cuboid;
   face: FaceDirection;
   setFace: (face: FaceDirection) => void;
   commitDocument: (fn: (document: EditorDocument) => EditorDocument) => void;
+  textures: PixelTexture[];
   textureWidth: number;
   textureHeight: number;
 }) {
@@ -55,7 +56,8 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
     const current = node.faces[face];
     if (current.rotation === 0 && current.uv.every((n, i) => n === [0, 0, 16, 16][i]))
       return node;
-    const defaultFace: FaceUV = { uv: [0, 0, 16, 16], rotation: 0 };
+    const defaultFace: FaceUV = { uv: [0, 0, 16, 16], rotation: 0,
+      textureId: current.textureId };
     return { ...node, faces: { ...node.faces, [face]: defaultFace } };
   }));
   return <section className="face-uv-section" aria-label="Face UV mapping">
@@ -71,6 +73,17 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
         className={face === direction ? "selected" : ""}
         onClick={() => setFace(direction)}>{faceLabel(direction)}</button>)}
     </div>
+    <label className="face-rotation-label">
+      <span>Texture for {face} face</span>
+      <select aria-label="Face texture asset" className="select-control"
+        value={mapping.textureId} disabled={selected.locked}
+        onChange={(event) => commitDocument((doc) =>
+          assignFaceTexture(doc, selected.id, face, event.target.value))}>
+        {textures.map(asset => <option key={asset.id} value={asset.id}>
+          {asset.name} · {asset.width}×{asset.height}
+        </option>)}
+      </select>
+    </label>
     <div className="form-caption">UV rectangle <span>edges</span></div>
     <div className="face-uv-grid" key={selected.id + ":" + face}>
       {(["U1", "V1", "U2", "V2"] as const).map((label, index) => {

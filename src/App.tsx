@@ -7,6 +7,8 @@ import {
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
 import {
+  activeTexture, addTexture, affectedFaces, assignFaceTexture, textureById,
+  removeTexture, renameTexture, selectTexture,
   addCuboid, createSampleDocument, deleteCuboid, duplicateCuboid,
   renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor,
   setTexturePixels, toggleFlag
@@ -35,7 +37,7 @@ import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
 import { TextureImportDialog } from "./components/TextureImportDialog";
-import { decodeBrowserPng, importTextureIntoDocument } from "./editor/textureImport";
+import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./editor/textureImport";
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
 import { encodeRgbaPng } from "./export/png";
 import { FaceUVInspector } from "./components/FaceUVInspector";
@@ -152,11 +154,13 @@ export function App() {
   const historyRef = useRef(history);
   historyRef.current = history;
   const doc = history.present;
+  const texture = activeTexture(doc);
   const exportIssues = useMemo(() => inspectJava1214(doc), [doc]);
   const [selectedId, setSelectedId] = useState<string | null>("body");
   const [selectedFace, setSelectedFace] = useState<FaceDirection>("north");
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const selected = doc.cuboids.find((node) => node.id === selectedId) ?? null;
+  const faceAsset = selected ? textureById(doc, selected.faces[selectedFace].textureId) : null;
   const selectedIndex = doc.cuboids.findIndex((node) => node.id === selectedId);
   // Undoing a duplicate or deleting the active part must not strand selection
   // on a missing ID. The next available element remains editable immediately.
@@ -174,6 +178,7 @@ export function App() {
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
   const [inspectorOpen, setInspectorOpen] = useState(() => window.innerWidth > 760);
   const [draftPixels, setDraftPixels] = useState<number[] | null>(null);
+  const [draftTextureId, setDraftTextureId] = useState<string | null>(null);
   const drag = useRef<PaintGesture | null>(null);
   const [cancelToken, setCancelToken] = useState(0);
   const writerId = useRef(crypto.randomUUID());
@@ -190,6 +195,9 @@ export function App() {
   const [savingProject, setSavingProject] = useState(false);
   const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
   const [pendingTexture, setPendingTexture] = useState<DecodedTexture | null>(null);
+  const [textureImportMode, setTextureImportMode] = useState<"replace" | "new">("replace");
+  const [deletingTextureId, setDeletingTextureId] = useState<string | null>(null);
+  const [deleteReplacementId, setDeleteReplacementId] = useState<string | null>(null);
   const [textureReading, setTextureReading] = useState(false);
   const [packInspecting, setPackInspecting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -210,6 +218,7 @@ export function App() {
     if (drag.current) {
       drag.current = null;
       setDraftPixels(null);
+      setDraftTextureId(null);
       setCancelToken((current) => current + 1);
     }
     setHistory((current) => commit(current, operation(current.present)));
@@ -218,6 +227,7 @@ export function App() {
   const clearStroke = useCallback(() => {
     drag.current = null;
     setDraftPixels(null);
+    setDraftTextureId(null);
     setCancelToken((current) => current + 1);
   }, []);
   const switchTool = (next: Tool) => {
@@ -225,17 +235,20 @@ export function App() {
     setTool(next);
   };
 
-  const beginPaint = useCallback((texel: Texel, face: string) => {
+  const beginPaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId) => {
     if (!writerRef.current || awaitingRecoveryRef.current || drag.current) return;
     if (tool !== "pencil" && tool !== "eraser") return;
-    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool);
+    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool, textureId);
     drag.current = started;
+    setDraftTextureId(started.textureId);
     setDraftPixels(started.pixels);
   }, [color, brushSize, tool]);
 
-  const continuePaint = useCallback((texel: Texel, face: string) => {
+  const continuePaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId) => {
     const current = drag.current;
-    if (!current) return;
+    if (!current || current.textureId !== textureId) return;
     const next = continuePaintGesture(current, texel, face);
     drag.current = next;
     setDraftPixels(next.pixels);
@@ -246,21 +259,29 @@ export function App() {
     if (!current) return;
     drag.current = null;
     setDraftPixels(null);
-    commitDocument((document) => commitPaintGesture(document, current));
+    setDraftTextureId(null);
+    commitDocument((document) => {
+      const next = commitPaintGesture(document, current);
+      return next === document ? document : selectTexture(next, current.textureId);
+    });
   }, [commitDocument]);
 
-  const samplePaint = useCallback((texel: Texel) => {
-    const texture = historyRef.current.present.texture;
-    setColor(readHex(texture.pixels, texture.width, texel));
+  const samplePaint = useCallback((texel: Texel,
+    textureId = historyRef.current.present.activeTextureId) => {
+    const sheet = textureById(historyRef.current.present, textureId);
+    if (sheet) setColor(readHex(sheet.pixels, sheet.width, texel));
   }, []);
 
-  const fillPaint = useCallback((texel: Texel) => {
+  const fillPaint = useCallback((texel: Texel,
+    textureId = historyRef.current.present.activeTextureId) => {
     if (tool !== "fill" || !writerRef.current || awaitingRecoveryRef.current) return;
     commitDocument((current) => {
-      const texture = current.texture;
-      return setTexturePixels(current, floodFill(
-        texture.pixels, texture.width, texture.height, texel, color
-      ));
+      const sheet = textureById(current, textureId);
+      if (!sheet) return current;
+      const changed = setTexturePixels(current, floodFill(
+        sheet.pixels, sheet.width, sheet.height, texel, color
+      ), textureId);
+      return changed === current ? current : selectTexture(changed, textureId);
     });
   }, [color, tool, commitDocument]);
 
@@ -577,14 +598,20 @@ export function App() {
     const image = pendingTexture;
     if (!image) return;
     try {
-      const proposed = importTextureIntoDocument(historyRef.current.present, image, policy);
-      // Commit through the normal source-document transaction (including
-      // undo/redo, checkpoint generation and 3D/2D preview invalidation).
-      commitDocument((current) =>
-        current === historyRef.current.present ? proposed
-          : importTextureIntoDocument(current, image, policy));
+      if (textureImportMode === "new") {
+        const source = activeTexture(historyRef.current.present);
+        const width = policy === "use-png-size" ? image.width : source.width;
+        const height = policy === "use-png-size" ? image.height : source.height;
+        const pixels = resampleNearest(image.pixels, image.width, image.height, width, height);
+        const newAsset = { id: "tex_" + crypto.randomUUID().replace(/-/g, "").slice(0, 16),
+          name: image.name, width, height, pixels };
+        commitDocument(current => addTexture(current, newAsset));
+        setNotice("New texture asset added. Assign it to individual faces in the Paint inspector.");
+      } else {
+        commitDocument(current => importTextureIntoDocument(current, image, policy));
+        setNotice("Selected texture replaced with one undoable edit. Save a .3dmc backup.");
+      }
       setPendingTexture(null);
-      setNotice("PNG applied to the shared texture in one undoable edit. Save a .3dmc source archive to retain it.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The PNG couldn't be applied.");
     }
@@ -592,11 +619,11 @@ export function App() {
 
   const downloadTexturePng = () => {
     try {
-      const png = encodeRgbaPng(doc.texture.width, doc.texture.height, doc.texture.pixels);
+      const png = encodeRgbaPng(texture.width, texture.height, texture.pixels);
       const url = URL.createObjectURL(new Blob([new Uint8Array(png)], { type: "image/png" }));
       const link = globalThis.document.createElement("a");
       link.href = url;
-      link.download = doc.texture.name.replace(/[^a-zA-Z0-9_.-]+/g, "-").slice(0, 80).replace(/\.png$/i, "") + ".png";
+      link.download = texture.name.replace(/[^a-zA-Z0-9_.-]+/g, "-").slice(0, 80).replace(/\.png$/i, "") + ".png";
       globalThis.document.body.appendChild(link);
       link.click();
       link.remove();
@@ -680,6 +707,7 @@ export function App() {
       setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null);
       setPendingTexture(null);
       setCandidate(null); setRecoveryStatus("unsaved");
+      setDeletingTextureId(null); setDeleteReplacementId(null);
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup.");
       return true;
     } catch (error) {
@@ -711,7 +739,8 @@ export function App() {
     switchTool("select");
   };
 
-  const viewPixels = draftPixels ?? doc.texture.pixels;
+  const visibleTexture = textureById(doc, draftTextureId ?? doc.activeTextureId) ?? texture;
+  const viewPixels = draftPixels ?? visibleTexture.pixels;
   const matching = doc.cuboids.filter((node) => node.name.toLowerCase().includes(search.toLowerCase()));
   const statusText = writerStatus === "blocked" ? "Other tab owns recovery" :
     writerStatus === "failed" ? "Recovery unavailable — download backup" :
@@ -842,14 +871,45 @@ export function App() {
         </div>
         <div className="scene-footer">
           <SectionHeading title="Assets" trailing={<span className="counter">01</span>}/>
-          <div className="asset-entry"><div className="asset-icon"><Paintbrush size={17}/></div>
-            <div><strong>{doc.texture.name}</strong><span>{doc.texture.width} × {doc.texture.height} · RGBA</span></div></div>
+          <div className="texture-slot-list" role="group" aria-label="Texture assets">
+            {doc.textures.map(asset => <div key={asset.id} className={
+              "texture-slot" + (doc.activeTextureId === asset.id ? " active" : "")
+            }>
+              <button type="button" aria-label={"Select texture " + asset.name}
+                aria-pressed={doc.activeTextureId === asset.id}
+                className="texture-slot-select"
+                onClick={() => commitDocument(current => selectTexture(current, asset.id))}>
+                <Paintbrush size={16}/>
+                <span><strong>{asset.name}</strong>
+                  <small>{asset.width}×{asset.height} · {asset.id === "main" ? "Main" : asset.id.slice(-5)}</small>
+                </span>
+              </button>
+              <button type="button" aria-label={"Delete texture " + asset.name}
+                disabled={doc.textures.length <= 1}
+                onClick={() => {
+                  setDeletingTextureId(asset.id);
+                  setDeleteReplacementId(doc.textures.find(t => t.id !== asset.id)?.id ?? null);
+                }}><Trash2 size={14}/></button>
+            </div>)}
+          </div>
+          <button type="button" className="texture-add-slot"
+            disabled={doc.textures.length >= 16 || textureReading}
+            onClick={() => { setTextureImportMode("new"); textureFileRef.current?.click(); }}>
+            <Plus size={14}/>Add texture from PNG
+            <span>{doc.textures.length}/16</span>
+          </button>
+          <div className="texture-selected-rename">
+            <CommittedText key={texture.id} label="Texture name" className="texture-rename-input"
+              value={texture.name}
+              onCommit={(name) => commitDocument(current =>
+                renameTexture(current, texture.id, name))}/>
+          </div>
           <input ref={textureFileRef} type="file" accept=".png,image/png" hidden
             onChange={chooseTexture}/>
           <div className="texture-asset-actions">
             <button type="button" aria-label="Import texture PNG"
               disabled={textureReading}
-              onClick={() => textureFileRef.current?.click()}>
+              onClick={() => { setTextureImportMode("replace"); textureFileRef.current?.click(); }}>
               <ImagePlus size={14}/>{textureReading ? "Reading…" : "Import PNG"}
             </button>
             <button type="button" aria-label="Download texture PNG"
@@ -857,7 +917,8 @@ export function App() {
           </div>
           <button type="button" className="legacy-json-link" onClick={saveLegacyJson}
             title="Additional portable legacy .3dmc.json backup">Download legacy JSON backup</button>
-          <div className="scene-meta"><span>Native source · .3dmc v1</span><span>1 shared texture</span></div>
+          <div className="scene-meta"><span>Native source · .3dmc v2</span>
+            <span>{doc.textures.length} textures</span></div>
         </div>
       </aside>
 
@@ -874,7 +935,7 @@ export function App() {
           <EditorViewport document={doc} pixels={viewPixels} selectedId={selectedId}
             selectedFace={selectedFace} onSelectFace={setSelectedFace}
             mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
-            cancelToken={cancelToken}
+            cancelToken={cancelToken} draftTextureId={draftTextureId}
             onSelect={setSelectedId} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
             onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint}
             onFill={fillPaint} onTransform={transform}/>
@@ -908,10 +969,13 @@ export function App() {
             </div>
           </div>
         </div>
-        {mode === "paint" && <TextureSurface pixels={viewPixels} width={doc.texture.width}
-          height={doc.texture.height} tool={tool} color={color} painting={!!draftPixels}
-          face={selected?.material === "texture" ? selected.faces[selectedFace] : null}
-          faceName={selected?.material === "texture" ? selectedFace : null}
+        {mode === "paint" && <TextureSurface pixels={viewPixels} width={visibleTexture.width}
+          height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
+          face={selected?.material === "texture" &&
+            selected.faces[selectedFace].textureId === visibleTexture.id
+            ? selected.faces[selectedFace] : null}
+          faceName={selected?.material === "texture" &&
+            selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
           onBegin={beginPaint} onMove={continuePaint} onEnd={finishPaint} onCancel={clearStroke}
           onSample={samplePaint} onFill={fillPaint}/>}
       </main>
@@ -924,7 +988,9 @@ export function App() {
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace}
               setFace={setSelectedFace} commitDocument={commitDocument}
-              textureWidth={doc.texture.width} textureHeight={doc.texture.height}/>}
+              textures={doc.textures}
+              textureWidth={faceAsset?.width ?? texture.width}
+              textureHeight={faceAsset?.height ?? texture.height}/>}
             <div className="inspector-group">
               <SectionHeading title="Transform" trailing={<SlidersHorizontal size={15} className="section-muted-icon"/>}/>
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/>
@@ -955,7 +1021,7 @@ export function App() {
               </div>
               {selected.material === "texture" ? <>
                 <div className="surface-summary"><div className="texture-swatch" style={{ background: "#d1a65d" }}/>
-                  <div><strong>{doc.texture.name}</strong><span>Shared texture · {doc.texture.width} × {doc.texture.height}</span></div></div>
+                  <div><strong>{texture.name}</strong><span>Shared texture · {texture.width} × {texture.height}</span></div></div>
                 <button className="inline-action" onClick={() => changeMode("paint")}><Paintbrush size={15}/>Edit texture <span>→</span></button>
               </> : <>
                 <div className="form-caption">Material color</div>
@@ -1001,8 +1067,9 @@ export function App() {
         {mode === "paint" && <div className="paint-options">
           <SectionHeading title="Paint controls"/>
           <div className="paint-import-actions">
-            <button type="button" onClick={() => textureFileRef.current?.click()}
-              disabled={textureReading}><ImagePlus size={14}/>Import PNG</button>
+            <button type="button" onClick={() => {
+              setTextureImportMode("replace"); textureFileRef.current?.click();
+            }} disabled={textureReading}><ImagePlus size={14}/>Replace PNG</button>
             <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button>
           </div>
           <div className="form-caption">Brush color</div>
@@ -1134,8 +1201,42 @@ export function App() {
       </div>
     </div></div>}
 
+    {deletingTextureId && <div className="modal-shade">
+      <div className="modal import-modal" role="dialog" aria-modal="true"
+        aria-labelledby="delete-texture-heading">
+        <h2 id="delete-texture-heading">Delete texture asset?</h2>
+        <p>This will remove <strong>{textureById(doc, deletingTextureId)?.name}</strong>.
+          Its {affectedFaces(doc, deletingTextureId).length} assigned faces
+          must be remapped to an existing texture. The operation is one undoable change.</p>
+        <label className="form-caption" htmlFor="delete-replacement">Replacement texture</label>
+        <select id="delete-replacement" className="select-control"
+          value={deleteReplacementId ?? ""}
+          onChange={event => setDeleteReplacementId(event.target.value)}>
+          {doc.textures.filter(t => t.id !== deletingTextureId).map(t =>
+            <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <div className="delete-impact" aria-label="Affected face bindings">
+          {affectedFaces(doc, deletingTextureId).slice(0, 24).map((entry, index) =>
+            <span key={entry.nodeId + entry.face + index}>{entry.name}: {entry.face}</span>)}
+          {affectedFaces(doc, deletingTextureId).length > 24 && <span>And more…</span>}
+        </div>
+        <div className="modal-actions">
+          <button className="text-button quiet" onClick={() => setDeletingTextureId(null)}>Cancel</button>
+          <button className="text-button primary" disabled={!deleteReplacementId}
+            onClick={() => {
+              const currentId = deletingTextureId;
+              const fallback = deleteReplacementId;
+              if (!fallback) return;
+              commitDocument(current => removeTexture(current, currentId, fallback));
+              setDeletingTextureId(null); setDeleteReplacementId(null);
+              setNotice("Texture removed; affected face assignments were remapped in one undoable edit.");
+            }}>Remove and remap</button>
+        </div>
+      </div>
+    </div>}
     {pendingTexture && <TextureImportDialog image={pendingTexture}
-      currentWidth={doc.texture.width} currentHeight={doc.texture.height}
+      isAdding={textureImportMode === "new"}
+      currentWidth={texture.width} currentHeight={texture.height}
       paintedFaces={doc.cuboids.filter((node) => node.material === "texture").length}
       onClose={() => setPendingTexture(null)}
       onConfirm={applyImportedTexture}/>}
@@ -1156,7 +1257,7 @@ export function App() {
             <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
           <div className="import-summary">
             <div><span>ELEMENTS</span><strong>{pendingPack.document.cuboids.length}</strong></div>
-            <div><span>TEXTURE</span><strong>{pendingPack.document.texture.width} × {pendingPack.document.texture.height}</strong></div>
+            <div><span>TEXTURE</span><strong>{activeTexture(pendingPack.document).width} × {activeTexture(pendingPack.document).height}</strong></div>
             <div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div>
           </div>
           <div className="import-notices">
