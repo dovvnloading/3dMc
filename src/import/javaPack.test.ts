@@ -86,15 +86,19 @@ describe("Java pack importer", () => {
 
     const alteredUv = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.elements[0].faces.north.uv = [2, 0, 16, 16];
-    });
-    const uv = inspectJava1214Pack(alteredUv);
-    expect(uv.status).toBe("blocked");
-    if (uv.status === "blocked") expect(uv.problems.join()).toMatch(/UV editing/);
-
-    const hiddenField = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.elements[0].faces.north.rotation = 90;
     });
-    expect(inspectJava1214Pack(hiddenField).status).toBe("blocked");
+    const uv = inspectJava1214Pack(alteredUv);
+    expect(uv.status).toBe("editable");
+    if (uv.status === "editable") {
+      expect(uv.document.cuboids[0]?.faces.north.uv).toEqual([2, 0, 16, 16]);
+      expect(uv.document.cuboids[0]?.faces.north.rotation).toBe(90);
+    }
+
+    const invalidRotation = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
+      model.elements[0].faces.north.rotation = 45;
+    });
+    expect(inspectJava1214Pack(invalidRotation).status).toBe("blocked");
 
     const parent = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.parent = "minecraft:block/cube_all";
