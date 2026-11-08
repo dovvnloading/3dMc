@@ -52,15 +52,3 @@ Do **not** repair the generated pack by hand and then call the original exporter
 The native project schema remains transitional `.3dmc.json`. Imported model and resource-pack support, per-face UV rectangles, pivots, rotations, target texture references beyond one sheet, texture alpha, and a versioned native archive are not included. Each needs its own fixture and preservation contract before export can be promoted beyond this experiment.
 
 The release-agnostic strategy remains in [COMPATIBILITY.md](../architecture/COMPATIBILITY.md).
-
-## Round-trip import (the next bounded slice)
-
-The Java 1.21.4 experiment can now re-import the **exact STORED ZIP subset emitted by 3dMc's own exporter** and recover editable cuboid bounds, material/color assignments and the shared opaque RGBA texture. The import runs as a preflight report; nothing replaces the active project until the user explicitly accepts it.
-
-This is **not** a general Minecraft resource-pack importer. A valid ZIP containing additional resources, inherited models, different per-face textures, rotations, UV rectangles, compressed ZIP entries, unsupported PNG formats, alternate blockstate variants, or unknown fields is **blocked with a specific reason** rather than silently flattened.
-
-ZIP inspection rejects oversized archives, unexpected paths, repeated names, non-stored/compressed entries, malformed directories/local headers, mismatched sizes and CRCs, and overlapping/untracked bytes. The PNG decoder accepts only the bounded RGBA8/filter-0 output from our encoder and checks PNG chunk CRCs plus zlib Adler-32 using a fixed-size inflate buffer.
-
-Native-only part names, visibility/lock flags, the source project ID and undo history do not exist in the resource pack, so they are **reinitialized visibly** after import. Saving a native project preserves these attributes going forward. Semantic round-trip tests check geometry, colors and opaque texture bytes and require the exporter to regenerate identical ZIP bytes for its own original output.
-
-The in-game verification issue remains [#4](https://github.com/dovvnloading/3dMc/issues/4). Passing import/export byte tests still does not prove Minecraft rendering fidelity.

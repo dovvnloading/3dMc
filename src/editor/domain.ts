@@ -6,6 +6,51 @@
 export type Vec3 = readonly [number, number, number];
 export type Axis = 0 | 1 | 2;
 export type MaterialKind = "solid" | "texture";
+export type FaceDirection = "down" | "up" | "north" | "south" | "west" | "east";
+export type FaceRotation = 0 | 90 | 180 | 270;
+export type FaceUVRect = readonly [number, number, number, number];
+export interface FaceUV {
+  /** Minecraft logical 0–16 UV edges, with (0, 0) at texture top-left. */
+  uv: FaceUVRect;
+  /** Clockwise quarter turns in the model's Java face binding. */
+  rotation: FaceRotation;
+}
+export type CuboidFaces = Record<FaceDirection, FaceUV>;
+
+export const FACE_DIRECTIONS: readonly FaceDirection[] =
+  ["down", "up", "north", "south", "west", "east"] as const;
+
+export function createDefaultFaces(): CuboidFaces {
+  return Object.fromEntries(FACE_DIRECTIONS.map((face) => [
+    face, { uv: [0, 0, 16, 16] as FaceUVRect, rotation: 0 as FaceRotation }
+  ])) as CuboidFaces;
+}
+
+function validFaceUV(value: unknown): value is FaceUV {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const face = value as Partial<FaceUV>;
+  return Array.isArray(face.uv) && face.uv.length === 4 &&
+    face.uv.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 16) &&
+    face.uv[0] !== face.uv[2] && face.uv[1] !== face.uv[3] &&
+    (face.rotation === 0 || face.rotation === 90 ||
+      face.rotation === 180 || face.rotation === 270) &&
+    Object.keys(value).every((key) => key === "uv" || key === "rotation");
+}
+
+export function isValidFaces(value: unknown): value is CuboidFaces {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const faces = value as Record<string, unknown>;
+  return Object.keys(faces).length === FACE_DIRECTIONS.length &&
+    Object.keys(faces).every((key) => FACE_DIRECTIONS.includes(key as FaceDirection)) &&
+    FACE_DIRECTIONS.every((key) => validFaceUV(faces[key]));
+}
+
+export function copyFaces(value: CuboidFaces): CuboidFaces {
+  return Object.fromEntries(FACE_DIRECTIONS.map((key) => [
+    key, { uv: [...value[key].uv] as [number, number, number, number], rotation: value[key].rotation }
+  ])) as CuboidFaces;
+}
+
 
 export interface Cuboid {
   id: string;
@@ -14,6 +59,7 @@ export interface Cuboid {
   to: Vec3;
   material: MaterialKind;
   color: string;
+  faces: CuboidFaces;
   visible: boolean;
   locked: boolean;
 }
@@ -28,7 +74,7 @@ export interface PixelTexture {
 }
 
 export interface EditorDocument {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   name: string;
   target: {
@@ -64,14 +110,18 @@ export function isValidCuboid(value: unknown): value is Cuboid {
       return size > 0 && size <= 64;
     }) &&
     (node.material === "solid" || node.material === "texture") &&
-    isHex(node.color) && typeof node.visible === "boolean" && typeof node.locked === "boolean";
+    isHex(node.color) && isValidFaces(node.faces) &&
+    typeof node.visible === "boolean" && typeof node.locked === "boolean";
 }
 
 /** Strict boundary validation: importing never trusts a TypeScript cast. */
 export function parseDocument(input: unknown): EditorDocument {
   if (!input || typeof input !== "object") throw new Error("This is not a 3dMc project.");
-  const value = input as Partial<EditorDocument>;
-  if (value.schemaVersion !== 1) throw new Error("Unsupported project version. The original file was not changed.");
+  const value = input as Omit<Partial<EditorDocument>, "schemaVersion"> & {
+    schemaVersion?: number;
+  };
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+    throw new Error("Unsupported project version. The original file was not changed.");
   if (typeof value.id !== "string" || value.id.length < 1 || value.id.length > 100 ||
       typeof value.name !== "string" || value.name.length < 1 || value.name.length > 100) {
     throw new Error("The project name or identifier is invalid.");
@@ -80,9 +130,16 @@ export function parseDocument(input: unknown): EditorDocument {
       !(value.target.candidateRelease === "1.21.4" || value.target.candidateRelease === "26.3") || value.target.status !== "unverified") {
     throw new Error("This project targets an unsupported prototype profile.");
   }
-  if (!Array.isArray(value.cuboids) || value.cuboids.length > 2000 ||
-      !value.cuboids.every(isValidCuboid) ||
-      new Set(value.cuboids.map((item) => item.id)).size !== value.cuboids.length) {
+  // A v1 cuboid has no face mapping. Migrate a copy to the exact legacy
+  // full-sheet mapping; do not invent face-specific values in a v1 file.
+  const migrated = Array.isArray(value.cuboids) && value.cuboids.length <= 2000
+    ? value.cuboids.map((node: Cuboid) =>
+      value.schemaVersion === 1
+        ? { ...node, faces: createDefaultFaces() }
+        : node)
+    : null;
+  if (!migrated || !migrated.every(isValidCuboid) ||
+      new Set(migrated.map((item) => item.id)).size !== migrated.length) {
     throw new Error("The project contains invalid or duplicate cuboids.");
   }
   const texture = value.texture as Partial<PixelTexture> | undefined;
@@ -99,11 +156,14 @@ export function parseDocument(input: unknown): EditorDocument {
   // Reconstruct only known fields. Prototypes, unknown metadata and forged
   // rendering objects never enter the live document.
   return {
-    schemaVersion: 1, id: value.id, name: value.name,
+    schemaVersion: 2, id: value.id, name: value.name,
     target: { edition: "java", family: "static-block", candidateRelease: value.target.candidateRelease, status: "unverified" },
-    cuboids: value.cuboids.map((node) => ({
-      id: node.id, name: node.name, from: [...node.from] as [number, number, number], to: [...node.to] as [number, number, number],
-      material: node.material, color: node.color, visible: node.visible, locked: node.locked
+    cuboids: migrated.map((node) => ({
+      id: node.id, name: node.name,
+      from: [...node.from] as [number, number, number],
+      to: [...node.to] as [number, number, number],
+      material: node.material, color: node.color,
+      faces: copyFaces(node.faces), visible: node.visible, locked: node.locked
     })),
     texture: { id: "main", name: texture.name, width: texture.width,
       height: texture.height, pixels: [...texture.pixels] }
@@ -112,7 +172,8 @@ export function parseDocument(input: unknown): EditorDocument {
 
 const base = (id: string, name: string, from: Vec3, to: Vec3, color: string,
   material: MaterialKind = "solid"): Cuboid =>
-  ({ id, name, from, to, color, material, visible: true, locked: false });
+  ({ id, name, from, to, color, material, faces: createDefaultFaces(),
+     visible: true, locked: false });
 
 function lanternPixels(): number[] {
   const pixels: number[] = [];
@@ -133,7 +194,7 @@ function lanternPixels(): number[] {
 
 export function createSampleDocument(): EditorDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "starter-lantern",
     name: "Copper Lantern",
     target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },
@@ -192,7 +253,8 @@ export function duplicateCuboid(doc: EditorDocument, id: string, newId: string):
   if (!source || doc.cuboids.some((node) => node.id === newId) || doc.cuboids.length >= 2000) return doc;
   return { ...doc, cuboids: [...doc.cuboids, {
     ...source, id: newId, name: source.name + " copy", locked: false,
-    from: [...source.from] as [number, number, number], to: [...source.to] as [number, number, number]
+    from: [...source.from] as [number, number, number], to: [...source.to] as [number, number, number],
+    faces: copyFaces(source.faces)
   }] };
 }
 
@@ -235,4 +297,32 @@ export function renameProject(doc: EditorDocument, name: string): EditorDocument
 export function setJavaCandidateRelease(doc: EditorDocument, release: "1.21.4" | "26.3"): EditorDocument {
   return doc.target.candidateRelease === release ? doc :
     { ...doc, target: { ...doc.target, candidateRelease: release, status: "unverified" } };
+}
+
+/** One face property commit is one reversible document operation. */
+export function updateFaceUV(
+  document: EditorDocument, id: string, face: FaceDirection,
+  field: 0 | 1 | 2 | 3, value: number
+): EditorDocument {
+  if (!Number.isFinite(value) || value < 0 || value > 16) return document;
+  return updateCuboid(document, id, (node) => {
+    const current = node.faces[face];
+    if (current.uv[field] === value) return node;
+    const uv = [...current.uv] as [number, number, number, number];
+    uv[field] = value;
+    const nextFace: FaceUV = { ...current, uv };
+    const next = { ...node, faces: { ...node.faces, [face]: nextFace } };
+    return isValidCuboid(next) ? next : node;
+  });
+}
+
+export function updateFaceRotation(
+  document: EditorDocument, id: string, face: FaceDirection, rotation: FaceRotation
+): EditorDocument {
+  if (rotation !== 0 && rotation !== 90 && rotation !== 180 && rotation !== 270) return document;
+  return updateCuboid(document, id, (node) => {
+    const current = node.faces[face];
+    return current.rotation === rotation ? node :
+      { ...node, faces: { ...node.faces, [face]: { ...current, rotation } } };
+  });
 }

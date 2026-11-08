@@ -11,7 +11,7 @@ import {
   renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor, setTexturePixels,
   toggleFlag, updateCuboid
 } from "./editor/domain";
-import type { Cuboid, EditorDocument, Vec3 } from "./editor/domain";
+import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domain";
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
@@ -22,6 +22,7 @@ import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
+import { FaceUVInspector } from "./components/FaceUVInspector";
 import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
 import {
@@ -135,6 +136,7 @@ export function App() {
   const doc = history.present;
   const exportIssues = useMemo(() => inspectJava1214(doc), [doc]);
   const [selectedId, setSelectedId] = useState<string | null>("body");
+  const [selectedFace, setSelectedFace] = useState<FaceDirection>("north");
   const selected = doc.cuboids.find((node) => node.id === selectedId) ?? null;
   const [mode, setMode] = useState<Mode>("model");
   const [tool, setTool] = useState<Tool>("select");
@@ -371,6 +373,7 @@ export function App() {
     setHistory(createHistory(document));
     setOpenSession((session) => session + 1);
     setSelectedId(document.cuboids[0]?.id ?? null);
+    setSelectedFace("north");
     setMode("model"); setTool("select"); setPendingOpen(null);
     setCandidate(null); setRecoveryStatus("unsaved");
     setNotice("Project opened. A portable copy has not been written by this session.");
@@ -495,6 +498,7 @@ export function App() {
             <div className="view-top-right"><span className="dot"/><span>LOCAL SESSION</span></div>
           </div>
           <EditorViewport document={doc} pixels={viewPixels} selectedId={selectedId}
+            selectedFace={selectedFace} onSelectFace={setSelectedFace}
             mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
             onSelect={setSelectedId} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
             onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint}
@@ -527,6 +531,8 @@ export function App() {
         </div>
         {mode === "paint" && <TextureSurface pixels={viewPixels} width={doc.texture.width}
           height={doc.texture.height} tool={tool} color={color} painting={!!draftPixels}
+          face={selected?.material === "texture" ? selected.faces[selectedFace] : null}
+          faceName={selected?.material === "texture" ? selectedFace : null}
           onBegin={beginPaint} onMove={continuePaint} onEnd={finishPaint} onCancel={clearStroke}
           onSample={samplePaint}/>}
       </main>
@@ -537,6 +543,9 @@ export function App() {
           <div className="selection-heading"><div className="selection-glyph"><Box size={20}/></div>
             <div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.id === "body" ? "Textured surface" : "Solid material"}</p></div></div>
           <div className="inspector-scroll">
+            {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace}
+              setFace={setSelectedFace} commitDocument={commitDocument}
+              textureWidth={doc.texture.width} textureHeight={doc.texture.height}/>}
             <div className="inspector-group">
               <SectionHeading title="Transform" trailing={<SlidersHorizontal size={15} className="section-muted-icon"/>}/>
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/>

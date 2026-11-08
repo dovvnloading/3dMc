@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import type { Texel } from "../editor/pixels";
+import type { FaceDirection, FaceUV } from "../editor/domain";
+import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
 import type { Tool } from "./EditorViewport";
 import { Minus, Plus } from "lucide-react";
 
@@ -11,6 +13,8 @@ interface Props {
   tool: Tool;
   color: string;
   painting: boolean;
+  face: FaceUV | null;
+  faceName: FaceDirection | null;
   onBegin: (texel: Texel, face: string) => void;
   onMove: (texel: Texel, face: string) => void;
   onEnd: () => void;
@@ -24,6 +28,9 @@ export function TextureSurface(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(8);
   const [cursor, setCursor] = useState<Texel>([0, 0]);
+  const region = props.face
+    ? logicalUVToPixelRect(props.face.uv, props.width, props.height)
+    : null;
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -60,7 +67,7 @@ export function TextureSurface(props: Props) {
   const pointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-    if (props.painting) props.onEnd();
+    if (props.tool === "pencil") props.onEnd();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
@@ -88,7 +95,9 @@ export function TextureSurface(props: Props) {
 
   return <section className="texture-editor" aria-label="Texture editor">
     <div className="texture-header">
-      <div><strong>Texture sheet</strong><span>Shared UV sample · {props.width} × {props.height}</span></div>
+      <div><strong>Texture sheet</strong>
+        <span>{props.faceName ? faceLabel(props.faceName) + " face UV" : "Shared texture"} · {props.width} × {props.height}</span>
+      </div>
       <div className="zoom-controls" aria-label="Texture zoom">
         <button title="Zoom out" onClick={() => setZoom((n) => Math.max(4, n - 2))}><Minus size={14}/></button>
         <span>{zoom}×</span>
@@ -103,6 +112,15 @@ export function TextureSurface(props: Props) {
           aria-label="Texture pixels. Arrow keys move the cursor; Space paints with pencil or Enter samples with eyedropper."
           onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
           onPointerCancel={props.onCancel} onKeyDown={onKeyDown} />
+        {region && <div className="uv-selection-rect" aria-hidden="true"
+          style={{
+            left: Math.min(region[0], region[2]) * zoom,
+            top: Math.min(region[1], region[3]) * zoom,
+            width: Math.abs(region[2] - region[0]) * zoom,
+            height: Math.abs(region[3] - region[1]) * zoom
+          }}>
+          <span>{props.faceName ? faceLabel(props.faceName) : "Face"}</span>
+        </div>}
         <div className="texel-focus" aria-hidden="true"
           style={{ width: zoom, height: zoom, left: cursor[0] * zoom, top: cursor[1] * zoom }} />
       </div>
@@ -111,6 +129,6 @@ export function TextureSurface(props: Props) {
       <span>Texel {cursor[0] + 1}, {cursor[1] + 1}</span>
       <span>Color <i className="color-dot" style={{ background: props.color }}/>{props.color.toUpperCase()}</span>
     </div>
-    <p className="texture-note">This early texture proof maps one shared sheet across textured faces. Per-face UV editing and Minecraft texture export require the compatibility stage.</p>
+    <p className="texture-note">The outlined region is read by the selected face. Painting these pixels can affect every face sharing that region. Select another face or edit its UV edges in the inspector.</p>
   </section>;
 }

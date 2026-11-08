@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { unzipSync, strFromU8, unzlibSync } from "fflate";
-import { createSampleDocument, setAxisValue, setTexturePixels } from "../editor/domain";
+import { createSampleDocument, setAxisValue, setTexturePixels, updateFaceRotation, updateFaceUV } from "../editor/domain";
 import { crc32, encodeRgbaPng } from "./png";
 import {
   buildJava1214Model, inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS,
@@ -107,5 +107,22 @@ describe("Java Edition 1.21.4 experimental pack", () => {
     const document = { ...createSampleDocument(), name: "../unsafe/\\path" };
     const result = makeJava1214Pack(document);
     expect(result.paths.every((path) => !path.includes("..") && !path.includes("\\"))).toBe(true);
+  });
+});
+
+describe("Java 1.21.4 face UV output", () => {
+  it("emits explicit authored rectangles and quarter-turns on the correct source faces", () => {
+    let doc = createSampleDocument();
+    doc = updateFaceUV(doc, "body", "east", 0, 4);
+    doc = updateFaceUV(doc, "body", "east", 1, 2);
+    doc = updateFaceRotation(doc, "body", "east", 180);
+    const zip = unzipSync(makeJava1214Pack(doc).zip);
+    const model = JSON.parse(strFromU8(zip[JAVA_PACK_PATHS.model]!));
+    expect(model.elements[0].faces.east).toEqual({
+      uv: [4, 2, 16, 16], texture: "#painted", rotation: 180
+    });
+    expect(model.elements[0].faces.north).toEqual({
+      uv: [0, 0, 16, 16], texture: "#painted"
+    });
   });
 });

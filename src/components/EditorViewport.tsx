@@ -3,7 +3,8 @@ import { Canvas, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
 import * as THREE from "three";
-import type { Cuboid, EditorDocument, Vec3 } from "../editor/domain";
+import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "../editor/domain";
+import { applyFaceUvs, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 
@@ -16,12 +17,14 @@ interface ViewportProps {
   document: EditorDocument;
   pixels: number[];
   selectedId: string | null;
+  selectedFace: FaceDirection;
   mode: Mode;
   tool: Tool;
   view: ViewRequest;
   snap: number;
   painting: boolean;
   onSelect: (id: string | null) => void;
+  onSelectFace: (face: FaceDirection) => void;
   onBeginPaint: (texel: Texel, face: string) => void;
   onContinuePaint: (texel: Texel, face: string) => void;
   onFinishPaint: () => void;
@@ -88,22 +91,52 @@ function useTextureMap({ width, height, pixels }: {
   return resource.texture;
 }
 
-type MeshProps = Pick<ViewportProps, "selectedId" | "mode" | "tool" | "snap" | "painting" |
-"onSelect" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
+type MeshProps = Pick<ViewportProps, "selectedId" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
+"onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
 "onCancelPaint" | "onSample" | "onTransform"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
+
+function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
+  const [sx, sy, sz] = dimensions(node);
+  const epsilon = 0.0014;
+  const placements: Record<FaceDirection, {
+    position: Vec3; rotation: Vec3; size: readonly [number, number]
+  }> = {
+    east: { position: [sx / 2 + epsilon, 0, 0], rotation: [0, Math.PI / 2, 0], size: [sz, sy] },
+    west: { position: [-sx / 2 - epsilon, 0, 0], rotation: [0, -Math.PI / 2, 0], size: [sz, sy] },
+    up: { position: [0, sy / 2 + epsilon, 0], rotation: [-Math.PI / 2, 0, 0], size: [sx, sz] },
+    down: { position: [0, -sy / 2 - epsilon, 0], rotation: [Math.PI / 2, 0, 0], size: [sx, sz] },
+    south: { position: [0, 0, sz / 2 + epsilon], rotation: [0, 0, 0], size: [sx, sy] },
+    north: { position: [0, 0, -sz / 2 - epsilon], rotation: [0, Math.PI, 0], size: [sx, sy] }
+  };
+  const placement = placements[face];
+  return <mesh position={placement.position} rotation={placement.rotation} renderOrder={5}>
+    <planeGeometry args={[placement.size[0], placement.size[1]]}/>
+    <meshBasicMaterial color="#80dbbf" side={THREE.DoubleSide} transparent opacity={0.15}
+      depthWrite={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}/>
+  </mesh>;
+}
 
 function AssetMesh(props: MeshProps) {
   const { node, selectedId, mode, tool, painting } = props;
   const anchor = useRef<THREE.Group>(null);
   const initialPosition = center(node);
+  const geometry = useMemo(() => {
+    const box = new THREE.BoxGeometry(...dimensions(node));
+    applyFaceUvs(box, node.faces);
+    return box;
+  }, [node.from, node.to, node.faces]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
   const isSelected = selectedId === node.id;
   const activeGizmo = isSelected && mode === "model" && !node.locked &&
     (tool === "move" || tool === "resize") ? tool : null;
 
   const onHit = (event: ThreeEvent<PointerEvent>): { texel: Texel; face: string } | null => {
-    if (node.material !== "texture" || !event.uv) return null;
-    const face = node.id + ":" + Math.floor((event.faceIndex ?? 0) / 2);
-    return { texel: uvToTexel(event.uv.x, event.uv.y, props.width, props.height), face };
+    const direction = faceFromTriangle(event.faceIndex ?? -1);
+    if (node.material !== "texture" || !event.uv || !direction) return null;
+    return {
+      texel: uvToTexel(event.uv.x, event.uv.y, props.width, props.height),
+      face: node.id + ":" + direction
+    };
   };
 
   const handleDown = (event: ThreeEvent<PointerEvent>) => {
@@ -112,6 +145,8 @@ function AssetMesh(props: MeshProps) {
     if (!hit) return;
     event.stopPropagation();
     props.onSelect(node.id);
+    const direction = faceFromTriangle(event.faceIndex ?? -1);
+    if (direction) props.onSelectFace(direction);
     if (tool === "eyedropper") { props.onSample(hit.texel); return; }
     if (tool !== "pencil" || node.locked) return;
     const capture = event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null;
@@ -124,7 +159,7 @@ function AssetMesh(props: MeshProps) {
     if (hit) props.onContinuePaint(hit.texel, hit.face);
   };
   const handleUp = (event: ThreeEvent<PointerEvent>) => {
-    if (!painting || event.button !== 0) return;
+    if (event.button !== 0 || mode !== "paint" || tool !== "pencil") return;
     event.stopPropagation();
     const capture = event.target as (EventTarget & {
       hasPointerCapture?: (id: number) => boolean;
@@ -139,16 +174,21 @@ function AssetMesh(props: MeshProps) {
       <mesh castShadow receiveShadow
         onClick={(event) => {
           event.stopPropagation();
-          if (mode !== "paint" && !node.locked) props.onSelect(node.id);
+          if (mode !== "paint" && !node.locked) {
+            props.onSelect(node.id);
+            const face = faceFromTriangle(event.faceIndex ?? -1);
+            if (face) props.onSelectFace(face);
+          }
         }}
         onPointerDown={handleDown} onPointerMove={handleMove}
         onPointerUp={handleUp} onPointerCancel={() => props.onCancelPaint()}>
         
-        <boxGeometry args={dimensions(node)} />
+        <primitive object={geometry} attach="geometry" />
         <meshStandardMaterial color={node.color} map={node.material === "texture" ? props.texture : null}
           roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0} />
         {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
       </mesh>
+      {isSelected && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
     </group>
   );
 
