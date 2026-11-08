@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
-  FolderOpen, FilePlus2, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
@@ -34,6 +34,10 @@ import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
+import { TextureImportDialog } from "./components/TextureImportDialog";
+import { decodeBrowserPng, importTextureIntoDocument } from "./editor/textureImport";
+import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
+import { encodeRgbaPng } from "./export/png";
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { makeSixFaceDiagnosticDocument } from "./compatibility/diagnostic";
@@ -185,6 +189,8 @@ export function App() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
   const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
+  const [pendingTexture, setPendingTexture] = useState<DecodedTexture | null>(null);
+  const [textureReading, setTextureReading] = useState(false);
   const [packInspecting, setPackInspecting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
@@ -193,6 +199,7 @@ export function App() {
   const saveProjectRef = useRef<() => Promise<void>>(async () => undefined);
   const fileRef = useRef<HTMLInputElement>(null);
   const packFileRef = useRef<HTMLInputElement>(null);
+  const textureFileRef = useRef<HTMLInputElement>(null);
   const activeRevision = useRef(history.revision);
   activeRevision.current = history.revision;
 
@@ -535,6 +542,58 @@ export function App() {
     }
   };
 
+  const chooseTexture = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const session = activeSession.current;
+    setTextureReading(true);
+    try {
+      const decoded = await decodeBrowserPng(file);
+      if (activeSession.current !== session) return;
+      setPendingTexture(decoded);
+    } catch (error) {
+      if (activeSession.current === session)
+        setNotice(error instanceof Error ? error.message : "The PNG couldn't be imported.");
+    } finally {
+      setTextureReading(false);
+    }
+  };
+
+  const applyImportedTexture = (policy: TextureImportPolicy) => {
+    const image = pendingTexture;
+    if (!image) return;
+    try {
+      const proposed = importTextureIntoDocument(historyRef.current.present, image, policy);
+      // Commit through the normal source-document transaction (including
+      // undo/redo, checkpoint generation and 3D/2D preview invalidation).
+      commitDocument((current) =>
+        current === historyRef.current.present ? proposed
+          : importTextureIntoDocument(current, image, policy));
+      setPendingTexture(null);
+      setNotice("PNG applied to the shared texture in one undoable edit. Save a .3dmc source archive to retain it.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The PNG couldn't be applied.");
+    }
+  };
+
+  const downloadTexturePng = () => {
+    try {
+      const png = encodeRgbaPng(doc.texture.width, doc.texture.height, doc.texture.pixels);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(png)], { type: "image/png" }));
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = doc.texture.name.replace(/[^a-zA-Z0-9_.-]+/g, "-").slice(0, 80).replace(/\.png$/i, "") + ".png";
+      globalThis.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setNotice("PNG texture download started. Native .3dmc source preserves your complete editable project.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not export PNG.");
+    }
+  };
+
   const chooseProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -606,6 +665,7 @@ export function App() {
       setSearch("");
       setShapeMenuOpen(false);
       setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null);
+      setPendingTexture(null);
       setCandidate(null); setRecoveryStatus("unsaved");
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup.");
       return true;
@@ -771,6 +831,17 @@ export function App() {
           <SectionHeading title="Assets" trailing={<span className="counter">01</span>}/>
           <div className="asset-entry"><div className="asset-icon"><Paintbrush size={17}/></div>
             <div><strong>{doc.texture.name}</strong><span>{doc.texture.width} × {doc.texture.height} · RGBA</span></div></div>
+          <input ref={textureFileRef} type="file" accept=".png,image/png" hidden
+            onChange={chooseTexture}/>
+          <div className="texture-asset-actions">
+            <button type="button" aria-label="Import texture PNG"
+              disabled={textureReading}
+              onClick={() => textureFileRef.current?.click()}>
+              <ImagePlus size={14}/>{textureReading ? "Reading…" : "Import PNG"}
+            </button>
+            <button type="button" aria-label="Download texture PNG"
+              onClick={downloadTexturePng}><Download size={14}/>Export PNG</button>
+          </div>
           <button type="button" className="legacy-json-link" onClick={saveLegacyJson}
             title="Additional portable legacy .3dmc.json backup">Download legacy JSON backup</button>
           <div className="scene-meta"><span>Native source · .3dmc v1</span><span>1 shared texture</span></div>
@@ -912,6 +983,11 @@ export function App() {
           <button className="text-button quiet" onClick={addElement}><Plus size={15}/>Add cuboid</button></div>}
         {mode === "paint" && <div className="paint-options">
           <SectionHeading title="Paint controls"/>
+          <div className="paint-import-actions">
+            <button type="button" onClick={() => textureFileRef.current?.click()}
+              disabled={textureReading}><ImagePlus size={14}/>Import PNG</button>
+            <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button>
+          </div>
           <div className="form-caption">Brush color</div>
           <div className="palette">{SWATCHES.map((swatch) =>
             <button key={swatch} style={{ background: swatch }} className={swatch === color ? "chosen" : ""}
@@ -1035,6 +1111,11 @@ export function App() {
       </div>
     </div></div>}
 
+    {pendingTexture && <TextureImportDialog image={pendingTexture}
+      currentWidth={doc.texture.width} currentHeight={doc.texture.height}
+      paintedFaces={doc.cuboids.filter((node) => node.material === "texture").length}
+      onClose={() => setPendingTexture(null)}
+      onConfirm={applyImportedTexture}/>}
     {pendingPack && <div className="modal-shade">
       <div className="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="pack-import-title"
         onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setPendingPack(null); } }}>

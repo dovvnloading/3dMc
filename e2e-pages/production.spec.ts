@@ -79,3 +79,23 @@ test("published creator flow can make a block, add a part and switch its painted
   expect((await saved).suggestedFilename()).toBe("published-creator-smoke.3dmc");
   expect(errors).toEqual([]);
 });
+
+
+test("compiled site can preflight a user PNG and keep the current workspace on cancel", async ({ page }) => {
+  await page.goto("/3dMc/");
+  const input = page.locator('input[accept=".png,image/png"]');
+  await expect(input).toBeAttached();
+  // A PNG exported by the production app must be accepted by its import path.
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download texture PNG" }).click();
+  const png = await downloaded;
+  const path = await png.path();
+  if (!path) throw new Error("PNG download is unavailable.");
+  await input.setInputFiles(path);
+  const dialog = page.getByRole("dialog", { name: "Replace the shared texture?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("32 × 32 pixels")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator(".asset-entry")).toContainText("lantern.png");
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
+});

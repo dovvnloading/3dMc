@@ -562,3 +562,116 @@ test("desktop shortcuts create a new project, duplicate elements and download na
     .getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("dialog", { name: "Create a new project" })).toHaveCount(0);
 });
+
+
+test("imports an RGBA PNG with explicit dimensions, undo, and native source persistence", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  const pixels = await page.evaluate(async () => {
+    const { encodeRgbaPng } = await import("/src/export/png.ts");
+    const rgba = new Array(16 * 16 * 4).fill(0);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const i = (y * 16 + x) * 4;
+      rgba[i] = 255; rgba[i + 1] = x * 12; rgba[i + 2] = y * 12;
+      rgba[i + 3] = x === 0 ? 100 : 255;
+    }
+    return Array.from(encodeRgbaPng(16, 16, rgba));
+  });
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name: "Imported Accent.png", mimeType: "image/png", buffer: Buffer.from(pixels)
+  });
+  const dialog = page.getByRole("dialog", { name: "Replace the shared texture?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("16 × 16 pixels")).toBeVisible();
+  await expect(dialog.getByText(/transparent or translucent pixels/)).toBeVisible();
+  await expect(dialog.getByText(/experimental Java 1.21.4 exporter/)).toBeVisible();
+  await dialog.getByRole("radio", { name: /Use the PNG dimensions/ }).check();
+  await expect(dialog.getByText("RESULTING CANVAS").locator("..")).toContainText("16 × 16");
+  await page.screenshot({ path: "test-results/png-import-preflight.png" });
+  await dialog.getByRole("button", { name: "Replace shared texture" }).click();
+
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  await expect(canvas).toHaveAttribute("width", "16");
+  await expect(canvas).toHaveAttribute("height", "16");
+  const alpha = await canvas.evaluate((node) => {
+    const context = (node as HTMLCanvasElement).getContext("2d")!;
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect(alpha).toBe(100);
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect(canvas).toHaveAttribute("width", "32");
+  await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
+  await expect(canvas).toHaveAttribute("width", "16");
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const exportModal = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(exportModal.getByText(/1 blockers?/)).toBeVisible();
+  await exportModal.getByRole("button", { name: "Close" }).click();
+
+  const exported = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const nativeFile = await exported;
+  const path = await nativeFile.path();
+  if (!path) throw new Error("Missing downloaded native source.");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  const opening = page.getByRole("dialog", { name: "Open this project?" });
+  await expect(opening).toBeVisible();
+  await opening.getByRole("button", { name: "Open project" }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await expect(page.locator(".texture-pixel-wrap canvas")).toHaveAttribute("width", "16");
+  expect(errors).toEqual([]);
+});
+
+test("non-square PNG scales by nearest neighbor and unsupported image bytes never replace the sheet", async ({ page }) => {
+  await page.goto("/");
+  const rgba = [
+    255, 0, 0, 255, 0, 255, 0, 255,
+    0, 0, 255, 255, 255, 255, 0, 255
+  ];
+  const png = await page.evaluate(async (pixels) => {
+    const { encodeRgbaPng } = await import("/src/export/png.ts");
+    return Array.from(encodeRgbaPng(2, 2, pixels));
+  }, rgba);
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name: "tiny.png", mimeType: "image/png", buffer: Buffer.from(png)
+  });
+  const dialog = page.getByRole("dialog", { name: "Replace the shared texture?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /Use the PNG dimensions/ })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Replace shared texture" }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const corners = await canvas.evaluate((node) => {
+    const context = (node as HTMLCanvasElement).getContext("2d")!;
+    return [[0, 0], [31, 0], [0, 31], [31, 31]].map(([x, y]) =>
+      Array.from(context.getImageData(x!, y!, 1, 1).data)
+    );
+  });
+  expect(corners).toEqual([[255, 0, 0, 255], [0, 255, 0, 255],
+    [0, 0, 255, 255], [255, 255, 0, 255]]);
+
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name: "not-png.png", mimeType: "image/png", buffer: Buffer.from("not a valid PNG")
+  });
+  await expect(page.getByRole("dialog", { name: "Replace the shared texture?" })).toHaveCount(0);
+  await expect(page.getByText(/Choose a valid PNG file/)).toBeVisible();
+  await expect(canvas).toHaveAttribute("width", "32");
+});
+
+test("PNG texture export downloads a separate editable image without changing the model", async ({ page }) => {
+  await page.goto("/");
+  const data = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download texture PNG" }).click();
+  const downloaded = await data;
+  expect(downloaded.suggestedFilename()).toBe("lantern.png");
+  const file = await downloaded.path();
+  if (!file) throw new Error("Missing exported PNG.");
+  await page.locator('input[accept=".png,image/png"]').setInputFiles(file);
+  const dialog = page.getByRole("dialog", { name: "Replace the shared texture?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("32 × 32 pixels")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
+});
