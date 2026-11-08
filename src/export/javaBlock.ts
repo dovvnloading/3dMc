@@ -63,13 +63,15 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
   if (document.cuboids.length > 256)
     issues.push(error("TOO_MANY_ELEMENTS", "This experimental exporter supports at most 256 cuboids."));
 
-  const t = document.texture;
   const powerOfTwo = (n: number) => Number.isSafeInteger(n) && n > 0 && (n & (n - 1)) === 0;
-  if (!powerOfTwo(t.width) || t.width !== t.height || t.width > 64) {
-    issues.push(error("TEXTURE_DIMENSIONS", "The shared texture must be square, power-of-two, and at most 64×64 texels."));
+  for (const t of document.textures) {
+    if (!powerOfTwo(t.width) || t.width !== t.height || t.width > 64)
+      issues.push(error("TEXTURE_DIMENSIONS", "Texture " + t.name +
+        " must be square, power-of-two, and at most 64×64 texels."));
+    if (t.pixels.some((part, i) => i % 4 === 3 && part !== 255))
+      issues.push(error("TEXTURE_ALPHA", "Texture " + t.name +
+        " uses alpha. This Java 1.21.4 profile supports opaque pixels only."));
   }
-  if (t.pixels.some((part, i) => i % 4 === 3 && part !== 255))
-    issues.push(error("TEXTURE_ALPHA", "This opaque-only profile does not support translucent or transparent pixels."));
 
   for (const node of document.cuboids) {
     // makeJava1214Pack() validates the full document before encoding.
@@ -97,12 +99,19 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
 // Source face directions come from the versioned domain model.
 
 export function buildJava1214Model(document: EditorDocument) {
-  const textures: Record<string, string> = { particle: "3dmc:block/main", painted: "3dmc:block/main" };
+  const textures: Record<string, string> = { particle: "3dmc:block/main" };
+  document.textures.forEach((_, index) => {
+    textures[index === 0 ? "painted" : "painted_" + index] =
+      index === 0 ? "3dmc:block/main" : "3dmc:block/tex_" + index;
+  });
   const elements = document.cuboids.map((node, i) => {
-    const key = node.material === "texture" ? "painted" : `solid_${i}`;
-    if (node.material === "solid") textures[key] = `3dmc:block/solid_${i}`;
+    const solidKey = `solid_${i}`;
+    if (node.material === "solid") textures[solidKey] = `3dmc:block/solid_${i}`;
     const faces = Object.fromEntries(FACE_DIRECTIONS.map((face) => {
       const binding = node.faces[face];
+      const textureIndex = document.textures.findIndex(t => t.id === binding.textureId);
+      const key = node.material === "solid" ? solidKey :
+        textureIndex === 0 ? "painted" : "painted_" + textureIndex;
       return [face, {
         uv: [...binding.uv], texture: "#" + key,
         ...(binding.rotation === 0 ? {} : { rotation: binding.rotation })
@@ -139,8 +148,13 @@ export function makeJava1214Pack(document: EditorDocument): JavaPackResult {
       variants: { "": { model: "3dmc:block/lantern" } }
     }),
     [JAVA_PACK_PATHS.model]: encodeJson(buildJava1214Model(source)),
-    [JAVA_PACK_PATHS.mainTexture]: encodeRgbaPng(source.texture.width, source.texture.height, source.texture.pixels)
+    [JAVA_PACK_PATHS.mainTexture]: encodeRgbaPng(
+      source.textures[0]!.width, source.textures[0]!.height, source.textures[0]!.pixels)
   };
+  source.textures.slice(1).forEach((t, index) => {
+    files[`assets/3dmc/textures/block/tex_${index + 1}.png`] =
+      encodeRgbaPng(t.width, t.height, t.pixels);
+  });
 
   source.cuboids.forEach((node, i) => {
     if (node.material !== "solid") return;
