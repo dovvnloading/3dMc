@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
+import { Component, useEffect, useMemo, useRef } from "react";
+import type { ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
@@ -284,9 +285,32 @@ function Scene(props: ViewportProps) {
   </>;
 }
 
+/**
+ * A failed GPU must never replace the canonical document workspace with the
+ * global startup error screen. Preserve numeric/model controls, 2D painting,
+ * recovery and source downloads when a browser disallows WebGL2.
+ */
+class ViewportFailureBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
+  componentDidCatch(error: Error): void {
+    console.error("3dMc 3D viewport unavailable; the editor document remains intact", error);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <div className="webgl-fallback" role="status" aria-label="3D preview unavailable">
+      <strong>3D rendering is unavailable in this browser session.</strong>
+      <p>The Scene, numeric inspector, 2D Paint tools, local recovery and portable source downloads remain available.
+        No project geometry or texture pixels were changed by the graphics failure.</p>
+      <button type="button" onClick={() => this.setState({ failed: false })}>Retry 3D rendering</button>
+    </div>;
+  }
+}
+
 export function EditorViewport(props: ViewportProps) {
   return <div className={"viewport-canvas viewport-" + props.mode}>
-    <Canvas camera={{ position: [2.9, 2.35, 3.2], fov: 40, near: 0.01, far: 100 }}
+    <ViewportFailureBoundary>
+      <Canvas camera={{ position: [2.9, 2.35, 3.2], fov: 40, near: 0.01, far: 100 }}
       frameloop="demand" shadows dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}
       fallback={<div className="webgl-fallback">3D rendering is unavailable. Your project remains editable through the Scene and Inspector.</div>}
       onPointerMissed={event => {
@@ -294,6 +318,7 @@ export function EditorViewport(props: ViewportProps) {
       }}>
       <Scene {...props}/>
       {import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("benchmark") && <DevPerformanceProbe/>}
-    </Canvas>
+      </Canvas>
+    </ViewportFailureBoundary>
   </div>;
 }
