@@ -51,3 +51,31 @@ test("compiled site remains interactive and downloads native source", async ({ p
   await page.getByRole("button", { name: "Save project" }).click();
   expect((await download).suggestedFilename()).toMatch(/\.3dmc$/);
 });
+
+
+test("published creator flow can make a block, add a part and switch its painted surface", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/3dMc/");
+  await page.getByRole("button", { name: "New project" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create a new project" });
+  await dialog.getByRole("button", { name: /Textured block/ }).click();
+  await dialog.getByRole("textbox", { name: "New project name" }).fill("Published creator smoke");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByRole("heading", { name: "Main block" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add primitive" }).click();
+  await page.getByRole("menu", { name: "Choose a primitive" })
+    .getByRole("menuitem", { name: /Narrow column/ }).click();
+  await expect(page.getByRole("heading", { name: "Narrow column" })).toBeVisible();
+  const material = page.getByRole("group", { name: "Element material" });
+  await material.getByRole("button", { name: "Painted" }).click();
+  await expect(material.getByRole("button", { name: "Painted" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({ path: "test-results/pages/creator-workspace.png" });
+
+  const saved = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  expect((await saved).suggestedFilename()).toBe("published-creator-smoke.3dmc");
+  expect(errors).toEqual([]);
+});
