@@ -1,5 +1,5 @@
 import type { EditorDocument } from "./domain";
-import { parseDocument } from "./domain";
+import { activeTexture, parseDocument } from "./domain";
 import { crc32 } from "../export/png";
 
 export const MAX_INPUT_PNG_BYTES = 1_500_000;
@@ -104,14 +104,14 @@ export function importTextureIntoDocument(
   if (policy === "use-png-size" && !canAdoptPngDimensions(image))
     reject("Adopting image size requires a square 16, 32 or 64-pixel PNG.");
 
-  const width = policy === "use-png-size" ? image.width : document.texture.width;
-  const height = policy === "use-png-size" ? image.height : document.texture.height;
+  const current = activeTexture(document);
+  const width = policy === "use-png-size" ? image.width : current.width;
+  const height = policy === "use-png-size" ? image.height : current.height;
   const pixels = resampleNearest(image.pixels, image.width, image.height, width, height);
   return parseDocument({
     ...document,
-    texture: { ...document.texture, name: image.name,
-      width, height, pixels
-    }
+    textures: document.textures.map(t => t.id === current.id
+      ? { ...t, name: image.name, width, height, pixels } : t)
   });
 }
 

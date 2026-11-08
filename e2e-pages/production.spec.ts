@@ -96,7 +96,8 @@ test("compiled site can preflight a user PNG and keep the current workspace on c
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("32 × 32 pixels")).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(page.locator(".asset-entry")).toContainText("lantern.png");
+  await expect(page.getByRole("group", { name: "Texture assets" })
+    .getByRole("button", { name: "Select texture lantern.png" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
 });
 
@@ -118,4 +119,16 @@ test("published paint tools erase and fill source RGBA pixels", async ({ page })
   const red = () => canvas.evaluate((node) =>
     (node as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data[0]);
   await expect.poll(red).toBe(245);
+});
+
+
+test("multi-texture Assets panel loads without runtime error on compiled Pages", async ({ page }) => {
+  const errors:string[]=[];
+  page.on("pageerror", e=>errors.push(e.message));
+  await page.goto("/3dMc/");
+  await expect(page.getByRole("group",{name:"Texture assets"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Add texture from PNG"})).toBeEnabled();
+  await page.getByRole("tab",{name:"Paint"}).click();
+  await expect(page.getByRole("combobox",{name:"Face texture asset"})).toHaveValue("main");
+  expect(errors).toEqual([]);
 });

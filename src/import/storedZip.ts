@@ -41,7 +41,9 @@ function reject(message: string): never {
 }
 
 const isPathAllowed = (path: string): boolean =>
-  EXPECTED.has(path) || /^assets\/3dmc\/textures\/block\/solid_(0|[1-9][0-9]*)\.png$/.test(path);
+  EXPECTED.has(path) ||
+  /^assets\/3dmc\/textures\/block\/solid_(0|[1-9][0-9]*)\.png$/.test(path) ||
+  /^assets\/3dmc\/textures\/block\/tex_([1-9][0-9]*)\.png$/.test(path);
 
 function readView(bytes: Uint8Array): DataView {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

@@ -1,5 +1,5 @@
 import type { EditorDocument, Vec3 } from "./domain";
-import { setTexturePixels, updateCuboid } from "./domain";
+import { activeTexture, setTexturePixels, textureById, updateCuboid } from "./domain";
 import type { Texel } from "./pixels";
 import { drawStroke } from "./pixels";
 
@@ -8,6 +8,7 @@ export type BrushMode = "pencil" | "eraser";
 export interface PaintGesture {
   /** One immutable source document, captured before any preview pixels. */
   readonly source: EditorDocument;
+  readonly textureId: string;
   readonly pixels: number[];
   readonly face: string;
   readonly previous: Texel;
@@ -19,12 +20,15 @@ export interface PaintGesture {
 /** Pure preview state: starting a gesture does not mutate the document. */
 export function beginPaintGesture(
   source: EditorDocument, texel: Texel, face: string,
-  color: string, size: BrushSize, brush: BrushMode = "pencil"
+  color: string, size: BrushSize, brush: BrushMode = "pencil",
+  textureId = source.activeTextureId
 ): PaintGesture {
+  const texture = textureById(source, textureId) ?? activeTexture(source);
   const alpha: 0 | 255 = brush === "eraser" ? 0 : 255;
   return {
-    source, pixels: drawStroke(source.texture.pixels, source.texture.width,
-      source.texture.height, texel, texel, color, size, alpha),
+    source, textureId: texture.id,
+    pixels: drawStroke(texture.pixels, texture.width,
+      texture.height, texel, texel, color, size, alpha),
     previous: texel, face, color, size, alpha
   };
 }
@@ -32,7 +36,7 @@ export function beginPaintGesture(
 export function continuePaintGesture(
   gesture: PaintGesture, texel: Texel, face: string
 ): PaintGesture {
-  const source = gesture.source.texture;
+  const source = textureById(gesture.source, gesture.textureId)!;
   // Never draw a connecting line through a UV atlas seam or across cuboids.
   const from = face === gesture.face ? gesture.previous : texel;
   return { ...gesture,
@@ -47,7 +51,7 @@ export function commitPaintGesture(
   document: EditorDocument, gesture: PaintGesture
 ): EditorDocument {
   if (document !== gesture.source) return document;
-  return setTexturePixels(document, gesture.pixels);
+  return setTexturePixels(document, gesture.pixels, gesture.textureId);
 }
 
 /** Cancel returns the identical original reference and creates no history. */

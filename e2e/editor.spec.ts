@@ -733,3 +733,105 @@ test("bucket fill respects contiguous RGBA boundaries, leaves one history entry,
   await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
   await expect.poll(() => sample(0, 0)).toEqual([245, 209, 132, 255]);
 });
+
+
+test("multiple PNG sources bind to different faces and round-trip through native and Java packs", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "New project" }).click();
+  const newDialog = page.getByRole("dialog", { name: "Create a new project" });
+  await newDialog.getByRole("button", { name: /Textured block/ }).click();
+  await newDialog.getByRole("textbox", { name: "New project name" }).fill("Multi material");
+  await newDialog.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByRole("heading", { name: "Main block" })).toBeVisible();
+
+  const png = await page.evaluate(async () => {
+    const { encodeRgbaPng } = await import("/src/export/png.ts");
+    const pixels: number[] = [];
+    for (let i = 0; i < 16 * 16; i++) pixels.push(220, i % 256, 25, 255);
+    return Array.from(encodeRgbaPng(16,16,pixels));
+  });
+  await page.getByRole("button", { name: "Add texture from PNG" }).click();
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name:"secondary.png", mimeType:"image/png", buffer:Buffer.from(png)
+  });
+  const preflight = page.getByRole("dialog", { name: "Add a texture asset?" });
+  await expect(preflight).toBeVisible();
+  await preflight.getByRole("radio", { name: /Use the PNG dimensions/ }).check();
+  await preflight.getByRole("button", { name: "Add texture asset" }).click();
+  await expect(page.getByRole("group", { name: "Texture assets" })
+    .getByRole("button", { name: "Select texture secondary.png" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const face = page.getByRole("region", { name: "Face UV mapping" });
+  await face.getByRole("button", { name: "North" }).click();
+  await face.getByRole("combobox", { name: "Face texture asset" })
+    .selectOption({ label: "secondary.png · 16×16" });
+  await expect(face.getByRole("combobox", { name: "Face texture asset" }))
+    .not.toHaveValue("main");
+  await face.getByRole("button", { name: "South" }).click();
+  await expect(face.getByRole("combobox", { name: "Face texture asset" }))
+    .toHaveValue("main");
+  await page.screenshot({ path:"test-results/multi-texture-face-inspector.png" });
+
+  const saved = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const source = await saved;
+  const filepath = await source.path();
+  if (!filepath) throw new Error("Native project download missing.");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]')
+    .setInputFiles(filepath);
+  const reopen = page.getByRole("dialog", { name: "Open this project?" });
+  await expect(reopen).toBeVisible();
+  await reopen.getByRole("button", { name: "Open project" }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await face.getByRole("button", { name: "North" }).click();
+  await expect(face.getByRole("combobox", { name: "Face texture asset" }))
+    .not.toHaveValue("main");
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const exporter = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(exporter.getByText(/0 blockers/)).toBeVisible();
+  const pack = page.waitForEvent("download");
+  await exporter.getByRole("button", { name: "Download experimental ZIP" }).click();
+  const out = await pack;
+  const outPath = await out.path();
+  if (!outPath) throw new Error("Resource pack download missing.");
+  await exporter.getByRole("button", { name: "Close" }).click();
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles(outPath);
+  const imported = page.getByRole("dialog", { name: "Import editable block pack?" });
+  await expect(imported).toBeVisible();
+  await imported.getByRole("button", { name: "Import as editable project" }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await face.getByRole("button", { name: "North" }).click();
+  await expect(face.getByRole("combobox", { name: "Face texture asset" }))
+    .not.toHaveValue("main");
+  expect(errors).toEqual([]);
+});
+
+test("texture deletion requires explicit affected-face remap and supports undo", async ({ page }) => {
+  await page.goto("/");
+  const saved = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download texture PNG" }).click();
+  const file = await saved;
+  const path = await file.path();
+  if (!path) throw new Error("No PNG file.");
+  await page.getByRole("button", { name: "Add texture from PNG" }).click();
+  await page.locator('input[accept=".png,image/png"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Add a texture asset?" })
+    .getByRole("button", { name: "Add texture asset" }).click();
+  const slots = page.getByRole("group", { name: "Texture assets" });
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
+  const deleteButtons = slots.locator('.texture-slot > button:last-child');
+  await deleteButtons.last().click();
+  const prompt = page.getByRole("dialog", { name: "Delete texture asset?" });
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole("button", { name: "Cancel" }).click();
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
+  await deleteButtons.last().click();
+  await prompt.getByRole("button", { name: "Remove and remap" }).click();
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(1);
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
+});

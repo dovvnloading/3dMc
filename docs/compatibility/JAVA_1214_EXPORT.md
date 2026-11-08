@@ -78,3 +78,12 @@ The Three.js BoxGeometry per-face UV attributes are derived from these canonical
 The Java 1.21.4 exporter writes each authored rectangle and its optional nonzero quarter-turn field, and the strict importer now reconstructs those fields rather than rejecting them. Import/export fidelity is claimed only for this limited explicit subset. Independent unit fixtures check UV scaling at 16, 32 and 64 pixels, reversed bounds, quarter turns including the down face, native migration and semantic round-trips.
 
 **Compatibility remains experimental:** actual Minecraft 1.21.4 six-face orientation and sampling must still be checked in-game under [Issue #4](https://github.com/dovvnloading/3dMc/issues/4). An internally consistent preview and codec pair cannot certify that result.
+
+
+## Experimental multi-texture extension (schema v3)
+
+The native editor can assign separate textures to each cuboid face. Java pack JSON uses the same explicit face bindings with texture aliases \`#painted\`, \`#painted_1\`, etc. The 0th source sheet is \`assets/3dmc/textures/block/main.png\`; following sheets are \`tex_1.png\`, \`tex_2.png\`, up to 16 total. The strict importer validates the entire contiguous alias/path set and rejects missing/extra resources or unsupported face rotation and model transforms. A solid-color element still uses its generated single-color texture and its source face bindings may be initialized on reimport because Java format does not retain native-only metadata.
+
+The first v3 source migration preserves legacy v2 face UVs and rotation, assigning their old shared sheet stable ID \`main\`. The Vite editor stores each sheet as one validated RGBA buffer, and the R3F renderer disposes maps when the resource key changes. Tests cover source migration, exact per-face aliases and deterministic native and experimental game-pack reimport.
+
+**Still not certified in Minecraft Java 1.21.4.** An internally consistent browser renderer/JSON importer is not a substitute for the six-face in-game evidence in Issue #4.

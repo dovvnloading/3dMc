@@ -5,6 +5,7 @@ import { canAdoptPngDimensions } from "../editor/textureImport";
 
 interface Props {
   image: DecodedTexture;
+  isAdding?: boolean;
   currentWidth: number;
   currentHeight: number;
   paintedFaces: number;
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export function TextureImportDialog({
-  image, currentWidth, currentHeight, paintedFaces, onClose, onConfirm
+  image, isAdding = false, currentWidth, currentHeight, paintedFaces, onClose, onConfirm
 }: Props) {
   const [policy, setPolicy] = useState<TextureImportPolicy>("keep-size");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,7 +41,7 @@ export function TextureImportDialog({
         <div className="png-import-symbol"><ImagePlus size={23}/></div>
         <div>
           <span className="png-import-kicker">TEXTURE IMPORT · PREFLIGHT</span>
-          <h2 id="png-import-title">Replace the shared texture?</h2>
+          <h2 id="png-import-title">{isAdding ? "Add a texture asset?" : "Replace the shared texture?"}</h2>
           <p>Review how this PNG will be applied before changing your project.</p>
         </div>
         <button type="button" aria-label="Cancel PNG import"
@@ -87,8 +88,10 @@ export function TextureImportDialog({
           </div>
           <div className="png-import-notices">
             <p><Info size={15}/><span>
-              This replaces one shared texture referenced by {paintedFaces} painted {paintedFaces === 1
-                ? "element" : "elements"}. It is <strong>one undoable edit</strong>; the original stays in Undo history.
+              {isAdding ? "A new named texture will be added. Assign it to any face in the Paint inspector." :
+                "This replaces the selected texture and affects all faces that use it."}
+              {isAdding ? "" : " Current painted element count: " + paintedFaces + "."}
+              It is <strong>one undoable edit</strong>; existing source textures remain in Undo history.
             </span></p>
             {resamples && <p><AlertTriangle size={15}/><span>
               Nearest-neighbor resampling changes pixel dimensions without smoothing. A non-square PNG is stretched
@@ -108,7 +111,7 @@ export function TextureImportDialog({
       <footer className="png-import-actions">
         <button type="button" className="text-button quiet" onClick={onClose}>Cancel</button>
         <button type="button" className="text-button primary" onClick={() => onConfirm(policy)}>
-          <ImagePlus size={16}/>Replace shared texture
+          <ImagePlus size={16}/>{isAdding ? "Add texture asset" : "Replace shared texture"}
         </button>
       </footer>
     </div>

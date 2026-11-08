@@ -46,7 +46,7 @@ export function addPrimitive(
     from: [...shape.from] as [number, number, number],
     to: [...shape.to] as [number, number, number],
     material: "solid", color: "#8ca794",
-    faces: createDefaultFaces(), visible: true, locked: false
+    faces: createDefaultFaces(document.activeTextureId), visible: true, locked: false
   };
   return { ...document, cuboids: [...document.cuboids, node] };
 }

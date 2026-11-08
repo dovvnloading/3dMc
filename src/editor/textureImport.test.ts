@@ -67,10 +67,10 @@ describe("PNG input boundary", () => {
       hasAlpha: false, translucentPixels: 0, opaquePixels: 256
     };
     const changed = importTextureIntoDocument(source, image, "use-png-size");
-    expect(changed.texture.width).toBe(16);
-    expect(changed.texture.height).toBe(16);
-    expect(changed.texture.name).toBe("custom.png");
-    expect(changed.texture.pixels).toEqual(image.pixels);
+    expect(changed.textures[0]!.width).toBe(16);
+    expect(changed.textures[0]!.height).toBe(16);
+    expect(changed.textures[0]!.name).toBe("custom.png");
+    expect(changed.textures[0]!.pixels).toEqual(image.pixels);
     expect(changed.cuboids).toEqual(source.cuboids);
     let history = commit(createHistory(source), changed);
     expect(history.past).toHaveLength(1);
@@ -88,14 +88,14 @@ describe("PNG input boundary", () => {
       hasAlpha: true, translucentPixels: 256, opaquePixels: 0
     };
     const changed = importTextureIntoDocument(source, image, "keep-size");
-    expect(changed.texture.width).toBe(32);
-    expect(changed.texture.pixels[3]).toBe(120);
+    expect(changed.textures[0]!.width).toBe(32);
+    expect(changed.textures[0]!.pixels[3]).toBe(120);
     const restored = await decodeNativeProject(await encodeNativeProject(changed));
     expect(restored).toEqual(changed);
     expect(inspectJava1214(changed).some(i =>
       i.severity === "error" && /alpha|opaque|transparen/i.test(i.message)
     )).toBe(true);
-    expect(setTexturePixels(changed, source.texture.pixels).texture.width).toBe(32);
+    expect(setTexturePixels(changed, source.textures[0]!.pixels).textures[0]!.width).toBe(32);
   });
 
   it("blocks unsupported policy and non-square source-size changes without mutation", () => {
@@ -108,8 +108,8 @@ describe("PNG input boundary", () => {
       .toThrow(TextureImportError);
     expect(() => importTextureIntoDocument(source, image, "bad" as "keep-size"))
       .toThrow(/policy/);
-    expect(source.texture.width).toBe(32);
-    expect(importTextureIntoDocument(source, image, "keep-size").texture.pixels)
+    expect(source.textures[0]!.width).toBe(32);
+    expect(importTextureIntoDocument(source, image, "keep-size").textures[0]!.pixels)
       .toHaveLength(32 * 32 * 4);
   });
 });

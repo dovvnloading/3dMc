@@ -16,11 +16,11 @@ describe("canonical document", () => {
 
   it("rejects unsupported versions, invalid geometry, and oversized pixels", () => {
     const sample = createSampleDocument();
-    expect(() => parseDocument({ ...sample, schemaVersion: 3 })).toThrow(/version/i);
+    expect(() => parseDocument({ ...sample, schemaVersion: 4 })).toThrow(/version/i);
     expect(() => parseDocument({ ...sample, cuboids: [
       { ...sample.cuboids[0], to: [3, 12, 13] }
     ] })).toThrow(/cuboid/i);
-    expect(() => parseDocument({ ...sample, texture: { ...sample.texture, width: 1024 } }))
+    expect(() => parseDocument({ ...sample, textures: [{ ...sample.textures[0]!, width: 1024 }] }))
       .toThrow(/texture/i);
   });
 
@@ -37,13 +37,13 @@ describe("canonical document", () => {
     const document = createSampleDocument();
     let history = createHistory(document);
     history = commit(history, setAxisValue(history.present, "body", "position", 1, 4));
-    const changedPixels = drawStroke(history.present.texture.pixels, 32, 32,
+    const changedPixels = drawStroke(history.present.textures[0]!.pixels, 32, 32,
       [2, 2], [7, 4], "#ff0044", 1);
     history = commit(history, setTexturePixels(history.present, changedPixels));
     expect(history.past).toHaveLength(2);
     const painted = history.present;
     history = undo(history);
-    expect(history.present.texture.pixels).toEqual(document.texture.pixels);
+    expect(history.present.textures[0]!.pixels).toEqual(document.textures[0]!.pixels);
     history = undo(history);
     expect(history.present).toBe(document);
     history = redo(redo(history));
@@ -81,18 +81,18 @@ describe("face-aware native project migration", () => {
   it("migrates legacy v1 cuboids to six full-sheet UV mappings without losing pixels", () => {
     const sample = createSampleDocument();
     const legacy = {
-      ...sample, schemaVersion: 1,
+      ...sample, schemaVersion: 1, texture: sample.textures[0]!,
       cuboids: sample.cuboids.map(({ faces: _faces, ...node }) => node)
     };
     const migrated = decodeProject(JSON.stringify(legacy));
-    expect(migrated.schemaVersion).toBe(2);
-    expect(migrated.texture.pixels).toEqual(sample.texture.pixels);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.textures[0]!.pixels).toEqual(sample.textures[0]!.pixels);
     expect(migrated.cuboids.map((node) => node.from))
       .toEqual(sample.cuboids.map((node) => node.from));
     for (const node of migrated.cuboids) {
       expect(Object.keys(node.faces).sort()).toEqual([...FACE_DIRECTIONS].sort());
       for (const face of FACE_DIRECTIONS)
-        expect(node.faces[face]).toEqual({ uv: [0, 0, 16, 16], rotation: 0 });
+        expect(node.faces[face]).toEqual({ uv: [0, 0, 16, 16], rotation: 0, textureId: "main" });
     }
     expect(decodeProject(encodeProject(migrated))).toEqual(migrated);
   });
@@ -103,7 +103,7 @@ describe("face-aware native project migration", () => {
     history = commit(history, updateFaceUV(history.present, "body", "north", 0, 2));
     history = commit(history, updateFaceRotation(history.present, "body", "north", 90));
     expect(history.present.cuboids[0]?.faces.north)
-      .toEqual({ uv: [2, 0, 16, 16], rotation: 90 });
+      .toEqual({ uv: [2, 0, 16, 16], rotation: 90, textureId: "main" });
     history = undo(undo(history));
     expect(history.present).toEqual(sample);
     history = redo(redo(history));
@@ -123,6 +123,6 @@ describe("face-aware native project migration", () => {
           uv: [4, 2, 4, 12], rotation: 90
         } } } : node)
     };
-    expect(() => parseDocument(wrong)).toThrow(/cuboids/i);
+    expect(() => parseDocument(wrong)).toThrow(/cuboid/i);
   });
 });
