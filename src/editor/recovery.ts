@@ -46,6 +46,7 @@ function openDatabase(): Promise<IDBDatabase> {
     // An upgrade preserves all v1 checkpoints in place. Ownership lives in a
     // separate object store so the writer and its checkpoint can share a tx.
     const request = indexedDB.open(DATABASE, 2);
+    let blocked = false;
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE))
         request.result.createObjectStore(STORE, { keyPath: "key" });
@@ -53,8 +54,14 @@ function openDatabase(): Promise<IDBDatabase> {
         request.result.createObjectStore(OWNERS, { keyPath: "key" });
     };
     request.onerror = () => reject(request.error ?? new Error("Could not open recovery storage."));
-    request.onblocked = () => reject(new Error("An older tab is blocking the recovery database upgrade."));
-    request.onsuccess = () => resolve(request.result);
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error("An older tab is blocking the recovery database upgrade."));
+    };
+    request.onsuccess = () => {
+      if (blocked) request.result.close();
+      else resolve(request.result);
+    };
   });
 }
 
@@ -203,6 +210,7 @@ export async function readRecovery(): Promise<RecoveryCandidate | null> {
       previous.result as Checkpoint | undefined
     ]);
     tx.onerror = () => reject(tx.error ?? new Error("Could not read recovery data."));
+    tx.onabort = () => reject(tx.error ?? new Error("Recovery read transaction aborted."));
   }).finally(() => db.close());
 
   for (let i = 0; i < records.length; i++) {

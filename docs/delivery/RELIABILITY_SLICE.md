@@ -32,3 +32,10 @@ The in-process publication queue controls ordering before asynchronous hashing. 
 - [Java 1.21.4 in-game verification](https://github.com/dovvnloading/3dMc/issues/4), including asymmetric six-face fixtures, is a separate gate. Successful browser/codec tests cannot satisfy it.
 
 See [Issue #8](https://github.com/dovvnloading/3dMc/issues/8) for remaining reliability tasks and [Issue #6](https://github.com/dovvnloading/3dMc/issues/6) for the UV performance/evidence gate.
+
+
+## Additional transaction-abort and lost-capture tests
+
+The recovery browser suite now injects a real IndexedDB read-transaction abort and checks that the read rejects promptly instead of hanging. Another scenario aborts a readwrite transaction during checkpoint publication and confirms the last acknowledged source is intact. A third scenario cancels a pencil stroke by losing pointer capture, verifying identical pixels and no new undo entry.
+
+If an IndexedDB version upgrade is blocked by an older tab, a late-opened database connection is now closed rather than leaked after the failure was already reported. These are Chromium fault injections, not a certification for every browser or device suspension pattern.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -100,6 +100,71 @@ function useTextureMaps(textures: PixelTexture[], draftPixels: number[],
   }, [resources, textures, draftPixels, draftTextureId, activeTextureId, invalidate]);
   useEffect(() => () => Object.values(resources).forEach(r => r.map.dispose()), [resources]);
   return Object.fromEntries(Object.entries(resources).map(([id, r]) => [id, r.map]));
+}
+
+
+/**
+ * Opt-in development-only diagnostics. This is not shipped to the production
+ * GitHub Pages bundle. Measures real R3F/WebGL resource counts and frame
+ * intervals, rather than inferring texture allocation from ZIP byte counts.
+ */
+interface EditorDiagnostics {
+  snapshot: () => {
+    gpuTextures: number; gpuGeometries: number;
+    drawCalls: number; triangles: number; renderedFrames: number;
+    frameIntervalP50Ms: number | null; frameIntervalP95Ms: number | null;
+    pixelRatio: number;
+  };
+  resetFrames: () => void;
+}
+type DiagnosticsWindow = Window & { __3dmcDiagnostics?: EditorDiagnostics };
+
+function DevPerformanceProbe() {
+  const { gl } = useThree();
+  const samples = useRef<number[]>([]);
+  const frameCount = useRef(0);
+  const lastFrame = useRef<number | null>(null);
+  useFrame(() => {
+    const now = performance.now();
+    if (lastFrame.current !== null) {
+      const interval = now - lastFrame.current;
+      if (interval > 0 && interval < 200) {
+        samples.current.push(interval);
+        if (samples.current.length > 200) samples.current.shift();
+      }
+    }
+    lastFrame.current = now;
+    frameCount.current += 1;
+  });
+  useEffect(() => {
+    const target = window as DiagnosticsWindow;
+    const percentile = (input: number[], percent: number) =>
+      input.length ? [...input].sort((a, b) => a - b)[Math.min(
+        input.length - 1, Math.floor((input.length - 1) * percent)
+      )]! : null;
+    const api: EditorDiagnostics = {
+      snapshot: () => ({
+        gpuTextures: gl.info.memory.textures,
+        gpuGeometries: gl.info.memory.geometries,
+        drawCalls: gl.info.render.calls,
+        triangles: gl.info.render.triangles,
+        renderedFrames: frameCount.current,
+        frameIntervalP50Ms: percentile(samples.current, .5),
+        frameIntervalP95Ms: percentile(samples.current, .95),
+        pixelRatio: gl.getPixelRatio()
+      }),
+      resetFrames: () => {
+        samples.current = [];
+        frameCount.current = 0;
+        lastFrame.current = null;
+      }
+    };
+    target.__3dmcDiagnostics = api;
+    return () => {
+      if (target.__3dmcDiagnostics === api) delete target.__3dmcDiagnostics;
+    };
+  }, [gl]);
+  return null;
 }
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
@@ -287,6 +352,9 @@ export function EditorViewport(props: ViewportProps) {
       fallback={<div className="webgl-fallback">3D rendering is unavailable. Your project remains editable through the Scene and Inspector.</div>}
       onPointerMissed={() => { if (props.mode === "model" && props.tool === "select") props.onSelect(null); }}>
       <Scene {...props} />
+      {import.meta.env.DEV && typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).has("benchmark") &&
+        <DevPerformanceProbe />}
     </Canvas>
   </div>;
 }
