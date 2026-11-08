@@ -12,7 +12,7 @@ The first implementation milestone is a polished, complete editing loop for a de
 
 ## Start here
 
-Read the [planning guide](docs/README.md) for the recommended reading order and the decisions that remain open. The [reliability implementation notes](docs/delivery/RELIABILITY_SLICE.md) distinguish what is protected today from future fault-injection and device testing.
+Read the [planning guide](docs/README.md) for the recommended reading order and the decisions that remain open. The [reliability implementation notes](docs/delivery/RELIABILITY_SLICE.md) distinguish what is protected today from future fault-injection and device testing. The [six-face game verification worksheet](docs/compatibility/SIX_FACE_GAME_CHECK.md) documents a reproducible asymmetric fixture for Minecraft 1.21.4; real in-game testing remains outstanding.
 
 | Document | What it answers |
 | --- | --- |

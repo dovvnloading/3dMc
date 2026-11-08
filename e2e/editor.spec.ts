@@ -377,3 +377,40 @@ test("a storage write failure is reported and native backup download stays avail
   expect(await file.path()).toBeTruthy();
   await expect(width).toHaveValue("12");
 });
+
+
+test("six-face diagnostic ZIP opens as a one-cuboid 64×64 editable fixture", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const modal = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(modal.getByRole("region", { name: "Six-face compatibility fixture" })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await modal.getByRole("button", { name: "Download six-face diagnostic ZIP" }).click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toBe("3dmc-java-1.21.4-six-face-orientation-test.zip");
+  const saved = await file.path();
+  if (!saved) throw new Error("Fixture download was not saved.");
+  await file.saveAs("test-results/six-face-orientation-test.zip");
+  await modal.getByRole("button", { name: "Close" }).click();
+
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles(saved);
+  const imported = page.getByRole("dialog", { name: "Import editable block pack?" });
+  await expect(imported).toBeVisible();
+  await expect(imported.locator(".import-summary").getByText("64 × 64")).toBeVisible();
+  await expect(imported.locator(".import-summary").getByText("1", { exact: true })).toBeVisible();
+  await imported.getByRole("button", { name: "Import as editable project" }).click();
+  await expect(page.getByRole("heading", { name: "Imported cuboid 01" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const mapping = page.getByRole("region", { name: "Face UV mapping" });
+  await mapping.getByRole("button", { name: "North" }).click();
+  await expect(mapping.getByRole("textbox", { name: "Face UV U1" })).toHaveValue("0");
+  await expect(mapping.getByRole("textbox", { name: "Face UV U2" })).toHaveValue("4");
+  await mapping.getByRole("button", { name: "East" }).click();
+  await expect(mapping.getByRole("textbox", { name: "Face UV U1" })).toHaveValue("4");
+  await expect(mapping.getByRole("textbox", { name: "Face UV U2" })).toHaveValue("8");
+  await mapping.getByRole("button", { name: "Down" }).click();
+  await expect(mapping.getByRole("textbox", { name: "Face UV V1" })).toHaveValue("4");
+  await expect(mapping.getByRole("textbox", { name: "Face UV V2" })).toHaveValue("8");
+  await page.screenshot({ path: "test-results/six-face-editor-preview.png" });
+});

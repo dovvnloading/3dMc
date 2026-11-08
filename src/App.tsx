@@ -30,6 +30,7 @@ import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
 import { FaceUVInspector } from "./components/FaceUVInspector";
+import { makeSixFaceDiagnosticDocument } from "./compatibility/diagnostic";
 import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
 import {
@@ -451,6 +452,27 @@ export function App() {
     }
   };
 
+  const downloadDiagnosticPack = () => {
+    try {
+      // This fixed, independently labeled specimen does not mutate or export
+      // the current user's document. It remains a game-unverified fixture.
+      const pack = makeJava1214Pack(makeSixFaceDiagnosticDocument());
+      const url = URL.createObjectURL(new Blob([new Uint8Array(pack.zip)], {
+        type: "application/zip"
+      }));
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = "3dmc-java-1.21.4-six-face-orientation-test.zip";
+      globalThis.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setNotice("Six-face diagnostic download started. Install the unmodified ZIP in Java 1.21.4 and record screenshots/logs; game verification remains pending.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare the diagnostic pack.");
+    }
+  };
+
   const chooseProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -821,6 +843,17 @@ export function App() {
         <code>{JAVA_PACK_PATHS.mainTexture}</code>
         <span>Plus {doc.cuboids.filter((node) => node.material === "solid").length} generated solid-color texture files.</span>
       </div>
+      <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture">
+        <div>
+          <strong>Six-face orientation test</strong>
+          <p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces,
+            upward arrows and asymmetric corner markers. It does not use or change your current project.
+            Minecraft Java 1.21.4 verification is still pending.</p>
+        </div>
+        <button className="text-button quiet" onClick={downloadDiagnosticPack}>
+          <Download size={15}/>Download six-face diagnostic ZIP
+        </button>
+      </section>
       <div className="export-issues">
         <strong>Preflight · {exportIssues.filter((issue) => issue.severity === "error").length} blockers</strong>
         {exportIssues.map((issue) => <div key={issue.code + (issue.nodeId ?? "")}
