@@ -40,10 +40,10 @@ test("model dimensions, undo/redo, paint, and portable project reopening", async
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save project" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/\.3dmc\.json$/);
+  expect(download.suggestedFilename()).toMatch(/\.3dmc$/);
   const path = await download.path();
   if (!path) throw new Error("Download was not saved in the browser test");
-  await page.locator('input[accept=".json,application/json"]').setInputFiles(path);
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
   await expect(page.getByRole("dialog", { name: "Open this project?" })).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Open project" }).click();
   await expect(page.getByRole("textbox", { name: "X size" })).toHaveValue("12");
@@ -73,7 +73,7 @@ test("opening a project commits a fresh local checkpoint before the next reload"
   const path = await download.path();
   if (!path) throw new Error("Project download missing");
 
-  await page.locator('input[accept=".json,application/json"]').setInputFiles(path);
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
   await page.getByRole("dialog").getByRole("button", { name: "Open project" }).click();
   await expect(page.getByText("Saved on this device")).toBeVisible();
   await page.reload();
@@ -200,7 +200,7 @@ test("per-face UV edits are reversible, visually linked, and survive native and 
   const projectFile = await saved;
   const projectPath = await projectFile.path();
   if (!projectPath) throw new Error("Browser did not save native test project.");
-  await page.locator('input[accept=".json,application/json"]').setInputFiles(projectPath);
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(projectPath);
   await page.getByRole("dialog", { name: "Open this project?" })
     .getByRole("button", { name: "Open project" }).click();
   await page.getByRole("tab", { name: "Paint" }).click();
@@ -373,7 +373,7 @@ test("a storage write failure is reported and native backup download stays avail
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save project" }).click();
   const file = await downloaded;
-  expect(file.suggestedFilename()).toMatch(/\.3dmc\.json$/);
+  expect(file.suggestedFilename()).toMatch(/\.3dmc$/);
   expect(await file.path()).toBeTruthy();
   await expect(width).toHaveValue("12");
 });
@@ -414,4 +414,96 @@ test("six-face diagnostic ZIP opens as a one-cuboid 64×64 editable fixture", as
   await expect(mapping.getByRole("textbox", { name: "Face UV V1" })).toHaveValue("4");
   await expect(mapping.getByRole("textbox", { name: "Face UV V2" })).toHaveValue("8");
   await page.screenshot({ path: "test-results/six-face-editor-preview.png" });
+});
+
+
+test("new project gallery creates an empty scene, then a textured block with a custom resolution", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "New project" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create a new project" });
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: "test-results/new-project-gallery.png" });
+  await dialog.getByRole("button", { name: /Empty canvas/ }).click();
+  await dialog.getByRole("textbox", { name: "New project name" }).fill("A clean slate");
+  await dialog.getByRole("button", { name: "16 pixel texture" }).click();
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue("A clean slate");
+  await expect(page.getByText("Your canvas is ready")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Add first cuboid" }).click();
+  await expect(page.getByRole("heading", { name: "New element" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeEnabled();
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect(page.getByText("Your canvas is ready")).toBeVisible();
+
+  await page.getByRole("button", { name: "New project" }).click();
+  await dialog.getByRole("button", { name: /Textured block/ }).click();
+  await dialog.getByRole("textbox", { name: "New project name" }).fill("Studio Block");
+  await dialog.getByRole("button", { name: "64 pixel texture" }).click();
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByRole("heading", { name: "Main block" })).toBeVisible();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const texture = page.locator(".texture-pixel-wrap canvas");
+  await expect(texture).toHaveAttribute("width", "64");
+  await expect(texture).toHaveAttribute("height", "64");
+  expect(errors).toEqual([]);
+});
+
+test("native project archive preserves editable geometry and exact pixels after reopen", async ({ page }) => {
+  await page.goto("/");
+  const xSize = page.getByRole("textbox", { name: "X size" });
+  await xSize.fill("12");
+  await xSize.press("Enter");
+  await expect(xSize).toHaveValue("12");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const mapping = page.getByRole("region", { name: "Face UV mapping" });
+  await mapping.getByRole("textbox", { name: "Face UV U1" }).fill("4");
+  await mapping.getByRole("textbox", { name: "Face UV U1" }).press("Enter");
+  await page.getByRole("tab", { name: "Model" }).click();
+
+  const saved = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const archive = await saved;
+  expect(archive.suggestedFilename()).toBe("copper-lantern.3dmc");
+  const path = await archive.path();
+  if (!path) throw new Error("Native project archive not available.");
+
+  await page.getByRole("button", { name: "New project" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create a new project" });
+  await dialog.getByRole("button", { name: /Empty canvas/ }).click();
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByText("Your canvas is ready")).toBeVisible();
+
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project" }).click();
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "X size" })).toHaveValue("12");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await expect(page.getByRole("region", { name: "Face UV mapping" })
+    .getByRole("textbox", { name: "Face UV U1" })).toHaveValue("4");
+});
+
+test("legacy JSON backups remain importable beside native .3dmc source archives", async ({ page }) => {
+  await page.goto("/");
+  const legacy = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download legacy JSON backup" }).click();
+  const file = await legacy;
+  expect(file.suggestedFilename()).toBe("copper-lantern.3dmc.json");
+  const path = await file.path();
+  if (!path) throw new Error("Legacy JSON download missing.");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" }).getByRole("button", { name: "Open project" }).click();
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles({
+    name: "not-a-project.3dmc", mimeType: "application/zip",
+    buffer: Buffer.from("invalid native ZIP")
+  });
+  await expect(page.getByRole("dialog", { name: "Open this project?" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
 });

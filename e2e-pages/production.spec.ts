@@ -49,5 +49,5 @@ test("compiled site remains interactive and downloads native source", async ({ p
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save project" }).click();
-  expect((await download).suggestedFilename()).toMatch(/\.3dmc\.json$/);
+  expect((await download).suggestedFilename()).toMatch(/\.3dmc$/);
 });
