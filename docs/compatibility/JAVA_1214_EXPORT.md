@@ -7,11 +7,11 @@
 - **Edition/release:** Minecraft Java Edition 1.21.4, stable, with resource-pack version **46**.
 - **Replacement:** Visual model of the existing `minecraft:diamond_block`. This does not add a new vanilla block, change collision, supply light, or alter gameplay.
 - **Blockstate dispatch:** `assets/minecraft/blockstates/diamond_block.json` uses an explicit single empty variant pointing to `3dmc:block/lantern`. A resource pack can override a vanilla model via a blockstate/model reference; do not assume the game's default stone blockstate selects a single model.
-- **Model:** `assets/3dmc/models/block/lantern.json`, with explicit `elements`, six face bindings, whole-sheet `[0,0,16,16]` logical UV rectangles, and namespaced texture references.
+- **Model:** `assets/3dmc/models/block/lantern.json`, with explicit `elements`, six face bindings, explicit per-face logical 0–16 UV rectangles, optional quarter-turn rotation fields, and namespaced texture references. Newly created cuboids default to full-sheet `[0,0,16,16]`.
 - **Images:** `assets/3dmc/textures/block/main.png` holds the editable opaque RGBA pixel sheet. Solid-color elements each receive an independently encoded 1×1 PNG, so viewport-only solid colors aren't silently lost.
 - **Metadata:** `pack.mcmeta` contains `pack.pack_format = 46`.
 - **ZIP:** Flat expected resource paths, uncompressed ZIP entries, fixed file timestamps. Repeated exports of the same document have identical bytes in the same runtime environment.
-- **Preview truth:** The browser viewport is an editor approximation. Face UV orientation, shading, and in-game output still need independent comparison; the generator does not claim parity.
+- **Preview truth:** The browser viewport is an editor approximation. Face orientation, shading, and in-game output still need independent comparison using asymmetric six-face fixtures; the generator does not claim parity.
 
 ## Preflight rules
 
@@ -49,6 +49,32 @@ Do **not** repair the generated pack by hand and then call the original exporter
 
 ## Next compatibility boundaries
 
-The native project schema remains transitional `.3dmc.json`. Imported model and resource-pack support, per-face UV rectangles, pivots, rotations, target texture references beyond one sheet, texture alpha, and a versioned native archive are not included. Each needs its own fixture and preservation contract before export can be promoted beyond this experiment.
+The native project schema remains transitional `.3dmc.json`. Broad third-party model and resource-pack support, element pivots/transforms, target texture references beyond one shared sheet, texture alpha, and a versioned native ZIP archive are not included. Each needs its own fixture and preservation contract before export can be promoted beyond this experiment.
 
 The release-agnostic strategy remains in [COMPATIBILITY.md](../architecture/COMPATIBILITY.md).
+
+## Round-trip import (the next bounded slice)
+
+The Java 1.21.4 experiment can now re-import the **exact STORED ZIP subset emitted by 3dMc's own exporter** and recover editable cuboid bounds, material/color assignments and the shared opaque RGBA texture. The import runs as a preflight report; nothing replaces the active project until the user explicitly accepts it.
+
+This is **not** a general Minecraft resource-pack importer. A valid ZIP containing additional resources, inherited models, different per-face texture **references**, element transforms, compressed ZIP entries, unsupported PNG formats, alternate blockstate variants, or unknown fields is **blocked with a specific reason** rather than silently flattened.
+
+ZIP inspection rejects oversized archives, unexpected paths, repeated names, non-stored/compressed entries, malformed directories/local headers, mismatched sizes and CRCs, and overlapping/untracked bytes. The PNG decoder accepts only the bounded RGBA8/filter-0 output from our encoder and checks PNG chunk CRCs plus zlib Adler-32 using a fixed-size inflate buffer.
+
+Native-only part names, visibility/lock flags, the source project ID and undo history do not exist in the resource pack, so they are **reinitialized visibly** after import. Saving a native project preserves these attributes going forward. Semantic round-trip tests check geometry, colors and opaque texture bytes and require the exporter to regenerate identical ZIP bytes for its own original output.
+
+The in-game verification issue remains [#4](https://github.com/dovvnloading/3dMc/issues/4). Passing import/export byte tests still does not prove Minecraft rendering fidelity.
+
+## Per-face UV authoring (schema v2)
+
+The new editor document stores a face binding for each of the six semantic directions: `down`, `up`, `north`, `south`, `west`, `east`. Each binding contains the explicit logical UV edges `[u1,v1,u2,v2]` and a face texture rotation of `0`, `90`, `180` or `270` degrees. Reversed bounds are allowed for intentional flips. Zero-area rectangles, non-finite coordinates and edges outside 0–16 are rejected. Element transforms remain outside this slice.
+
+The face selection lives in Paint mode rather than becoming another top-level mode. Scene selection, 3D surface selection, numeric face editing, an outlined 2D texture region and export all refer to the same face binding. Numeric editing is reversible, and an explicit Reset face action restores full-sheet mapping in one transaction.
+
+Native v1 `.3dmc.json` projects are **migrated in memory**: a missing face binding becomes `[0,0,16,16]` and zero rotation on each of the six directions, preserving source cuboid bounds, material flags and texture pixels. Saving writes schema v2; no original file is overwritten just by opening it.
+
+The Three.js BoxGeometry per-face UV attributes are derived from these canonical bindings. Raycasting returns the same baked UV values that painting converts back to texels. Texture-space continuity is maintained within one semantic face; a cross-face sample starts a new stroke segment to prevent painting through disconnected atlas regions. Changes to shared texture pixels affect all faces referencing those pixels. The texture panel outlines the selected face’s current UV rectangle.
+
+The Java 1.21.4 exporter writes each authored rectangle and its optional nonzero quarter-turn field, and the strict importer now reconstructs those fields rather than rejecting them. Import/export fidelity is claimed only for this limited explicit subset. Independent unit fixtures check UV scaling at 16, 32 and 64 pixels, reversed bounds, quarter turns including the down face, native migration and semantic round-trips.
+
+**Compatibility remains experimental:** actual Minecraft 1.21.4 six-face orientation and sampling must still be checked in-game under [Issue #4](https://github.com/dovvnloading/3dMc/issues/4). An internally consistent preview and codec pair cannot certify that result.

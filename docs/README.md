@@ -1,6 +1,6 @@
 # 3dMc planning guide
 
-**Status:** proposed foundation, prepared 2026-11-08. An S0 editor implementation has now begun on the stacked feature branch; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
+**Status:** proposed foundation, prepared 2026-11-08. The editor is implemented on main with a staged UV-authoring update; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
 
 ## The central decision
 
@@ -51,7 +51,7 @@ If two documents disagree, use the source of truth for that subject and update t
 
 ## What is ready and what still needs evidence
 
-This foundation defines the product direction, implementation order, architectural boundaries, and quality expectations. It does not establish a validated product-market fit, a measured performance result, or tested Minecraft compatibility. S0 exists to convert the riskiest assumptions into evidence before implementation hardens around them. The [Java 1.21.4 export experiment](compatibility/JAVA_1214_EXPORT.md) now implements deterministic offline packaging for one replacement block. In-game verification remains pending.
+This foundation defines the product direction, implementation order, architectural boundaries, and quality expectations. It does not establish a validated product-market fit, a measured performance result, or tested Minecraft compatibility. S0 exists to convert the riskiest assumptions into evidence before implementation hardens around them. The [Java 1.21.4 export experiment](compatibility/JAVA_1214_EXPORT.md) implements deterministic offline packaging and exact-subset import for one replacement block, with a face-aware UV extension. In-game verification remains pending.
 
 The next concrete step is the [S0 work queue](delivery/BACKLOG.md#s0-direction-and-compatibility-proof): pin the target, build reference fixtures, test the navigation model with creators, and establish the runtime and benchmark baseline. S1 then turns those decisions into the first complete editor slice.
 

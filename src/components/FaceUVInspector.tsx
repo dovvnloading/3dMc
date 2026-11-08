@@ -3,7 +3,7 @@ import { RotateCcw } from "lucide-react";
 import {
   FACE_DIRECTIONS, updateCuboid, updateFaceRotation, updateFaceUV
 } from "../editor/domain";
-import type { Cuboid, EditorDocument, FaceDirection, FaceRotation } from "../editor/domain";
+import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV } from "../editor/domain";
 import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
 
 function UVField({ label, value, opposite, disabled, onCommit }: {
@@ -55,11 +55,8 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
     const current = node.faces[face];
     if (current.rotation === 0 && current.uv.every((n, i) => n === [0, 0, 16, 16][i]))
       return node;
-    return {
-      ...node, faces: {
-        ...node.faces, [face]: { uv: [0, 0, 16, 16], rotation: 0 }
-      }
-    };
+    const defaultFace: FaceUV = { uv: [0, 0, 16, 16], rotation: 0 };
+    return { ...node, faces: { ...node.faces, [face]: defaultFace } };
   }));
   return <section className="face-uv-section" aria-label="Face UV mapping">
     <div className="panel-section-heading">
