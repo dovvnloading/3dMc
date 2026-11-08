@@ -17,6 +17,7 @@ import type { History } from "./editor/history";
 import { commitSelectionGesture, deleteSelection, duplicateSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
+import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
 import { decodeNativeProject, encodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
@@ -170,14 +171,26 @@ export function App() {
   const fileRef = useRef<HTMLInputElement>(null), packFileRef = useRef<HTMLInputElement>(null), textureFileRef = useRef<HTMLInputElement>(null);
   const sceneListRef = useRef<HTMLDivElement>(null);
   const activeRevision = useRef(history.revision); activeRevision.current = history.revision;
+  const fileIntent = useRef(0), openingProject = useRef(false);
+  const textureSource = useRef<{ document: EditorDocument; mode: "replace" | "new" } | null>(null);
 
+  // Synchronously publish the authoritative revision before React batches the render.
+  // Two commands in the same event turn must not silently discard the second edit.
+  const publishHistory = useCallback((advance: (current: History) => History): boolean => {
+    const current = historyRef.current, next = advance(current);
+    if (next === current) return false;
+    historyRef.current = next; activeRevision.current = next.revision;
+    setHistory(next);
+    return true;
+  }, []);
   const commitDocument = useCallback((operation: CommitFn) => {
-    if (!writerRef.current || awaitingRecoveryRef.current) return;
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
     if (drag.current) {
       drag.current = null; setDraftPixels(null); setDraftTextureId(null); setCancelToken(current => current + 1);
     }
-    setHistory(current => commit(current, operation(current.present)));
-  }, []);
+    try { publishHistory(current => commit(current, operation(current.present))); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "The edit was rejected; no project data changed."); }
+  }, [publishHistory]);
   const clearStroke = useCallback(() => {
     drag.current = null; setDraftPixels(null); setDraftTextureId(null); setCancelToken(current => current + 1);
   }, []);
@@ -188,7 +201,7 @@ export function App() {
       selectAt(current, id, historyRef.current.present.cuboids.map(node => node.id), modifiers));
   }, [clearStroke]);
   const applyBatch = useCallback((operation: CommitFn): boolean => {
-    if (!writerRef.current || awaitingRecoveryRef.current) return false;
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return false;
     const source = historyRef.current.present;
     try {
       const next = operation(source);
@@ -219,7 +232,7 @@ export function App() {
   }, [applyBatch]);
 
   const beginPaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
-    if (!writerRef.current || awaitingRecoveryRef.current || drag.current || (tool !== "pencil" && tool !== "eraser")) return;
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current || (tool !== "pencil" && tool !== "eraser")) return;
     const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool, textureId);
     drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
   }, [color, brushSize, tool]);
@@ -330,13 +343,13 @@ export function App() {
   const keepCurrentWorkspace = () => { awaitingRecoveryRef.current = false; setCandidate(null); setWriterEpoch(epoch => epoch + 1); };
   const navigate = (kind: ViewKind) => setView(current => ({ kind, count: current.count + 1 }));
   const runUndo = useCallback(() => {
-    if (!writerRef.current || awaitingRecoveryRef.current) return;
-    clearStroke(); setHistory(state => undo(state));
-  }, [clearStroke]);
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
+    clearStroke(); publishHistory(undo);
+  }, [clearStroke, publishHistory]);
   const runRedo = useCallback(() => {
-    if (!writerRef.current || awaitingRecoveryRef.current) return;
-    clearStroke(); setHistory(state => redo(state));
-  }, [clearStroke]);
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
+    clearStroke(); publishHistory(redo);
+  }, [clearStroke, publishHistory]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       if (event.key === "Escape" && drag.current) { event.preventDefault(); clearStroke(); return; }
@@ -413,30 +426,37 @@ export function App() {
   };
   const chooseTexture = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-    const session = activeSession.current; setTextureReading(true);
+    const request = ++fileIntent.current, session = activeSession.current;
+    const source = historyRef.current.present, importMode = textureImportMode;
+    const current = () => fileIntent.current === request && activeSession.current === session;
+    setTextureReading(true); setPackInspecting(false);
     try {
-      const decoded = await decodeBrowserPng(file); if (activeSession.current !== session) return;
-      setPendingTexture(decoded);
+      const decoded = await decodeBrowserPng(file); if (!current()) return;
+      if (historyRef.current.present !== source) {
+        setNotice("The project or selected texture changed while the PNG was decoding. Choose the image again; no pixels were replaced."); return;
+      }
+      textureSource.current = { document: source, mode: importMode }; setPendingTexture(decoded);
     } catch (error) {
-      if (activeSession.current === session) setNotice(error instanceof Error ? error.message : "The PNG couldn't be imported.");
-    } finally { setTextureReading(false); }
+      if (current()) setNotice(error instanceof Error ? error.message : "The PNG couldn't be imported.");
+    } finally { if (current()) setTextureReading(false); }
   };
   const applyImportedTexture = (policy: TextureImportPolicy) => {
-    const image = pendingTexture; if (!image) return;
-    try {
-      if (textureImportMode === "new") {
-        const source = activeTexture(historyRef.current.present);
-        const width = policy === "use-png-size" ? image.width : source.width, height = policy === "use-png-size" ? image.height : source.height;
-        const pixels = resampleNearest(image.pixels, image.width, image.height, width, height);
-        const newAsset = { id: "tex_" + crypto.randomUUID().replace(/-/g, "").slice(0, 16), name: image.name, width, height, pixels };
-        commitDocument(current => addTexture(current, newAsset));
-        setNotice("New texture asset added. Assign it to individual faces in the Paint inspector.");
-      } else {
-        commitDocument(current => importTextureIntoDocument(current, image, policy));
-        setNotice("Selected texture replaced with one undoable edit. Save a .3dmc backup.");
-      }
-      setPendingTexture(null);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "The PNG couldn't be applied."); }
+    const image = pendingTexture, captured = textureSource.current; if (!image || !captured) return;
+    const id = "tex_" + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    const accepted = applyBatch(current => {
+      if (current !== captured.document) throw new Error("The source changed after PNG preflight. Cancel and choose the image again; newer work was preserved.");
+      if (captured.mode === "replace") return importTextureIntoDocument(current, image, policy);
+      const source = activeTexture(current);
+      const width = policy === "use-png-size" ? image.width : source.width;
+      const height = policy === "use-png-size" ? image.height : source.height;
+      const pixels = resampleNearest(image.pixels, image.width, image.height, width, height);
+      return addTexture(current, { id, name: image.name, width, height, pixels });
+    });
+    if (accepted) {
+      setPendingTexture(null); textureSource.current = null;
+      setNotice(captured.mode === "new" ? "New texture asset added. Assign it to individual faces in the Paint inspector." :
+        "Selected texture replaced with one undoable edit. Save a .3dmc backup.");
+    }
   };
   const downloadTexturePng = () => {
     try {
@@ -450,6 +470,9 @@ export function App() {
   };
   const chooseProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
+    const request = ++fileIntent.current, session = activeSession.current;
+    const current = () => fileIntent.current === request && activeSession.current === session;
+    setTextureReading(false); setPackInspecting(false);
     try {
       let imported: EditorDocument;
       if (file.size > MAX_NATIVE_BYTES) throw new Error("File exceeds the 3 MB project import budget.");
@@ -460,32 +483,42 @@ export function App() {
         if (file.size > MAX_PROJECT_BYTES) throw new Error("Legacy JSON project exceeds the 1.5 MB import limit.");
         imported = decodeProject(await file.text());
       }
-      setPendingOpen(imported);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "The project could not be opened."); }
+      if (current()) setPendingOpen(imported);
+    } catch (error) { if (current()) setNotice(error instanceof Error ? error.message : "The project could not be opened."); }
   };
   const choosePack = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
+    const request = ++fileIntent.current, session = activeSession.current;
+    const current = () => fileIntent.current === request && activeSession.current === session;
+    setTextureReading(false);
     if (file.size > 2_000_000) { setPendingPack({ status: "blocked", problems: ["This ZIP exceeds the 2 MB pack-import limit."] }); return; }
     setPackInspecting(true);
-    try { setPendingPack(inspectJava1214Pack(new Uint8Array(await file.arrayBuffer()))); }
-    catch (error) { setPendingPack({ status: "blocked", problems: [error instanceof Error ? error.message : "Could not read the selected ZIP."] }); }
-    finally { setPackInspecting(false); }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (current()) setPendingPack(inspectJava1214Pack(bytes));
+    } catch (error) { if (current()) setPendingPack({ status: "blocked", problems: [error instanceof Error ? error.message : "Could not read the selected ZIP."] }); }
+    finally { if (current()) setPackInspecting(false); }
   };
   const acceptOpen = async (document: EditorDocument): Promise<boolean> => {
     const lease = writerRef.current;
     if (!lease) { setNotice("Editing is paused. Take over local recovery before opening this document."); return false; }
+    if (openingProject.current) return false;
+    openingProject.current = true; fileIntent.current++; clearStroke();
+    setTextureReading(false); setPackInspecting(false);
     try {
       const rotated = await rotateRecoveryWriter(lease);
       if (writerRef.current?.generation !== lease.generation) return false;
-      writerRef.current = rotated; awaitingRecoveryRef.current = false; clearStroke();
-      setWriterEpoch(epoch => epoch + 1); setHistory(createHistory(document)); setOpenSession(session => session + 1);
+      writerRef.current = rotated; awaitingRecoveryRef.current = false;
+      const nextHistory = createHistory(document), nextSession = activeSession.current + 1;
+      historyRef.current = nextHistory; activeRevision.current = nextHistory.revision; activeSession.current = nextSession;
+      setWriterEpoch(epoch => epoch + 1); setHistory(nextHistory); setOpenSession(nextSession);
       setSelectedId(document.cuboids[0]?.id ?? null); setSelectedFace("north"); setSearch(""); setShapeMenuOpen(false);
-      setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null); setPendingTexture(null);
+      setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null); setPendingTexture(null); textureSource.current = null;
       setCandidate(null); setRecoveryStatus("unsaved"); setDeletingTextureId(null); setDeleteReplacementId(null);
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup."); return true;
     } catch (error) {
       markWriterLost(); setNotice(error instanceof Error ? error.message : "Could not safely open the project."); return false;
-    }
+    } finally { openingProject.current = false; }
   };
   const createNewProject = async (options: NewProjectOptions): Promise<boolean> => {
     const opened = await acceptOpen(makeNewProject(options)); if (opened) setNewProjectOpen(false); return opened;
@@ -501,6 +534,7 @@ export function App() {
   const visibleTexture = textureById(doc, draftTextureId ?? doc.activeTextureId) ?? texture;
   const viewPixels = draftPixels ?? visibleTexture.pixels;
   const matching = doc.cuboids.filter(node => node.name.toLowerCase().includes(search.toLowerCase()));
+  const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = writerStatus === "blocked" ? "Other tab owns recovery" : writerStatus === "failed" ? "Recovery unavailable — download backup" :
     recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save unavailable" :
     writerStatus === "checking" ? "Checking recovery ownership…" : "Unsaved local changes";
@@ -538,7 +572,9 @@ export function App() {
       <span className="workspace-dot"/><span>WORKSPACE</span></div>
       <div className="mode-tabs" role="tablist" aria-label="Authoring mode">{(["model", "paint", "preview"] as const).map(item =>
         <button key={item} role="tab" aria-selected={mode === item} className={"mode-tab" + (mode === item ? " current" : "")} onClick={() => changeMode(item)}>{item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</div>
-      <div className="mode-options"><span className="mode-hint">{mode === "model" ? "Precision modeling" : mode === "paint" ? "Shared texture · pixel editor" : "Clean preview"}</span><ChevronDown size={15} className="muted-icon" aria-hidden="true"/></div>
+      <div className="mode-options creator-options"><CreatorTools key={openSession} document={doc} revision={history.revision} mode={mode}
+        selectedId={selectedId} face={selectedFace} onApply={applyBatch} onOpen={acceptOpen} onBackup={saveProject} onCancelGesture={clearStroke}
+        onLayout={layout => { clearStroke(); setSceneOpen(layout === "balanced"); setInspectorOpen(layout !== "canvas"); if (layout === "paint") changeMode("paint"); }}/></div>
     </nav>
     <div className="editor-grid">
       <aside className="scene-panel" aria-label="Scene hierarchy">
@@ -553,7 +589,7 @@ export function App() {
           {doc.cuboids.length === 0 && <div className="scene-empty-start"><Box size={29} strokeWidth={1.2}/><strong>Your canvas is ready</strong><p>Add the first cuboid to begin shaping your asset.</p>
             <button onClick={addElement}><FilePlus2 size={14}/>Add first cuboid</button></div>}
           {doc.cuboids.length > 0 && matching.length === 0 && <div className="empty-list">No matching elements.<button onClick={() => setSearch("")}>Clear search</button></div>}
-          {matching.map((node, index) => <div role="option" aria-selected={selectedSet.has(node.id)} tabIndex={selectedId === node.id || (!selectedId && index === 0) ? 0 : -1}
+          {matching.map((node, index) => <div role="option" aria-selected={selectedSet.has(node.id)} tabIndex={focusableId === node.id ? 0 : -1}
             key={node.id} className={"scene-row" + (selectedSet.has(node.id) ? " selected" : "") + (selectedId === node.id ? " primary-selected" : "") + (!node.visible ? " hidden-row" : "")}
             onClick={event => {
               clearStroke(); setSelection(current => selectAt(current, node.id, matching.map(item => item.id), { toggle: event.ctrlKey || event.metaKey, range: event.shiftKey }));
@@ -700,15 +736,15 @@ export function App() {
         setNotice("Texture removed; affected face assignments were remapped in one undoable edit.");
       }}>Remove and remap</button></div>
     </div></div>}
-    {pendingTexture && <TextureImportDialog image={pendingTexture} isAdding={textureImportMode === "new"} currentWidth={texture.width} currentHeight={texture.height}
-      paintedFaces={doc.cuboids.filter(node => node.material === "texture").length} onClose={() => setPendingTexture(null)} onConfirm={applyImportedTexture}/>}
+    {pendingTexture && <TextureImportDialog image={pendingTexture} isAdding={textureSource.current?.mode === "new"} currentWidth={texture.width} currentHeight={texture.height}
+      paintedFaces={doc.cuboids.filter(node => node.material === "texture").length} onClose={() => { setPendingTexture(null); textureSource.current = null; }} onConfirm={applyImportedTexture}/>}
     {pendingPack && <div className="modal-shade"><div className="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="pack-import-title" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setPendingPack(null); } }}>
       <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" : "Pack cannot be safely imported"}</h2></div></div>
       {pendingPack.status === "editable" ? <><p>This pack matches the supported 3dMc experimental export format. Import it as a <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
         <div className="import-summary"><div><span>ELEMENTS</span><strong>{pendingPack.document.cuboids.length}</strong></div><div><span>TEXTURE</span><strong>{activeTexture(pendingPack.document).width} × {activeTexture(pendingPack.document).height}</strong></div><div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div></div>
         <div className="import-notices"><h3>What to know before importing</h3>{pendingPack.notices.map(message => <p key={message}><Info size={15}/>{message}</p>)}</div>
         <p className="import-consequence">Your current workspace will be replaced. Download your current native project first if you need an independent copy. The original ZIP is never modified.</p>
-        <div className="modal-actions"><button className="text-button quiet" autoFocus onClick={() => setPendingPack(null)}>Cancel</button><button className="text-button primary" onClick={() => { const imported = pendingPack.document; setPendingPack(null); acceptOpen(imported); setNotice("Experimental pack imported as an editable project. Download a native project backup to retain your work."); }}><PackageOpen size={15}/>Import as editable project</button></div>
+        <div className="modal-actions"><button className="text-button quiet" autoFocus onClick={() => setPendingPack(null)}>Cancel</button><button className="text-button primary" onClick={() => void acceptOpen(pendingPack.document)}><PackageOpen size={15}/>Import as editable project</button></div>
       </> : <><p>No changes were made to your project. This importer accepts only the exact structure produced by the 3dMc experimental Java 1.21.4 exporter.</p><div className="import-blockers">{pendingPack.problems.map(message => <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}</div>
         <p className="import-consequence">Other resource packs may use valid Minecraft features that this editor cannot yet preserve. They are blocked rather than partially converted.</p><div className="modal-actions"><button className="text-button primary" autoFocus onClick={() => setPendingPack(null)}>Keep working</button></div></>}
     </div></div>}
