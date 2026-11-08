@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
-  FolderOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
@@ -22,6 +22,8 @@ import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
+import { inspectJava1214Pack } from "./import/javaPack";
+import type { PackImportReport } from "./import/javaPack";
 import {
   inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS, makeJava1214Pack
 } from "./export/javaBlock";
@@ -149,11 +151,14 @@ export function App() {
   const [candidate, setCandidate] = useState<RecoveryCandidate | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
+  const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
+  const [packInspecting, setPackInspecting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
   const [lastExport, setLastExport] = useState<{ revision: number; bytes: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const packFileRef = useRef<HTMLInputElement>(null);
   const activeRevision = useRef(history.revision);
   activeRevision.current = history.revision;
 
@@ -339,6 +344,28 @@ export function App() {
     }
   };
 
+  const choosePack = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 2_000_000) {
+      setPendingPack({ status: "blocked", problems: ["This ZIP exceeds the 2 MB pack-import limit."] });
+      return;
+    }
+    setPackInspecting(true);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      setPendingPack(inspectJava1214Pack(bytes));
+    } catch (error) {
+      setPendingPack({
+        status: "blocked",
+        problems: [error instanceof Error ? error.message : "Could not read the selected ZIP."]
+      });
+    } finally {
+      setPackInspecting(false);
+    }
+  };
+
   const acceptOpen = (document: EditorDocument) => {
     clearStroke();
     setHistory(createHistory(document));
@@ -388,6 +415,11 @@ export function App() {
         </div>
         <input type="file" ref={fileRef} accept=".json,application/json" hidden onChange={chooseProject} />
         <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc.json project"><FolderOpen size={16}/>Open</button>
+        <input type="file" ref={packFileRef} accept=".zip,application/zip" hidden onChange={choosePack}/>
+        <button className="text-button subtle" onClick={() => packFileRef.current?.click()}
+          disabled={packInspecting} title="Import a 3dMc experimental Java 1.21.4 resource pack">
+          <PackageOpen size={16}/>{packInspecting ? "Inspecting…" : "Import pack"}
+        </button>
         <button className="text-button quiet" onClick={saveProject}><Save size={16}/>Save project</button>
         <button className="text-button primary" onClick={() => setExportOpen(true)}
           title="Experimental pack export; in-game validation is pending">
@@ -646,6 +678,57 @@ export function App() {
         </button>
       </div>
     </div></div>}
+
+    {pendingPack && <div className="modal-shade">
+      <div className="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="pack-import-title"
+        onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setPendingPack(null); } }}>
+        <div className="import-header">
+          <div className="modal-icon"><PackageOpen size={22}/></div>
+          <div>
+            <span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span>
+            <h2 id="pack-import-title">
+              {pendingPack.status === "editable" ? "Import editable block pack?" : "Pack cannot be safely imported"}
+            </h2>
+          </div>
+        </div>
+        {pendingPack.status === "editable" ? <>
+          <p>This pack matches the supported 3dMc experimental export format. Import it as a
+            <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
+          <div className="import-summary">
+            <div><span>ELEMENTS</span><strong>{pendingPack.document.cuboids.length}</strong></div>
+            <div><span>TEXTURE</span><strong>{pendingPack.document.texture.width} × {pendingPack.document.texture.height}</strong></div>
+            <div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div>
+          </div>
+          <div className="import-notices">
+            <h3>What to know before importing</h3>
+            {pendingPack.notices.map((message) => <p key={message}><Info size={15}/>{message}</p>)}
+          </div>
+          <p className="import-consequence">Your current workspace will be replaced. Download your current native
+            project first if you need an independent copy. The original ZIP is never modified.</p>
+          <div className="modal-actions">
+            <button className="text-button quiet" autoFocus onClick={() => setPendingPack(null)}>Cancel</button>
+            <button className="text-button primary" onClick={() => {
+              const imported = pendingPack.document;
+              setPendingPack(null);
+              acceptOpen(imported);
+              setNotice("Experimental pack imported as an editable project. Download a native project backup to retain your work.");
+            }}><PackageOpen size={15}/>Import as editable project</button>
+          </div>
+        </> : <>
+          <p>No changes were made to your project. This importer accepts only the exact
+            structure produced by the 3dMc experimental Java 1.21.4 exporter.</p>
+          <div className="import-blockers">
+            {pendingPack.problems.map((message) =>
+              <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}
+          </div>
+          <p className="import-consequence">Other resource packs may use valid Minecraft features that this
+            editor cannot yet preserve. They are blocked rather than partially converted.</p>
+          <div className="modal-actions">
+            <button className="text-button primary" autoFocus onClick={() => setPendingPack(null)}>Keep working</button>
+          </div>
+        </>}
+      </div>
+    </div>}
     {pendingOpen && <div className="modal-shade"><div className="modal" role="dialog" aria-modal="true"
       aria-labelledby="open-dialog-title">
       <div className="modal-icon"><AlertCircle size={23}/></div>
