@@ -16,6 +16,8 @@ For implementation, start with the [decision register](decisions/DECISIONS.md), 
 
 For design, pair the workspace specification with the [design system](design/DESIGN_SYSTEM.md). Evaluate complete task flows, including empty, interrupted, unsupported, and recovery states.
 
+For the publicly hosted application, use the [GitHub Pages deployment guide](delivery/PAGES_DEPLOYMENT.md) to check the production build and the repository's Pages source settings. Our normal editor smoke tests use Vite's dev server; a second suite now verifies the compiled site under the `/3dMc/` URL.
+
 ## Workspace direction
 
 ![Static design proposal for the 3dMc workspace](design/workspace-blueprint.png)

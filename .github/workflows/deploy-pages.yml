@@ -1,0 +1,58 @@
+name: Deploy editor to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: github-pages-deployment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test production site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DEPLOY_TARGET: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build React app for /3dMc/
+        run: npm run build
+      - name: Install Chromium for production smoke test
+        run: npx playwright install --with-deps chromium
+      - name: Test compiled production app under /3dMc/
+        run: npx playwright test --config playwright.pages.config.ts
+      - name: Upload browser debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages-production-smoke
+          path: test-results/pages/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload compiled site (not repository source)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    name: Publish built app
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

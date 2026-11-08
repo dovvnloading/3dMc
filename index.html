@@ -5,11 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#141619" />
     <meta name="description" content="3dMc — a focused Minecraft asset authoring workspace." />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" />
     <title>3dMc — Asset Studio</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #141619; color: #f0f2f6;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      #boot-fallback { max-width: 560px; margin: 12vh auto 0; padding: 32px;
+        line-height: 1.6; }
+      #boot-fallback h1 { font-size: 26px; margin: 0 0 16px; }
+      #boot-fallback p { color: #b8c0cd; }
+      #boot-fallback a { color: #80dbbf; }
+      #boot-fallback .progress { background: #80dbbf; width: 36px; height: 3px; border-radius: 4px; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main id="boot-fallback" aria-live="polite">
+        <div class="progress" aria-hidden="true"></div>
+        <h1>3dMc Studio</h1>
+        <p>Starting the 3D asset editor…</p>
+        <p>If this message remains, the site may be serving source files instead of the compiled React application, or a required script failed to load.</p>
+        <p><a href="https://github.com/dovvnloading/3dMc/issues">Report an editor loading problem</a></p>
+      </main>
+    </div>
+    <noscript>3dMc requires JavaScript to run the editor.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
