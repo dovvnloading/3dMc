@@ -559,7 +559,7 @@ test("desktop shortcuts create a new project, duplicate elements and download na
   await page.keyboard.press("Control+n");
   await expect(page.getByRole("dialog", { name: "Create a new project" })).toBeVisible();
   await page.getByRole("dialog", { name: "Create a new project" })
-    .getByRole("button", { name: "Cancel" }).click();
+    .getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Create a new project" })).toHaveCount(0);
 });
 
@@ -672,6 +672,6 @@ test("PNG texture export downloads a separate editable image without changing th
   const dialog = page.getByRole("dialog", { name: "Replace the shared texture?" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("32 × 32 pixels")).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
 });
