@@ -400,7 +400,7 @@ test("six-face diagnostic ZIP opens as a one-cuboid 64×64 editable fixture", as
   await expect(imported.locator(".import-summary").getByText("1", { exact: true })).toBeVisible();
   await imported.getByRole("button", { name: "Import as editable project" }).click();
   await expect(page.getByRole("heading", { name: "Imported cuboid 01" })).toBeVisible();
-  await expect(page.getByText("Textured surface", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cuboid · Textured surface")).toBeVisible();
 
   await page.getByRole("tab", { name: "Paint" }).click();
   const mapping = page.getByRole("region", { name: "Face UV mapping" });
