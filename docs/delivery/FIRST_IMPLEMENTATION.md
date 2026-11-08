@@ -25,7 +25,8 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - Select any cuboid face in Paint, edit its four UV edges and quarter-turn texture rotation, reset face UVs, and inspect the highlighted pixel region.
 - Inspect a clean Preview mode.
 - Download and reopen a constrained `.3dmc.json` prototype project, including automatic legacy schema-v1 to schema-v2 face mapping migration.
-- Save small local IndexedDB checkpoints atomically with a previous-candidate fallback.
+- Save small local IndexedDB checkpoints atomically with a previous-candidate fallback and a writer-generation fence.
+- Complete 2D paint strokes as one history action; Escape, pointer cancellation, loss of capture and window blur cancel transient pixels. 3D gizmo commits happen at normal gesture completion and cancel by restoring preview transforms.
 - Create an explicitly **experimental Java Edition 1.21.4 pack** (resource-pack format 46), including an override for `minecraft:diamond_block`, six face references per cuboid, a source texture PNG, solid-color PNGs, and a ZIP archive.
 - Re-import this exact generated resource-pack ZIP subset, with strict archive and PNG validation, a reviewable preflight, explicit native-metadata loss notices, and an editable recovered geometry/texture document.
 - Review blockers and warnings before export; unsupported targets, out-of-range cuboids, and alpha prevent a misleading ZIP.
@@ -38,15 +39,17 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - The `.3dmc.json` file is a **transitional source format**. It is not the planned versioned ZIP `.3dmc` archive, and it supports one shared texture with a 64×64 ceiling.
 - The exporter now writes explicit supported UV rectangles and quarter-turn face rotations. The first ZIP importer accepts only these generated structures. Third-party pack import, element transforms/rotation, dependency graphs, and renderer/game parity remain future work. The source project keeps richer metadata than the game output.
 - Rotation editing is hidden until the selected profile is verified. Scale/translation gizmos are an integration proof, not an exhaustive interaction implementation.
-- Local checkpoint publication is serialized within one tab. **A multi-tab ownership-generation fence is not yet implemented.** Work in one active tab; save a portable project file before risky operations. Browser storage is not a portable backup.
+- IndexedDB checkpoints now use **a single-tab lease and a monotonic generation** checked in the same transaction as publication. Another tab opens read-only and must explicitly take over; an older writer cannot publish new checkpoints after takeover. Browser storage is not a portable backup.
+- Reloading creates a new writer identity. A recent lease may require an explicit takeover before continuing; the app retains the recovered content for an explicit decision.
+- Quota exhaustion, battery/device sleep, interrupted source imports, other browser engines and cross-process GPU behavior are not exhaustively validated. A failed local save must leave a working native download route.
 - The current history stores document snapshots (up to 50 operations) for small samples. Tiled texture history and larger workloads come later.
 - No browser usability study, accessibility audit, real-device benchmark, or Minecraft game test has been run. CI build/unit tests do not substitute for those gates.
 
 ## Next required engineering tasks
 
 1. Maintain green locked-install and Chromium smoke-test CI; expand the browser and real-device interaction matrix.
-2. Implement a complete gesture transaction controller, including tests for lost pointer capture, cancellation, and exact numeric commit semantics.
-3. Finish multi-tab recovery fencing and fault injection, including stale save completions, quota exhaustion, corruption, and checkpoint garbage collection.
+2. Extend the now-tested gesture controller to more browser/input devices and lost-capture/interrupted gizmo stress cases.
+3. Extend the now-atomic writer-generation fence with explicit fault injection for quota exhaustion, upgrade blocking, corruption and checkpoint garbage collection.
 4. Complete the [pinned Java 1.21.4 compatibility proof](../compatibility/JAVA_1214_EXPORT.md): independently check the blockstate/model and six-face texture directions in-game, record evidence, then decide whether to promote the profile.
 5. Replace the transitional JSON project with a versioned native archive; keep the schema-v1→v2 migration covered by permanent fixtures.
 6. Run the creator task study and device baseline before any claim of polished release readiness.

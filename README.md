@@ -6,13 +6,13 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 ## Project status
 
-**An executable editor is on the main branch.** It provides a React/Three.js viewport, cuboid authoring, texture painting, undo/redo, project files and local recovery. The next slice adds **per-face UV rectangles, four quarter-turn rotations, and a migration to native project schema v2**. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. A **Java 1.21.4 experimental resource-pack pipeline** now exports model/blockstate JSON, PNGs and ZIPs, and can import the exact subset of packs it generates for further editing. It performs strict file and schema checks and shows a preflight before replacing the workspace. The experimental Java pack codec now also round-trips supported face UV rectangles and quarter-turn rotations. It has **not** been verified in-game, does not register new block behavior, and does not claim arbitrary third-party pack import.
+**An executable editor is on the main branch.** It provides a React/Three.js viewport, cuboid authoring, texture painting, undo/redo, project files and local recovery. Per-face UV rectangles, four quarter-turn rotations and native project schema v2 are now implemented. The current reliability slice adds **atomic painting gestures and generation-fenced local recovery across tabs**. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. A **Java 1.21.4 experimental resource-pack pipeline** now exports model/blockstate JSON, PNGs and ZIPs, and can import the exact subset of packs it generates for further editing. It performs strict file and schema checks and shows a preflight before replacing the workspace. The experimental Java pack codec now also round-trips supported face UV rectangles and quarter-turn rotations. It has **not** been verified in-game, does not register new block behavior, and does not claim arbitrary third-party pack import.
 
 The first implementation milestone is a polished, complete editing loop for a deliberately small Java block asset profile. A creator should be able to shape an original cuboid asset, paint it, undo changes, save and reopen their project, and export a resource pack verified in a specific Minecraft release.
 
 ## Start here
 
-Read the [planning guide](docs/README.md) for the recommended reading order and the decisions that remain open.
+Read the [planning guide](docs/README.md) for the recommended reading order and the decisions that remain open. The [reliability implementation notes](docs/delivery/RELIABILITY_SLICE.md) distinguish what is protected today from future fault-injection and device testing.
 
 | Document | What it answers |
 | --- | --- |

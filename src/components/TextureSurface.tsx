@@ -26,6 +26,7 @@ const FACE = "texture-canvas";
 
 export function TextureSurface(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const strokePointer = useRef<number | null>(null);
   const [zoom, setZoom] = useState(8);
   const [cursor, setCursor] = useState<Texel>([0, 0]);
   const region = props.face
@@ -49,11 +50,12 @@ export function TextureSurface(props: Props) {
   };
 
   const pointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || strokePointer.current !== null) return;
     const point = pointAt(event);
     setCursor(point);
     if (props.tool === "eyedropper") { props.onSample(point); return; }
     if (props.tool !== "pencil") return;
+    strokePointer.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
     props.onBegin(point, FACE);
   };
@@ -61,14 +63,30 @@ export function TextureSurface(props: Props) {
   const pointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
     const point = pointAt(event);
     setCursor(point);
-    if (props.painting) props.onMove(point, FACE);
+    if (strokePointer.current === event.pointerId) props.onMove(point, FACE);
   };
 
   const pointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (strokePointer.current !== event.pointerId) return;
+    strokePointer.current = null;
+    props.onEnd();
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-    if (props.tool === "pencil") props.onEnd();
   };
+  const pointerCancel = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (strokePointer.current !== event.pointerId) return;
+    strokePointer.current = null;
+    props.onCancel();
+  };
+  const lostCapture = (event: PointerEvent<HTMLCanvasElement>) => {
+    // Successful pointerup clears the token before releasing capture.
+    if (strokePointer.current !== event.pointerId) return;
+    strokePointer.current = null;
+    props.onCancel();
+  };
+  useEffect(() => {
+    if (!props.painting) strokePointer.current = null;
+  }, [props.painting]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
     const delta: Record<string, Texel> = {
@@ -111,7 +129,8 @@ export function TextureSurface(props: Props) {
           tabIndex={0}
           aria-label="Texture pixels. Arrow keys move the cursor; Space paints with pencil or Enter samples with eyedropper."
           onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
-          onPointerCancel={props.onCancel} onKeyDown={onKeyDown} />
+          onPointerCancel={pointerCancel} onLostPointerCapture={lostCapture}
+          onKeyDown={onKeyDown} />
         {region && <div className="uv-selection-rect" aria-hidden="true"
           style={{
             left: Math.min(region[0], region[2]) * zoom,

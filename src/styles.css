@@ -502,3 +502,34 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 @media (max-width:760px) {
   .face-uv-section { padding-inline:12px; }
 }
+
+
+/* Recovery ownership is intentionally modal: no stale tab may keep editing. */
+.writer-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(7, 12, 15, .72);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.writer-modal {
+  width: min(490px, 94vw);
+  background: #242b32;
+  border: 1px solid #60786f;
+  box-shadow: 0 28px 100px rgba(0,0,0,.65);
+  border-radius: 12px;
+  padding: 24px;
+}
+.writer-modal .modal-icon { color: var(--accent); background: var(--selected); }
+.writer-modal h2 { font-size: 18px; margin: 17px 0 10px; }
+.writer-modal p { font-size: 13px; line-height: 1.7; color: var(--secondary); }
+.writer-modal .modal-actions { flex-wrap: wrap; }
+.recovery-screen-shade {
+  position: fixed;
+  z-index: 19;
+  inset: 100px 0 32px;
+  background: rgba(7, 12, 15, .5);
+  pointer-events: auto;
+}

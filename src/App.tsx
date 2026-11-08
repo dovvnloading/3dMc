@@ -8,16 +8,23 @@ import {
 } from "lucide-react";
 import {
   addCuboid, createSampleDocument, deleteCuboid, duplicateCuboid,
-  renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor, setTexturePixels,
-  toggleFlag, updateCuboid
+  renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor,
+  toggleFlag
 } from "./editor/domain";
 import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domain";
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
-import { readRecovery, saveRecovery } from "./editor/recovery";
-import type { RecoveryCandidate } from "./editor/recovery";
-import { drawStroke, readHex } from "./editor/pixels";
+import {
+  claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter,
+  saveRecovery, RecoveryOwnershipLost
+} from "./editor/recovery";
+import type { RecoveryCandidate, RecoveryLease } from "./editor/recovery";
+import { readHex } from "./editor/pixels";
+import {
+  beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture
+} from "./editor/gestures";
+import type { PaintGesture } from "./editor/gestures";
 import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
@@ -29,9 +36,9 @@ import {
   inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS, makeJava1214Pack
 } from "./export/javaBlock";
 
-type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed";
+type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed" | "blocked";
+type WriterStatus = "checking" | "owned" | "blocked" | "failed";
 type CommitFn = (document: EditorDocument) => EditorDocument;
-type Drag = { pixels: number[]; previous: Texel; face: string };
 const SWATCHES = ["#f5d184", "#80dbbf", "#bb8870", "#c76d68", "#aebce2", "#f1f2f6", "#384f49", "#222e38"];
 
 function IconButton({ label, children, onClick, disabled = false, active = false }: {
@@ -148,7 +155,14 @@ export function App() {
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
   const [inspectorOpen, setInspectorOpen] = useState(() => window.innerWidth > 760);
   const [draftPixels, setDraftPixels] = useState<number[] | null>(null);
-  const drag = useRef<Drag | null>(null);
+  const drag = useRef<PaintGesture | null>(null);
+  const [cancelToken, setCancelToken] = useState(0);
+  const writerId = useRef(crypto.randomUUID());
+  const writerRef = useRef<RecoveryLease | null>(null);
+  const [writerStatus, setWriterStatus] = useState<WriterStatus>("checking");
+  const [writerEpoch, setWriterEpoch] = useState(0);
+  const [takingOver, setTakingOver] = useState(false);
+  const awaitingRecoveryRef = useRef(false);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>("unsaved");
   const [candidate, setCandidate] = useState<RecoveryCandidate | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
@@ -165,34 +179,50 @@ export function App() {
   activeRevision.current = history.revision;
 
   const commitDocument = useCallback((operation: CommitFn) => {
+    if (!writerRef.current || awaitingRecoveryRef.current) return;
+    // Independent property edits cancel an in-progress paint preview instead of
+    // silently dropping its pixels later or applying it to a changed document.
+    if (drag.current) {
+      drag.current = null;
+      setDraftPixels(null);
+      setCancelToken((current) => current + 1);
+    }
     setHistory((current) => commit(current, operation(current.present)));
   }, []);
 
-  const clearStroke = useCallback(() => { drag.current = null; setDraftPixels(null); }, []);
+  const clearStroke = useCallback(() => {
+    drag.current = null;
+    setDraftPixels(null);
+    setCancelToken((current) => current + 1);
+  }, []);
+  const switchTool = (next: Tool) => {
+    clearStroke();
+    setTool(next);
+  };
+
   const beginPaint = useCallback((texel: Texel, face: string) => {
-    if (drag.current) return;
-    const active = historyRef.current.present.texture;
-    const pixels = drawStroke(active.pixels, active.width, active.height, texel, texel, color, brushSize);
-    drag.current = { pixels, previous: texel, face };
-    setDraftPixels(pixels);
+    if (!writerRef.current || awaitingRecoveryRef.current || drag.current) return;
+    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize);
+    drag.current = started;
+    setDraftPixels(started.pixels);
   }, [color, brushSize]);
+
   const continuePaint = useCallback((texel: Texel, face: string) => {
     const current = drag.current;
     if (!current) return;
-    const texture = historyRef.current.present.texture;
-    const previous = current.face === face ? current.previous : texel;
-    const pixels = drawStroke(current.pixels, texture.width, texture.height,
-      previous, texel, color, brushSize);
-    drag.current = { pixels, previous: texel, face };
-    setDraftPixels(pixels);
-  }, [color, brushSize]);
+    const next = continuePaintGesture(current, texel, face);
+    drag.current = next;
+    setDraftPixels(next.pixels);
+  }, []);
+
   const finishPaint = useCallback(() => {
     const current = drag.current;
     if (!current) return;
     drag.current = null;
-    commitDocument((document) => setTexturePixels(document, current.pixels));
     setDraftPixels(null);
+    commitDocument((document) => commitPaintGesture(document, current));
   }, [commitDocument]);
+
   const samplePaint = useCallback((texel: Texel) => {
     const texture = historyRef.current.present.texture;
     setColor(readHex(texture.pixels, texture.width, texel));
@@ -201,69 +231,157 @@ export function App() {
   const changeMode = (next: Mode) => {
     clearStroke();
     setMode(next);
-    setTool(next === "paint" ? "pencil" : "select");
+    switchTool(next === "paint" ? "pencil" : "select");
   };
 
   const transform = useCallback((id: string, position: Vec3, scale: Vec3) => {
-    commitDocument((document) => updateCuboid(document, id, (node) => {
-      const originalCenter = [
-        (node.from[0] + node.to[0] - 16) / 32,
-        (node.from[1] + node.to[1]) / 32,
-        (node.from[2] + node.to[2] - 16) / 32
-      ];
-      const delta = position.map((value, i) => (value - originalCenter[i]!) * 16);
-      const oldCenter = node.from.map((value, i) => (value + node.to[i]!) / 2);
-      const from = node.from.map((value, i) => {
-        if (Math.abs(scale[i]! - 1) < 0.00001) return value + delta[i]!;
-        const newSize = (node.to[i]! - value) * scale[i]!;
-        return oldCenter[i]! + delta[i]! - newSize / 2;
-      }) as [number, number, number];
-      const to = node.to.map((value, i) => {
-        if (Math.abs(scale[i]! - 1) < 0.00001) return value + delta[i]!;
-        const newSize = (value - node.from[i]!) * scale[i]!;
-        return oldCenter[i]! + delta[i]! + newSize / 2;
-      }) as [number, number, number];
-      const rounded = (values: [number, number, number]): [number, number, number] =>
-        values.map((value) => Math.round(value * 10000) / 10000) as [number, number, number];
-      if (node.from.every((value, i) => Math.abs(value - from[i]!) < 0.00001) &&
-          node.to.every((value, i) => Math.abs(value - to[i]!) < 0.00001)) return node;
-      return { ...node, from: rounded(from), to: rounded(to) };
-    }));
+    commitDocument((document) => commitGizmoTransform(document, id, position, scale));
   }, [commitDocument]);
+
+  const markWriterLost = useCallback((failed = false) => {
+    writerRef.current = null;
+    clearStroke();
+    setWriterStatus(failed ? "failed" : "blocked");
+    setRecoveryStatus(failed ? "failed" : "blocked");
+  }, [clearStroke]);
 
   useEffect(() => {
     let alive = true;
-    readRecovery().then((result) => {
-      if (alive) { setCandidate(result); setBootChecked(true); }
+    Promise.all([readRecovery(), claimRecoveryWriter(writerId.current)]).then(([restored, claim]) => {
+      if (!alive) return;
+      setCandidate(restored);
+      awaitingRecoveryRef.current = restored !== null;
+      if (claim.granted) {
+        writerRef.current = claim.lease;
+        setWriterStatus("owned");
+      } else {
+        writerRef.current = null;
+        setWriterStatus("blocked");
+        setRecoveryStatus("blocked");
+      }
+      setBootChecked(true);
     }).catch(() => {
-      if (alive) { setRecoveryStatus("failed"); setBootChecked(true); }
+      if (!alive) return;
+      setWriterStatus("failed");
+      setRecoveryStatus("failed");
+      setBootChecked(true);
     });
     return () => { alive = false; };
   }, []);
 
   useEffect(() => {
-    // The starter has no recovery history, but an explicitly opened project
-    // must publish its revision-zero snapshot even before its first edit.
+    if (writerStatus !== "owned") return;
+    let inFlight = false;
+    const renew = () => {
+      const lease = writerRef.current;
+      if (!lease || inFlight) return;
+      inFlight = true;
+      renewRecoveryWriter(lease).then((updated) => {
+        // A new project may have rotated the generation while renewing.
+        if (writerRef.current?.generation !== lease.generation ||
+            writerRef.current?.ownerId !== lease.ownerId) return;
+        if (!updated) markWriterLost();
+        else writerRef.current = updated;
+      }).catch(() => {
+        if (writerRef.current?.generation === lease.generation) markWriterLost(true);
+      }).finally(() => { inFlight = false; });
+    };
+    const visible = () => { if (!document.hidden) renew(); };
+    const timer = window.setInterval(renew, 4_000);
+    window.addEventListener("focus", renew);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", renew);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [writerStatus, markWriterLost]);
+
+  useEffect(() => {
+    const cancel = () => clearStroke();
+    window.addEventListener("blur", cancel);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [clearStroke]);
+
+  useEffect(() => {
+    if (writerStatus !== "owned" || awaitingRecoveryRef.current) return;
+    // Initial starter has no checkpoint, but explicitly opened projects always
+    // publish an initial snapshot, even before their first edit.
     if (history.revision === 0 && openSession === 0) return;
+    const lease = writerRef.current;
+    if (!lease) return;
     setRecoveryStatus("unsaved");
     const revision = history.revision;
     const snapshot = history.present;
     const session = openSession;
+    const current = () => writerRef.current?.generation === lease.generation &&
+      activeSession.current === session && activeRevision.current === revision;
     const timer = window.setTimeout(() => {
+      if (!current()) return;
       setRecoveryStatus("saving");
-      saveRecovery(snapshot, revision).then(() => {
-        if (activeSession.current === session && activeRevision.current === revision) setRecoveryStatus("saved");
-      }).catch(() => { if (activeSession.current === session && activeRevision.current === revision) setRecoveryStatus("failed"); });
+      saveRecovery(snapshot, revision, lease).then(() => {
+        if (current()) setRecoveryStatus("saved");
+      }).catch((error: unknown) => {
+        if (!current()) return;
+        if (error instanceof RecoveryOwnershipLost) markWriterLost();
+        else setRecoveryStatus("failed");
+      });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [history, openSession]);
+  }, [history, openSession, writerStatus, writerEpoch, markWriterLost]);
+
+  const takeOverWriter = async () => {
+    if (takingOver) return;
+    setTakingOver(true);
+    try {
+      const claim = await claimRecoveryWriter(writerId.current, true);
+      if (!claim.granted) throw new RecoveryOwnershipLost();
+      writerRef.current = claim.lease;
+      const latest = await readRecovery();
+      awaitingRecoveryRef.current = latest !== null;
+      setCandidate(latest);
+      setWriterStatus("owned");
+      setWriterEpoch((epoch) => epoch + 1);
+      setRecoveryStatus("unsaved");
+      setNotice("This tab now owns local recovery. Choose the saved session or keep this workspace before editing.");
+    } catch (error) {
+      setWriterStatus("failed");
+      setNotice(error instanceof Error ? error.message : "Could not take over local recovery.");
+    } finally {
+      setTakingOver(false);
+    }
+  };
+
+  const keepCurrentWorkspace = () => {
+    awaitingRecoveryRef.current = false;
+    setCandidate(null);
+    setWriterEpoch((epoch) => epoch + 1);
+  };
 
   const navigate = (kind: ViewKind) => setView((current) => ({ kind, count: current.count + 1 }));
-  const runUndo = useCallback(() => { clearStroke(); setHistory((state) => undo(state)); }, [clearStroke]);
-  const runRedo = useCallback(() => { clearStroke(); setHistory((state) => redo(state)); }, [clearStroke]);
+  const runUndo = useCallback(() => {
+    if (!writerRef.current || awaitingRecoveryRef.current) return;
+    clearStroke();
+    setHistory((state) => undo(state));
+  }, [clearStroke]);
+  const runRedo = useCallback(() => {
+    if (!writerRef.current || awaitingRecoveryRef.current) return;
+    clearStroke();
+    setHistory((state) => redo(state));
+  }, [clearStroke]);
 
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
+      // Gesture cancellation must work even while a pointer has capture.
+      if (event.key === "Escape" && drag.current) {
+        event.preventDefault();
+        clearStroke();
+        return;
+      }
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
       const command = event.metaKey || event.ctrlKey;
@@ -275,12 +393,12 @@ export function App() {
       }
       if (command || event.altKey) return;
       const key = event.key.toLowerCase();
-      if (key === "escape") { clearStroke(); setTool("select"); }
-      if (key === "v") setTool("select");
-      if (key === "w" && mode === "model") setTool("move");
-      if (key === "r" && mode === "model") setTool("resize");
-      if (key === "b" && mode === "paint") setTool("pencil");
-      if (key === "i" && mode === "paint") setTool("eyedropper");
+      if (key === "escape") { clearStroke(); switchTool("select"); }
+      if (key === "v") switchTool("select");
+      if (key === "w" && mode === "model") switchTool("move");
+      if (key === "r" && mode === "model") switchTool("resize");
+      if (key === "b" && mode === "paint") switchTool("pencil");
+      if (key === "i" && mode === "paint") switchTool("eyedropper");
       if (key === "f") navigate("iso");
       if ((key === "delete" || key === "backspace") && selectedId && mode === "model") {
         commitDocument((document) => deleteCuboid(document, selectedId));
@@ -368,28 +486,48 @@ export function App() {
     }
   };
 
-  const acceptOpen = (document: EditorDocument) => {
-    clearStroke();
-    setHistory(createHistory(document));
-    setOpenSession((session) => session + 1);
-    setSelectedId(document.cuboids[0]?.id ?? null);
-    setSelectedFace("north");
-    setMode("model"); setTool("select"); setPendingOpen(null);
-    setCandidate(null); setRecoveryStatus("unsaved");
-    setNotice("Project opened. A portable copy has not been written by this session.");
+  const acceptOpen = async (document: EditorDocument) => {
+    const lease = writerRef.current;
+    if (!lease) {
+      setNotice("Editing is paused. Take over local recovery before opening this document.");
+      return;
+    }
+    try {
+      // Invalidate every queued save for the previous document before changing
+      // the active source. Its content can never publish in the new session.
+      const rotated = await rotateRecoveryWriter(lease);
+      if (writerRef.current?.generation !== lease.generation) return;
+      writerRef.current = rotated;
+      awaitingRecoveryRef.current = false;
+      clearStroke();
+      setWriterEpoch((epoch) => epoch + 1);
+      setHistory(createHistory(document));
+      setOpenSession((session) => session + 1);
+      setSelectedId(document.cuboids[0]?.id ?? null);
+      setSelectedFace("north");
+      setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null);
+      setCandidate(null); setRecoveryStatus("unsaved");
+      setNotice("Project opened. Local recovery is updating; download a native project for a portable backup.");
+    } catch (error) {
+      markWriterLost();
+      setNotice(error instanceof Error ? error.message : "Could not safely open the project.");
+    }
   };
 
   const addElement = () => {
     const id = crypto.randomUUID();
     commitDocument((current) => addCuboid(current, id));
-    setSelectedId(id); setMode("model"); setTool("select");
+    setSelectedId(id); setMode("model"); switchTool("select");
   };
 
   const viewPixels = draftPixels ?? doc.texture.pixels;
   const matching = doc.cuboids.filter((node) => node.name.toLowerCase().includes(search.toLowerCase()));
-  const statusText = recoveryStatus === "saved" ? "Saved on this device" :
+  const statusText = writerStatus === "blocked" ? "Other tab owns recovery" :
+    writerStatus === "failed" ? "Recovery unavailable — download backup" :
+    recoveryStatus === "saved" ? "Saved on this device" :
     recoveryStatus === "saving" ? "Saving locally…" :
-    recoveryStatus === "failed" ? "Local save unavailable" : "Unsaved local changes";
+    recoveryStatus === "failed" ? "Local save unavailable" :
+    writerStatus === "checking" ? "Checking recovery ownership…" : "Unsaved local changes";
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") +
     (!inspectorOpen ? " inspector-collapsed" : "")}>
@@ -500,19 +638,20 @@ export function App() {
           <EditorViewport document={doc} pixels={viewPixels} selectedId={selectedId}
             selectedFace={selectedFace} onSelectFace={setSelectedFace}
             mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
+            cancelToken={cancelToken}
             onSelect={setSelectedId} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
             onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint}
             onTransform={transform}/>
           {mode !== "preview" && <div className="tool-rail" aria-label="Editor tools">
             {mode === "model" ? <>
-              <IconButton active={tool === "select"} label="Select (V)" onClick={() => setTool("select")}><MousePointer2 size={18}/></IconButton>
-              <IconButton active={tool === "move"} label="Move (W)" onClick={() => setTool("move")}><Move3D size={18}/></IconButton>
-              <IconButton active={tool === "resize"} label="Resize (R)" onClick={() => setTool("resize")}><Maximize2 size={18}/></IconButton>
+              <IconButton active={tool === "select"} label="Select (V)" onClick={() => switchTool("select")}><MousePointer2 size={18}/></IconButton>
+              <IconButton active={tool === "move"} label="Move (W)" onClick={() => switchTool("move")}><Move3D size={18}/></IconButton>
+              <IconButton active={tool === "resize"} label="Resize (R)" onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton>
               <div className="rail-divider"/>
               <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
             </> : <>
-              <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => setTool("pencil")}><Paintbrush size={18}/></IconButton>
-              <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => setTool("eyedropper")}><Pipette size={18}/></IconButton>
+              <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
+              <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
             </>}
           </div>}
           <div className="view-bottom">
@@ -616,19 +755,38 @@ export function App() {
       <div aria-live="polite" className={"save-status status-" + recoveryStatus}><span className="status-indicator"/>
         {statusText}</div>
       <span className="status-divider"/>
-      <button onClick={() => setNotice("Local recovery protects acknowledged checkpoints in this browser only. Download the project as a portable backup. Concurrent-tab editing is not yet guarded.")}>Recovery details <Info size={12}/></button>
+      <button onClick={() => setNotice("Recovery uses a single-tab writer generation with atomic checkpoints and a verified previous version. Another tab must explicitly take over. Browser storage is not a portable backup; download a project copy.")}>Recovery details <Info size={12}/></button>
       <div className="status-space"/>
       <span>{selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span>
       <span className="status-divider"/><span>Grid {snap} unit</span>
       <span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
 
-    {!bootChecked && <div className="boot-loader" aria-live="polite">Checking local recovery…</div>}
-    {candidate && bootChecked && <div className="recovery-banner" role="status">
+    {!bootChecked && <div className="boot-loader" aria-live="polite">Checking local recovery ownership…</div>}
+    {bootChecked && writerStatus !== "owned" && <div className="writer-shade">
+      <div className="writer-modal" role="dialog" aria-modal="true" aria-labelledby="writer-title">
+        <div className="modal-icon"><Lock size={22}/></div>
+        <h2 id="writer-title">{writerStatus === "blocked"
+          ? "Another tab controls local recovery" : "Local recovery isn't available"}</h2>
+        <p>{writerStatus === "blocked"
+          ? "This editor is read-only here to protect the other tab's saved work. You can download the current project, or explicitly take over editing. A suspended older tab will no longer be able to overwrite this tab's checkpoints."
+          : "You can still download the current project as a portable backup. Retry ownership only when you're ready to edit."}</p>
+        <div className="modal-actions">
+          <button className="text-button quiet" onClick={saveProject}>
+            <Save size={15}/>Download backup
+          </button>
+          <button className="text-button primary" disabled={takingOver}
+            onClick={takeOverWriter}>{takingOver ? "Taking over…" : "Take over editing"}</button>
+        </div>
+      </div>
+    </div>}
+    {candidate && bootChecked && writerStatus === "owned" &&
+      <div className="recovery-screen-shade" aria-hidden="true" />}
+    {candidate && bootChecked && writerStatus === "owned" && <div className="recovery-banner" role="status">
       <div><Info size={19}/><p><strong>Continue a local session?</strong>
         <span>{candidate.document.name} · {getFilename(new Date(candidate.savedAt))}
           {candidate.fallback ? " · Previous verified checkpoint" : ""}</span></p></div>
-      <button className="text-button quiet" onClick={() => setCandidate(null)}>Start sample</button>
+      <button className="text-button quiet" onClick={keepCurrentWorkspace}>Keep current workspace</button>
       <button className="text-button primary" onClick={() => acceptOpen(candidate.document)}>Recover project</button>
     </div>}
     {notice && <div role="status" className="notice-toast"><Info size={17}/><span>{notice}</span>
@@ -671,7 +829,7 @@ export function App() {
           <span><b>{issue.severity === "error" ? "Fix required" : "Notice"}</b>
             {issue.message}</span>
           {issue.nodeId && <button onClick={() => {
-            setSelectedId(issue.nodeId!); setMode("model"); setTool("select"); setExportOpen(false);
+            setSelectedId(issue.nodeId!); setMode("model"); switchTool("select"); setExportOpen(false);
           }}>Locate</button>}
         </div>)}
       </div>
