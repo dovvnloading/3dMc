@@ -508,16 +508,20 @@ export function App() {
     if (!file) return;
     try {
       let imported: EditorDocument;
-      if (file.name.toLowerCase().endsWith(".3dmc")) {
-        if (file.size > MAX_NATIVE_BYTES)
-          throw new Error("Native project exceeds the 3 MB archive import limit.");
+      if (file.size > MAX_NATIVE_BYTES)
+        throw new Error("File exceeds the 3 MB project import budget.");
+      // Browsers may rename downloads or supply a temporary file without its
+      // original extension. Inspect the ZIP signature before deciding codec.
+      // Neither filename nor MIME type is trusted as validation of its contents.
+      const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const nativeZip = signature[0] === 0x50 && signature[1] === 0x4b &&
+        signature[2] === 0x03 && signature[3] === 0x04;
+      if (nativeZip || file.name.toLowerCase().endsWith(".3dmc")) {
         imported = await decodeNativeProject(new Uint8Array(await file.arrayBuffer()));
-      } else if (file.name.toLowerCase().endsWith(".json")) {
+      } else {
         if (file.size > MAX_PROJECT_BYTES)
           throw new Error("Legacy JSON project exceeds the 1.5 MB import limit.");
         imported = decodeProject(await file.text());
-      } else {
-        throw new Error("Choose a .3dmc native archive or a legacy .3dmc.json file.");
       }
       setPendingOpen(imported);
     } catch (error) {
