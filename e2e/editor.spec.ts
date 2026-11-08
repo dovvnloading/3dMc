@@ -80,3 +80,30 @@ test("opening a project commits a fresh local checkpoint before the next reload"
   await expect(page.getByText("Continue a local session?")).toBeVisible();
   await expect(page.getByText(/Recovery import proof/).first()).toBeVisible();
 });
+
+test("experimental Java pack download and actionable geometry blockers", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const modal = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(modal).toBeVisible();
+  await expect(modal.getByText(/0 blockers/)).toBeVisible();
+  await expect(modal.getByText(/not been checked in Minecraft/)).toBeVisible();
+  await page.screenshot({ path: "test-results/java-export-preflight.png" });
+  const downloaded = page.waitForEvent("download");
+  await modal.getByRole("button", { name: "Download experimental ZIP" }).click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toBe("3dmc-diamond-block-java-1.21.4-experimental.zip");
+  await modal.getByRole("button", { name: "Close" }).click();
+
+  const x = page.getByRole("textbox", { name: "X position" });
+  await x.fill("30");
+  await x.press("Enter");
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  await expect(modal.getByText(/outside Java model element bounds/)).toBeVisible();
+  await expect(modal.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
+  await modal.getByRole("button", { name: "Locate" }).click();
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+  expect(errors).toEqual([]);
+});

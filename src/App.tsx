@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   addCuboid, createSampleDocument, deleteCuboid, duplicateCuboid,
-  renameCuboid, renameProject, setAxisValue, setMaterialColor, setTexturePixels,
+  renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease, setMaterialColor, setTexturePixels,
   toggleFlag, updateCuboid
 } from "./editor/domain";
 import type { Cuboid, EditorDocument, Vec3 } from "./editor/domain";
@@ -22,6 +22,9 @@ import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
+import {
+  inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS, makeJava1214Pack
+} from "./export/javaBlock";
 
 type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed";
 type CommitFn = (document: EditorDocument) => EditorDocument;
@@ -128,6 +131,7 @@ export function App() {
   const historyRef = useRef(history);
   historyRef.current = history;
   const doc = history.present;
+  const exportIssues = useMemo(() => inspectJava1214(doc), [doc]);
   const [selectedId, setSelectedId] = useState<string | null>("body");
   const selected = doc.cuboids.find((node) => node.id === selectedId) ?? null;
   const [mode, setMode] = useState<Mode>("model");
@@ -145,6 +149,9 @@ export function App() {
   const [candidate, setCandidate] = useState<RecoveryCandidate | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
+  const [lastExport, setLastExport] = useState<{ revision: number; bytes: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const activeRevision = useRef(history.revision);
@@ -293,6 +300,32 @@ export function App() {
     }
   };
 
+  const downloadJavaPack = () => {
+    if (exportStatus === "building") return;
+    setExportStatus("building");
+    const capturedRevision = history.revision;
+    try {
+      const pack = makeJava1214Pack(doc);
+      const blob = new Blob([new Uint8Array(pack.zip)], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = "3dmc-diamond-block-java-1.21.4-experimental.zip";
+      globalThis.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setLastExport({ revision: capturedRevision, bytes: pack.zip.length });
+      setExportStatus("started");
+      setNotice("Experimental Java pack download started. This artifact still requires an in-game check.");
+    } catch (error) {
+      setExportStatus("idle");
+      setNotice(error instanceof JavaExportBlocked
+        ? error.issues.filter((issue) => issue.severity === "error").map((issue) => issue.message).join(" ")
+        : error instanceof Error ? error.message : "Could not prepare the resource pack.");
+    }
+  };
+
   const chooseProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -336,7 +369,17 @@ export function App() {
       <div className="project-header">
         <CommittedText label="Project name" className="project-title" value={doc.name}
           onCommit={(name) => commitDocument((current) => renameProject(current, name))} />
-        <span className="profile-label" title="Experimental profile; not checked in Minecraft">Java · Static block <i/> 26.3 candidate</span>
+        <label className="profile-label" title="Target compatibility is experimental">
+          Java · Static block
+          <select className="target-select" aria-label="Minecraft target version"
+            value={doc.target.candidateRelease} onChange={(event) => {
+              const release = event.target.value === "26.3" ? "26.3" : "1.21.4";
+              commitDocument((current) => setJavaCandidateRelease(current, release));
+            }}>
+            <option value="1.21.4">1.21.4 · Experimental</option>
+            <option value="26.3">26.3 · Not supported</option>
+          </select>
+        </label>
       </div>
       <div className="app-actions">
         <div className="history-actions">
@@ -346,7 +389,10 @@ export function App() {
         <input type="file" ref={fileRef} accept=".json,application/json" hidden onChange={chooseProject} />
         <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc.json project"><FolderOpen size={16}/>Open</button>
         <button className="text-button quiet" onClick={saveProject}><Save size={16}/>Save project</button>
-        <button className="text-button primary" disabled title="Target-specific Minecraft export is not game-verified yet"><Download size={16}/>Minecraft export <span className="soon">Soon</span></button>
+        <button className="text-button primary" onClick={() => setExportOpen(true)}
+          title="Experimental pack export; in-game validation is pending">
+          <Download size={16}/>Minecraft export
+        </button>
       </div>
     </header>
 
@@ -521,7 +567,7 @@ export function App() {
               {size} px</button>)}</div>
         </div>}
         <div className="inspector-bottom"><Info size={15}/>
-          <span>Editor prototype · Minecraft export is not verified</span></div>
+          <span>Experimental Java exporter · in-game verification pending</span></div>
       </aside>
     </div>
 
@@ -533,7 +579,7 @@ export function App() {
       <div className="status-space"/>
       <span>{selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span>
       <span className="status-divider"/><span>Grid {snap} unit</span>
-      <span className="status-divider"/><span className="status-profile">Prototype · S0</span>
+      <span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
 
     {!bootChecked && <div className="boot-loader" aria-live="polite">Checking local recovery…</div>}
@@ -546,6 +592,60 @@ export function App() {
     </div>}
     {notice && <div role="status" className="notice-toast"><Info size={17}/><span>{notice}</span>
       <button onClick={() => setNotice(null)} aria-label="Dismiss notice">×</button></div>}
+    {exportOpen && <div className="modal-shade"><div className="modal export-modal" role="dialog"
+      aria-modal="true" aria-labelledby="pack-export-title"
+      onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setExportOpen(false); } }}>
+      <div className="export-heading">
+        <div className="modal-icon"><Download size={22}/></div>
+        <div><span className="export-kicker">OUTPUT EXPERIMENT · NOT GAME VERIFIED</span>
+          <h2 id="pack-export-title">Experimental resource pack</h2></div>
+      </div>
+      <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>)
+        that replaces the visual model of <strong>minecraft:diamond_block</strong>.
+        Gameplay, lighting, and collision do not change.</p>
+      <label className="export-target-control" htmlFor="export-target">
+        <span>Target profile</span>
+        <select id="export-target" className="select-control"
+          value={doc.target.candidateRelease} onChange={(event) => {
+            const release = event.target.value === "26.3" ? "26.3" : "1.21.4";
+            commitDocument((current) => setJavaCandidateRelease(current, release));
+          }}>
+          <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option>
+          <option value="26.3">Java Edition 26.3 · Unsupported</option>
+        </select>
+      </label>
+      <div className="export-file-list" aria-label="Files in the export">
+        <strong>Output files</strong>
+        <code>{JAVA_PACK_PATHS.metadata}</code>
+        <code>{JAVA_PACK_PATHS.blockstate}</code>
+        <code>{JAVA_PACK_PATHS.model}</code>
+        <code>{JAVA_PACK_PATHS.mainTexture}</code>
+        <span>Plus {doc.cuboids.filter((node) => node.material === "solid").length} generated solid-color texture files.</span>
+      </div>
+      <div className="export-issues">
+        <strong>Preflight · {exportIssues.filter((issue) => issue.severity === "error").length} blockers</strong>
+        {exportIssues.map((issue) => <div key={issue.code + (issue.nodeId ?? "")}
+          className={"export-issue issue-" + issue.severity}>
+          {issue.severity === "error" ? <AlertCircle size={15}/> : <Info size={15}/>}
+          <span><b>{issue.severity === "error" ? "Fix required" : "Notice"}</b>
+            {issue.message}</span>
+          {issue.nodeId && <button onClick={() => {
+            setSelectedId(issue.nodeId!); setMode("model"); setTool("select"); setExportOpen(false);
+          }}>Locate</button>}
+        </div>)}
+      </div>
+      {lastExport && <p className="export-last">
+        Last download started for revision {lastExport.revision} ({Math.round(lastExport.bytes / 1024)} KiB).
+        {lastExport.revision !== history.revision ? " New changes have not been exported." : ""}
+      </p>}
+      <div className="modal-actions">
+        <button className="text-button quiet" autoFocus onClick={() => setExportOpen(false)}>Close</button>
+        <button className="text-button primary" onClick={downloadJavaPack}
+          disabled={exportStatus === "building" || exportIssues.some((issue) => issue.severity === "error")}>
+          <Download size={15}/>{exportStatus === "building" ? "Building…" : "Download experimental ZIP"}
+        </button>
+      </div>
+    </div></div>}
     {pendingOpen && <div className="modal-shade"><div className="modal" role="dialog" aria-modal="true"
       aria-labelledby="open-dialog-title">
       <div className="modal-icon"><AlertCircle size={23}/></div>

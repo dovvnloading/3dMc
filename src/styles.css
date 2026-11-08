@@ -344,3 +344,36 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition:none !important; animation:none !important; scroll-behavior:auto !important; }
 }
+
+/* Experimental export: editorial hierarchy without overloading the viewport. */
+.target-select {
+  border:1px solid #4b5965; border-radius:5px; margin-left:9px;
+  background:var(--control); color:var(--secondary);
+  padding:5px 7px; font-size:11px; cursor:pointer; max-width:155px;
+}
+.target-select:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.export-modal { width:min(680px, 96vw); max-height:min(88dvh, 840px); overflow:auto; }
+.export-heading { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+.export-heading .modal-icon { flex:0 0 42px; background:var(--selected); color:var(--accent); }
+.export-heading h2 { margin:6px 0 0; font-size:19px; }
+.export-kicker { color:var(--accent); font-size:10px; font-weight:700; letter-spacing:1.2px; }
+.export-target-control { display:block; margin:18px 0; }
+.export-target-control span { display:block; color:var(--secondary); font-size:12px; margin-bottom:8px; }
+.export-file-list { border:1px solid var(--divider); padding:14px; border-radius:8px; background:var(--panel); display:grid; gap:8px; }
+.export-file-list strong, .export-issues>strong { font-size:12px; font-weight:700; color:var(--text); }
+.export-file-list code { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; overflow-wrap:anywhere; color:#c2d7d0; }
+.export-file-list span { font-size:11px; color:var(--muted); margin-top:3px; }
+.export-issues { margin-top:16px; display:grid; gap:9px; }
+.export-issue { display:flex; align-items:flex-start; gap:10px; border:1px solid var(--divider); background:var(--panel); border-radius:7px; padding:10px; }
+.export-issue>svg { flex:0 0 16px; margin-top:3px; color:#a8c5ff; }
+.export-issue.issue-error { border-color:#715356; }
+.export-issue.issue-error>svg { color:var(--error); }
+.export-issue>span { display:grid; gap:4px; line-height:1.5; color:var(--secondary); font-size:11px; flex:1; }
+.export-issue>span b { color:var(--text); font-size:11px; }
+.export-issue button { border:1px solid var(--interactive-border); background:var(--control); border-radius:5px; padding:5px 8px; font-size:11px; color:var(--text); }
+.export-last { font-size:11px !important; color:var(--accent) !important; }
+@media(max-width:760px) {
+  .export-modal { max-height:92dvh; padding:16px; }
+  .export-modal .modal-actions { flex-wrap:wrap; }
+  .export-modal .modal-actions button { flex:1; min-height:36px; }
+}

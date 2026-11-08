@@ -6,7 +6,7 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 ## Project status
 
-**Implementation has begun on the stacked feature branch [feat/editor-core-slice](https://github.com/dovvnloading/3dMc/tree/feat/editor-core-slice).** That branch contains a real React/Three.js editing preview with cuboid transforms, painting, undo/redo, prototype project files, and local checkpoint recovery. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. The game exporter is not implemented or verified.
+**Implementation has begun on the stacked feature branch [feat/editor-core-slice](https://github.com/dovvnloading/3dMc/tree/feat/editor-core-slice).** That branch contains a real React/Three.js editing preview with cuboid transforms, painting, undo/redo, prototype project files, and local checkpoint recovery. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. A **Java 1.21.4 experimental resource-pack generator** now produces model/blockstate JSON, PNGs, and a ZIP with offline validation and tests. It has **not** been verified in-game, and it does not register new block behavior.
 
 The first implementation milestone is a polished, complete editing loop for a deliberately small Java block asset profile. A creator should be able to shape an original cuboid asset, paint it, undo changes, save and reopen their project, and export a resource pack verified in a specific Minecraft release.
 
@@ -35,7 +35,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 - Three initial workspace modes: **Model**, **Paint**, and **Preview**. More advanced controls appear in context.
 - Explicit compatibility profiles, starting with a tested subset of Java block models. Java items, Bedrock entities and animation, and other formats follow their own readiness gates.
 
-Exact dependency versions, the initial Minecraft release, and the supported browser matrix will be pinned during the first compatibility and platform probes. The executable implementation is documented in [First implementation](docs/delivery/FIRST_IMPLEMENTATION.md). To run it on this feature branch: `npm install` followed by `npm run dev`. The dependency lockfile is committed; use `npm ci` for reproducible installation.
+Exact dependency versions, the initial Minecraft release, and the supported browser matrix will be pinned during the first compatibility and platform probes. The executable implementation is documented in [First implementation](docs/delivery/FIRST_IMPLEMENTATION.md). To run it on this feature branch: `npm install` followed by `npm run dev`. The dependency lockfile is committed; use `npm ci` for reproducible installation. The [Java 1.21.4 export experiment](docs/compatibility/JAVA_1214_EXPORT.md) explains its exact output and remaining in-game check.
 
 ## Quality commitment
 
