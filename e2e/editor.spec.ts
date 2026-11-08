@@ -822,16 +822,16 @@ test("texture deletion requires explicit affected-face remap and supports undo",
   await page.getByRole("dialog", { name: "Add a texture asset?" })
     .getByRole("button", { name: "Add texture asset" }).click();
   const slots = page.getByRole("group", { name: "Texture assets" });
-  await expect(slots.getByRole("button", { name: "Select texture lantern.png" })).toHaveCount(2);
-  const deleteButtons = page.getByRole("button", { name: "Delete texture lantern.png" });
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
+  const deleteButtons = slots.locator('.texture-slot > button:last-child');
   await deleteButtons.last().click();
   const prompt = page.getByRole("dialog", { name: "Delete texture asset?" });
   await expect(prompt).toBeVisible();
   await prompt.getByRole("button", { name: "Cancel" }).click();
-  await expect(slots.getByRole("button", { name: "Select texture lantern.png" })).toHaveCount(2);
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
   await deleteButtons.last().click();
   await prompt.getByRole("button", { name: "Remove and remap" }).click();
-  await expect(slots.getByRole("button", { name: "Select texture lantern.png" })).toHaveCount(1);
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(1);
   await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
-  await expect(slots.getByRole("button", { name: "Select texture lantern.png" })).toHaveCount(2);
+  await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
 });
