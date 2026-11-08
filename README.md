@@ -6,7 +6,7 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 ## Project status
 
-**Planning foundation — application implementation has not started.** This repository currently contains the product definition, interaction and visual specifications, technical design, compatibility strategy, and staged delivery plan. Features described in these documents are proposals and acceptance criteria, not shipped capabilities.
+**Implementation has begun on the stacked feature branch [feat/editor-core-slice](https://github.com/dovvnloading/3dMc/tree/feat/editor-core-slice).** That branch contains a real React/Three.js editing preview with cuboid transforms, painting, undo/redo, prototype project files, and local checkpoint recovery. The planning documents remain proposed acceptance criteria, not evidence of Minecraft compatibility or a shipped release. The game exporter is not implemented or verified.
 
 The first implementation milestone is a polished, complete editing loop for a deliberately small Java block asset profile. A creator should be able to shape an original cuboid asset, paint it, undo changes, save and reopen their project, and export a resource pack verified in a specific Minecraft release.
 
@@ -35,7 +35,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 - Three initial workspace modes: **Model**, **Paint**, and **Preview**. More advanced controls appear in context.
 - Explicit compatibility profiles, starting with a tested subset of Java block models. Java items, Bedrock entities and animation, and other formats follow their own readiness gates.
 
-Exact dependency versions, the initial Minecraft release, and the supported browser matrix will be pinned during the first compatibility and platform probes. There is no application build or development command yet; see the [first implementation sequence](docs/delivery/BACKLOG.md#first-implementation-sequence).
+Exact dependency versions, the initial Minecraft release, and the supported browser matrix will be pinned during the first compatibility and platform probes. The executable implementation is documented in [First implementation](docs/delivery/FIRST_IMPLEMENTATION.md). To run it on this feature branch: `npm install` followed by `npm run dev`. The dependency lockfile is committed; use `npm ci` for reproducible installation.
 
 ## Quality commitment
 
