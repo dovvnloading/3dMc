@@ -910,3 +910,31 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .paint-options .segmented button:disabled {
   cursor:not-allowed;opacity:.45;
 }
+
+
+/* Multi-texture authoring: compact slots, contextual face assignment. */
+.texture-slot-list {display:flex;flex-direction:column;gap:5px;max-height:210px;overflow:auto;padding:1px 0 9px;}
+.texture-slot {display:flex;align-items:stretch;gap:2px;background:#242e34;border:1px solid #43545b;border-radius:7px;}
+.texture-slot.active {background:#284539;border-color:#65a78f;}
+.texture-slot-select {display:flex;align-items:center;gap:9px;flex:1;text-align:left;min-width:0;padding:8px;
+ border:0;color:#cbd8d3;background:transparent;border-radius:6px;}
+.texture-slot-select svg {color:#91cdb9;flex:none;}
+.texture-slot-select span {display:flex;min-width:0;flex-direction:column;gap:2px;}
+.texture-slot-select strong {color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px;}
+.texture-slot-select small {font-size:10px;color:var(--muted);}
+.texture-slot>button:last-child {border:0;background:transparent;color:var(--muted);padding:5px 9px;}
+.texture-slot>button:last-child:hover:not(:disabled) {color:#ffabb0;}
+.texture-slot>button:last-child:disabled {opacity:.3;cursor:not-allowed;}
+.texture-add-slot {display:flex;align-items:center;gap:8px;min-height:32px;width:100%;padding:5px 10px;
+ border:1px dashed #517b6d;border-radius:6px;background:#263c35;color:#bdf0d8;font-size:11px;}
+.texture-add-slot span {margin-left:auto;color:#8bb7aa;font-size:10px;}
+.texture-add-slot:hover:not(:disabled) {border-color:#80dbbf;background:#355649;}
+.texture-add-slot:disabled {opacity:.38;cursor:not-allowed;}
+.texture-selected-rename {padding:8px 1px 12px;}
+.texture-rename-input {height:33px;width:100%;color:var(--text);background:var(--control);
+ border:1px solid #4c606a;border-radius:6px;padding:0 8px;font-size:11px;}
+.delete-impact {margin-top:12px;max-height:160px;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;}
+.delete-impact span {font-size:10px;color:#d4e8da;border:1px solid #4a6b61;background:#2d463e;
+ border-radius:4px;padding:5px 7px;}
+.texture-slot-select:focus-visible,.texture-add-slot:focus-visible,
+.texture-slot>button:last-child:focus-visible {outline:2px solid #80dbbf;outline-offset:1px;}

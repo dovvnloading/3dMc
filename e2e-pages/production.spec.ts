@@ -119,3 +119,15 @@ test("published paint tools erase and fill source RGBA pixels", async ({ page })
     (node as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data[0]);
   await expect.poll(red).toBe(245);
 });
+
+
+test("multi-texture Assets panel loads without runtime error on compiled Pages", async ({ page }) => {
+  const errors:string[]=[];
+  page.on("pageerror", e=>errors.push(e.message));
+  await page.goto("/3dMc/");
+  await expect(page.getByRole("group",{name:"Texture assets"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Add texture from PNG"})).toBeEnabled();
+  await page.getByRole("tab",{name:"Paint"}).click();
+  await expect(page.getByRole("combobox",{name:"Face texture asset"})).toHaveValue("main");
+  expect(errors).toEqual([]);
+});
