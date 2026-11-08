@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
-  FolderOpen, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, FilePlus2, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
@@ -15,6 +15,9 @@ import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domai
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
+import { decodeNativeProject, encodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
+import { makeNewProject } from "./editor/templates";
+import type { NewProjectOptions } from "./editor/templates";
 import {
   claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter,
   saveRecovery, RecoveryOwnershipLost
@@ -30,6 +33,7 @@ import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
 import { FaceUVInspector } from "./components/FaceUVInspector";
+import { NewProjectDialog } from "./components/NewProjectDialog";
 import { makeSixFaceDiagnosticDocument } from "./compatibility/diagnostic";
 import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
@@ -168,6 +172,8 @@ export function App() {
   const [candidate, setCandidate] = useState<RecoveryCandidate | null>(null);
   const [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
   const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
   const [packInspecting, setPackInspecting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -409,10 +415,10 @@ export function App() {
     return () => window.removeEventListener("keydown", listener);
   }, [mode, selectedId, runUndo, runRedo, commitDocument, clearStroke]);
 
-  const saveProject = () => {
+  const saveLegacyJson = () => {
     try {
-      const json = encodeProject(doc);
-      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      const text = encodeProject(doc);
+      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
       const link = globalThis.document.createElement("a");
       link.href = url;
       link.download = safeFilename(doc.name);
@@ -420,9 +426,32 @@ export function App() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      setNotice("Project download started. Keep the file as a portable backup.");
+      setNotice("Legacy JSON backup download started. Keep this as an additional portable copy.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not prepare your project.");
+      setNotice(error instanceof Error ? error.message : "Could not prepare the JSON backup.");
+    }
+  };
+
+  const saveProject = async () => {
+    if (savingProject) return;
+    setSavingProject(true);
+    try {
+      const archive = await encodeNativeProject(doc);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(archive)], {
+        type: "application/zip"
+      }));
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = nativeFilename(doc.name);
+      globalThis.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setNotice("Native .3dmc project download started. Keep the archive as your portable backup.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare your native project archive.");
+    } finally {
+      setSavingProject(false);
     }
   };
 
@@ -478,8 +507,22 @@ export function App() {
     event.target.value = "";
     if (!file) return;
     try {
-      if (file.size > MAX_PROJECT_BYTES) throw new Error("File exceeds the 1.5 MB prototype limit.");
-      const imported = decodeProject(await file.text());
+      let imported: EditorDocument;
+      if (file.size > MAX_NATIVE_BYTES)
+        throw new Error("File exceeds the 3 MB project import budget.");
+      // Browsers may rename downloads or supply a temporary file without its
+      // original extension. Inspect the ZIP signature before deciding codec.
+      // Neither filename nor MIME type is trusted as validation of its contents.
+      const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const nativeZip = signature[0] === 0x50 && signature[1] === 0x4b &&
+        signature[2] === 0x03 && signature[3] === 0x04;
+      if (nativeZip || file.name.toLowerCase().endsWith(".3dmc")) {
+        imported = await decodeNativeProject(new Uint8Array(await file.arrayBuffer()));
+      } else {
+        if (file.size > MAX_PROJECT_BYTES)
+          throw new Error("Legacy JSON project exceeds the 1.5 MB import limit.");
+        imported = decodeProject(await file.text());
+      }
       setPendingOpen(imported);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The project could not be opened.");
@@ -508,17 +551,17 @@ export function App() {
     }
   };
 
-  const acceptOpen = async (document: EditorDocument) => {
+  const acceptOpen = async (document: EditorDocument): Promise<boolean> => {
     const lease = writerRef.current;
     if (!lease) {
       setNotice("Editing is paused. Take over local recovery before opening this document.");
-      return;
+      return false;
     }
     try {
       // Invalidate every queued save for the previous document before changing
       // the active source. Its content can never publish in the new session.
       const rotated = await rotateRecoveryWriter(lease);
-      if (writerRef.current?.generation !== lease.generation) return;
+      if (writerRef.current?.generation !== lease.generation) return false;
       writerRef.current = rotated;
       awaitingRecoveryRef.current = false;
       clearStroke();
@@ -527,13 +570,23 @@ export function App() {
       setOpenSession((session) => session + 1);
       setSelectedId(document.cuboids[0]?.id ?? null);
       setSelectedFace("north");
+      setSearch("");
       setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null);
       setCandidate(null); setRecoveryStatus("unsaved");
-      setNotice("Project opened. Local recovery is updating; download a native project for a portable backup.");
+      setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup.");
+      return true;
     } catch (error) {
       markWriterLost();
       setNotice(error instanceof Error ? error.message : "Could not safely open the project.");
+      return false;
     }
+  };
+
+  const createNewProject = async (options: NewProjectOptions): Promise<boolean> => {
+    const created = makeNewProject(options);
+    const opened = await acceptOpen(created);
+    if (opened) setNewProjectOpen(false);
+    return opened;
   };
 
   const addElement = () => {
@@ -576,14 +629,22 @@ export function App() {
           <IconButton label="Undo (Ctrl/Cmd+Z)" disabled={!history.past.length} onClick={runUndo}><Undo2 size={17}/></IconButton>
           <IconButton label="Redo (Ctrl/Cmd+Shift+Z)" disabled={!history.future.length} onClick={runRedo}><Redo2 size={17}/></IconButton>
         </div>
-        <input type="file" ref={fileRef} accept=".json,application/json" hidden onChange={chooseProject} />
-        <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc.json project"><FolderOpen size={16}/>Open</button>
+        <button className="text-button quiet new-project-trigger" aria-label="New project"
+          title="Create a new project" onClick={() => setNewProjectOpen(true)}>
+          <FilePlus2 size={16}/>New
+        </button>
+        <input type="file" ref={fileRef} accept=".3dmc,.json,application/json,application/zip" hidden onChange={chooseProject} />
+        <button className="text-button subtle" onClick={() => fileRef.current?.click()}
+          title="Open a .3dmc native project or legacy JSON"><FolderOpen size={16}/>Open</button>
         <input type="file" ref={packFileRef} accept=".zip,application/zip" hidden onChange={choosePack}/>
         <button className="text-button subtle" onClick={() => packFileRef.current?.click()}
           disabled={packInspecting} title="Import a 3dMc experimental Java 1.21.4 resource pack">
           <PackageOpen size={16}/>{packInspecting ? "Inspecting…" : "Import pack"}
         </button>
-        <button className="text-button quiet" onClick={saveProject}><Save size={16}/>Save project</button>
+        <button className="text-button quiet" onClick={() => void saveProject()}
+          disabled={savingProject} title="Download native .3dmc source project">
+          <Save size={16}/>{savingProject ? "Preparing…" : "Save project"}
+        </button>
         <button className="text-button primary" onClick={() => setExportOpen(true)}
           title="Experimental pack export; in-game validation is pending">
           <Download size={16}/>Minecraft export
@@ -620,7 +681,16 @@ export function App() {
         <div className="scene-search"><Search size={15}/><input value={search} aria-label="Filter scene elements"
           onChange={(event) => setSearch(event.target.value)} placeholder="Find an element…"/></div>
         <div className="scene-list" role="listbox" aria-label="Scene elements">
-          {matching.length === 0 && <div className="empty-list">No matching elements. <button onClick={() => setSearch("")}>Clear search</button></div>}
+          {doc.cuboids.length === 0 && <div className="scene-empty-start">
+            <Box size={29} strokeWidth={1.2}/>
+            <strong>Your canvas is ready</strong>
+            <p>Add the first cuboid to begin shaping your asset.</p>
+            <button onClick={addElement}><FilePlus2 size={14}/>Add first cuboid</button>
+          </div>}
+          {doc.cuboids.length > 0 && matching.length === 0 &&
+            <div className="empty-list">No matching elements.
+              <button onClick={() => setSearch("")}>Clear search</button>
+            </div>}
           {matching.map((node) => <div role="option" aria-selected={selectedId === node.id}
             tabIndex={0} key={node.id} className={"scene-row" + (selectedId === node.id ? " selected" : "") +
               (!node.visible ? " hidden-row" : "")}
@@ -643,7 +713,9 @@ export function App() {
           <SectionHeading title="Assets" trailing={<span className="counter">01</span>}/>
           <div className="asset-entry"><div className="asset-icon"><Paintbrush size={17}/></div>
             <div><strong>{doc.texture.name}</strong><span>{doc.texture.width} × {doc.texture.height} · RGBA</span></div></div>
-          <div className="scene-meta"><span>Prototype format</span><span>1 shared texture</span></div>
+          <button type="button" className="legacy-json-link" onClick={saveLegacyJson}
+            title="Additional portable legacy .3dmc.json backup">Download legacy JSON backup</button>
+          <div className="scene-meta"><span>Native source · .3dmc v1</span><span>1 shared texture</span></div>
         </div>
       </aside>
 
@@ -929,6 +1001,9 @@ export function App() {
         </>}
       </div>
     </div>}
+    {newProjectOpen && <NewProjectDialog
+      onClose={() => setNewProjectOpen(false)}
+      onCreate={createNewProject} onBackup={saveProject}/>}
     {pendingOpen && <div className="modal-shade"><div className="modal" role="dialog" aria-modal="true"
       aria-labelledby="open-dialog-title">
       <div className="modal-icon"><AlertCircle size={23}/></div>

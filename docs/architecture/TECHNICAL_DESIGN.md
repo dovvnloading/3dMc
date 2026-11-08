@@ -222,3 +222,8 @@ S0 proves the exact Java profile, UV/transform/color mapping, replacement block,
 S1 implements the polished lantern loop: cuboid editing, opaque Pencil/Eyedropper, coherent history, native save/reopen, local recovery, constrained import, and the verified replacement pack. S2 broadens authoring, UV tools, and painting only after the memory and compatibility gates pass. S3 adds version-aware Java item definitions and production pack workflows. S4 introduces Bedrock geometry, then animation with its own evaluator and tests. S5 evaluates further asset families and extensions from actual demand.
 
 The architecture is successful when each stage adds a capability without changing what a saved document, undo operation, or verified export means. A premium prototype depends on those promises being dependable from its first complete workflow.
+
+
+## Implemented native source container (first version)
+
+The executable project now supports [the .3dmc native ZIP archive](NATIVE_PROJECT_ARCHIVE.md), with a whitelisted, size-bounded STORED ZIP reader, SHA-256 integrity for document metadata and the PNG source, and a canonical schema-v2 document. This is a deliberately smaller first implementation than the proposed multi-texture manifest/blob graph. The integrity check verifies accidental corruption but is **not** a digital signature or an authenticity proof. Expansion to multiple source images must add reachability and migration rules before storing more blobs.
