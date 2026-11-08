@@ -1,6 +1,6 @@
 # 3dMc planning guide
 
-**Status:** proposed foundation, prepared 2026-11-08. No application features have been implemented or measured.
+**Status:** proposed foundation, prepared 2026-11-08. An S0 editor implementation has now begun on the stacked feature branch; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
 
 ## The central decision
 

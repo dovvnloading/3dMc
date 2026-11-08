@@ -1,0 +1,40 @@
+name: Editor checks
+on:
+  push:
+    branches: [main, docs/editor-foundation, feat/editor-core-slice]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, domain and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Domain tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser workflow smoke
+        run: npm run test:e2e
+      - name: Upload browser screenshot and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-workspace-smoke
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
