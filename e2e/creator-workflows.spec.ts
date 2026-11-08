@@ -70,7 +70,6 @@ test("external model import preflights unsupported fields and accepts an explici
   const faces = Object.fromEntries(["north", "east", "south", "west", "up", "down"]
     .map(face => [face, { uv: [0, 0, 16, 16], texture: "#base", rotation: 0 }]));
   const valid = { textures: { base: "demo:block/paint" }, elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces }] };
-  const json = dialog.getByRole("button", { name: "Choose model JSON files" });
   // Input has a native file button in some browsers; target the labeled input itself.
   const fileInput = dialog.getByLabel("External model JSON files");
   await fileInput.setInputFiles({ name: "safe.json", mimeType: "application/json",
