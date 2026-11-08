@@ -25,13 +25,16 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 - Inspect a clean Preview mode.
 - Download and reopen a constrained `.3dmc.json` prototype project.
 - Save small local IndexedDB checkpoints atomically with a previous-candidate fallback.
+- Create an explicitly **experimental Java Edition 1.21.4 pack** (resource-pack format 46), including an override for `minecraft:diamond_block`, six face references per cuboid, a source texture PNG, solid-color PNGs, and a ZIP archive.
+- Review blockers and warnings before export; unsupported targets, out-of-range cuboids, and alpha prevent a misleading ZIP.
 - Reject unrecognized project schemas, invalid sizes, unsupported profiles, and invalid texture bytes.
 
 ## Important limitations
 
-- **No Java resource-pack export yet.** The candidate Java 26.3 label is for planned compatibility fixtures; this editor does not yet verify any Java game content. The Minecraft export button is disabled rather than simulating success.
+- **Java 1.21.4 export is experimental, not game-verified.** It has deterministic structure and pixel tests, but the actual generated pack has not yet been checked in Minecraft. Do not label it compatible or ready for production use.
+- Existing 26.3 candidate project files still open, but require an explicit target change before attempting this 1.21.4 export.
 - The `.3dmc.json` file is a **transitional source format**. It is not the planned versioned ZIP `.3dmc` archive, and it supports one shared texture with a 64×64 ceiling.
-- The texture maps across textured faces in the renderer, but per-face Java UV rules, transforms, import/export codecs, and independent in-game checks remain to be implemented.
+- The exporter uses a full 0–16 UV rectangle on every face and replaces the blockstate mapping. Per-face UV editing, rotation, dependency imports, and renderer/game parity remain future work. The source project keeps richer metadata than the game output.
 - Rotation editing is hidden until the selected profile is verified. Scale/translation gizmos are an integration proof, not an exhaustive interaction implementation.
 - Local checkpoint publication is serialized within one tab. **A multi-tab ownership-generation fence is not yet implemented.** Work in one active tab; save a portable project file before risky operations. Browser storage is not a portable backup.
 - The current history stores document snapshots (up to 50 operations) for small samples. Tiled texture history and larger workloads come later.
@@ -42,7 +45,7 @@ Direct and transitive dependencies are now locked in `package-lock.json`; CI ins
 1. Maintain green locked-install and Chromium smoke-test CI; expand the browser and real-device interaction matrix.
 2. Implement a complete gesture transaction controller, including tests for lost pointer capture, cancellation, and exact numeric commit semantics.
 3. Finish multi-tab recovery fencing and fault injection, including stale save completions, quota exhaustion, corruption, and checkpoint garbage collection.
-4. Pin a Java release and replacement block using independent fixtures. Prove UV orientation, pivots, transforms, pack metadata, and actual output in game.
+4. Complete the [pinned Java 1.21.4 compatibility proof](../compatibility/JAVA_1214_EXPORT.md): independently check the blockstate/model and six-face texture directions in-game, record evidence, then decide whether to promote the profile.
 5. Replace the transitional JSON project with a versioned native archive and migrations.
 6. Run the creator task study and device baseline before any claim of polished release readiness.
 

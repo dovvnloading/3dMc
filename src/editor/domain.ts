@@ -34,7 +34,7 @@ export interface EditorDocument {
   target: {
     edition: "java";
     family: "static-block";
-    candidateRelease: "26.3";
+    candidateRelease: "1.21.4" | "26.3";
     status: "unverified";
   };
   cuboids: Cuboid[];
@@ -77,7 +77,7 @@ export function parseDocument(input: unknown): EditorDocument {
     throw new Error("The project name or identifier is invalid.");
   }
   if (!value.target || value.target.edition !== "java" || value.target.family !== "static-block" ||
-      value.target.candidateRelease !== "26.3" || value.target.status !== "unverified") {
+      !(value.target.candidateRelease === "1.21.4" || value.target.candidateRelease === "26.3") || value.target.status !== "unverified") {
     throw new Error("This project targets an unsupported prototype profile.");
   }
   if (!Array.isArray(value.cuboids) || value.cuboids.length > 2000 ||
@@ -100,7 +100,7 @@ export function parseDocument(input: unknown): EditorDocument {
   // rendering objects never enter the live document.
   return {
     schemaVersion: 1, id: value.id, name: value.name,
-    target: { edition: "java", family: "static-block", candidateRelease: "26.3", status: "unverified" },
+    target: { edition: "java", family: "static-block", candidateRelease: value.target.candidateRelease, status: "unverified" },
     cuboids: value.cuboids.map((node) => ({
       id: node.id, name: node.name, from: [...node.from] as [number, number, number], to: [...node.to] as [number, number, number],
       material: node.material, color: node.color, visible: node.visible, locked: node.locked
@@ -136,7 +136,7 @@ export function createSampleDocument(): EditorDocument {
     schemaVersion: 1,
     id: "starter-lantern",
     name: "Copper Lantern",
-    target: { edition: "java", family: "static-block", candidateRelease: "26.3", status: "unverified" },
+    target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },
     cuboids: [
       base("body", "Lantern body", [3, 3, 3], [13, 12, 13], "#ffffff", "texture"),
       base("base", "Foundation", [2, 1, 2], [14, 3, 14], "#637e70"),
@@ -229,4 +229,10 @@ export function setTexturePixels(doc: EditorDocument, pixels: number[]): EditorD
 export function renameProject(doc: EditorDocument, name: string): EditorDocument {
   const next = name.trim().slice(0, 100);
   return next && next !== doc.name ? { ...doc, name: next } : doc;
+}
+
+/** Target changes are document edits; older candidate projects still open unchanged. */
+export function setJavaCandidateRelease(doc: EditorDocument, release: "1.21.4" | "26.3"): EditorDocument {
+  return doc.target.candidateRelease === release ? doc :
+    { ...doc, target: { ...doc.target, candidateRelease: release, status: "unverified" } };
 }

@@ -51,7 +51,7 @@ If two documents disagree, use the source of truth for that subject and update t
 
 ## What is ready and what still needs evidence
 
-This foundation defines the product direction, implementation order, architectural boundaries, and quality expectations. It does not establish a validated product-market fit, a measured performance result, or tested Minecraft compatibility. S0 exists to convert the riskiest assumptions into evidence before implementation hardens around them.
+This foundation defines the product direction, implementation order, architectural boundaries, and quality expectations. It does not establish a validated product-market fit, a measured performance result, or tested Minecraft compatibility. S0 exists to convert the riskiest assumptions into evidence before implementation hardens around them. The [Java 1.21.4 export experiment](compatibility/JAVA_1214_EXPORT.md) now implements deterministic offline packaging for one replacement block. In-game verification remains pending.
 
 The next concrete step is the [S0 work queue](delivery/BACKLOG.md#s0-direction-and-compatibility-proof): pin the target, build reference fixtures, test the navigation model with creators, and establish the runtime and benchmark baseline. S1 then turns those decisions into the first complete editor slice.
 
