@@ -507,3 +507,58 @@ test("legacy JSON backups remain importable beside native .3dmc source archives"
   await expect(page.getByRole("dialog", { name: "Open this project?" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
 });
+
+
+test("primitive library and material editor create a paintable Java block component", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add primitive" }).click();
+  const menu = page.getByRole("menu", { name: "Choose a primitive" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: /Half slab/ }).click();
+
+  await expect(page.getByRole("heading", { name: "Half slab" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "X size" })).toHaveValue("16");
+  await expect(page.getByRole("textbox", { name: "Y size" })).toHaveValue("8");
+  await expect(page.getByRole("textbox", { name: "Z size" })).toHaveValue("16");
+
+  const material = page.getByRole("group", { name: "Element material" });
+  await material.getByRole("button", { name: "Painted" }).click();
+  await expect(material.getByRole("button", { name: "Painted" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const exportModal = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(exportModal.getByText(/0 blockers/)).toBeVisible();
+  await exportModal.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Move selected element up" }).click();
+  const sceneRows = page.locator(".scene-row-name");
+  await expect(sceneRows.nth(6)).toHaveText("Half slab");
+  await expect(sceneRows.nth(7)).toHaveText("Handle · right");
+
+  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  await expect(sceneRows.nth(7)).toHaveText("Half slab");
+  await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
+  await expect(sceneRows.nth(6)).toHaveText("Half slab");
+  await page.screenshot({ path: "test-results/primitive-and-material-editor.png" });
+  expect(errors).toEqual([]);
+});
+
+test("desktop shortcuts create a new project, duplicate elements and download native source", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "View iso" }).focus();
+  await page.keyboard.press("Control+d");
+  await expect(page.getByRole("heading", { name: "Lantern body copy" })).toBeVisible();
+  await page.keyboard.press("Control+z");
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page.keyboard.press("Control+s");
+  expect((await download).suggestedFilename()).toBe("copper-lantern.3dmc");
+
+  await page.keyboard.press("Control+n");
+  await expect(page.getByRole("dialog", { name: "Create a new project" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Create a new project" })
+    .getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog", { name: "Create a new project" })).toHaveCount(0);
+});
