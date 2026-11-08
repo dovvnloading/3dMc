@@ -15,7 +15,7 @@ describe("Minecraft face UV mapping", () => {
   });
 
   it("maps logical texel rectangles at 16, 32 and 64 pixels without assuming 16 physical pixels", () => {
-    const binding = { uv: [2, 4, 14, 12] as const, rotation: 0 as const };
+    const binding = { uv: [2, 4, 14, 12] as const, rotation: 0 as const, textureId: "main" };
     expect(logicalUVToPixelRect(binding.uv, 16, 16)).toEqual([2, 4, 14, 12]);
     expect(logicalUVToPixelRect(binding.uv, 32, 32)).toEqual([4, 8, 28, 24]);
     expect(logicalUVToPixelRect(binding.uv, 64, 64)).toEqual([8, 16, 56, 48]);
@@ -26,7 +26,7 @@ describe("Minecraft face UV mapping", () => {
   });
 
   it("preserves mirrored bounds and quarter turns, reversing rotation on down", () => {
-    const binding = { uv: [12, 3, 2, 13] as const, rotation: 0 as const };
+    const binding = { uv: [12, 3, 2, 13] as const, rotation: 0 as const, textureId: "main" };
     expect(localToLogicalUV("north", binding, 0, 0)).toEqual([12, 3]);
     expect(localToLogicalUV("north", binding, 1, 1)).toEqual([2, 13]);
     expect(localToLogicalUV("north", { ...binding, rotation: 90 }, 0, 0)).toEqual([12, 13]);
@@ -37,8 +37,8 @@ describe("Minecraft face UV mapping", () => {
 
   it("bakes every face mapping into the exact UVs consumed by raycasting and the renderer", () => {
     const faces = createDefaultFaces();
-    faces.north = { uv: [2, 4, 14, 12], rotation: 90 };
-    faces.down = { uv: [0, 1, 8, 13], rotation: 90 };
+    faces.north = { uv: [2, 4, 14, 12], rotation: 90, textureId: "main" };
+    faces.down = { uv: [0, 1, 8, 13], rotation: 90, textureId: "main" };
     const box = new BoxGeometry(1, 1, 1);
     applyFaceUvs(box, faces);
     const uv = box.getAttribute("uv");

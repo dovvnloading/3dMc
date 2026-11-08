@@ -16,8 +16,8 @@ describe("asymmetric six-face Minecraft 1.21.4 diagnostic", () => {
     const doc = makeSixFaceDiagnosticDocument();
     expect(doc.schemaVersion).toBe(2);
     expect(doc.cuboids).toHaveLength(1);
-    expect(doc.texture.width).toBe(64);
-    expect(doc.texture.height).toBe(64);
+    expect(doc.textures[0]!.width).toBe(64);
+    expect(doc.textures[0]!.height).toBe(64);
     const faces = doc.cuboids[0]!.faces;
     expect([...FACE_DIAGNOSTIC_LAYOUT.map((tile) => tile.face)].sort())
       .toEqual([...FACE_DIRECTIONS].sort());
@@ -26,17 +26,17 @@ describe("asymmetric six-face Minecraft 1.21.4 diagnostic", () => {
       const x = item.col * 16, y = item.row * 16;
       expect(faces[item.face]).toEqual({
         uv: [item.col * 4, item.row * 4, item.col * 4 + 4, item.row * 4 + 4],
-        rotation: 0
+        rotation: 0, textureId: "main"
       });
-      expect(pixel(doc.texture.pixels, x + 1, y + 1)).toEqual([255, 255, 255, 255]);
-      expect(pixel(doc.texture.pixels, x + 13, y + 2)).toEqual([12, 17, 25, 255]);
-      expect(pixel(doc.texture.pixels, x + 2, y + 13)).toEqual([255, 228, 65, 255]);
-      expect(pixel(doc.texture.pixels, x + 13, y + 13)).toEqual([252, 135, 175, 255]);
-      expect(pixel(doc.texture.pixels, x + 5, y + 5)).toEqual([...item.color, 255]);
+      expect(pixel(doc.textures[0]!.pixels, x + 1, y + 1)).toEqual([255, 255, 255, 255]);
+      expect(pixel(doc.textures[0]!.pixels, x + 13, y + 2)).toEqual([12, 17, 25, 255]);
+      expect(pixel(doc.textures[0]!.pixels, x + 2, y + 13)).toEqual([255, 228, 65, 255]);
+      expect(pixel(doc.textures[0]!.pixels, x + 13, y + 13)).toEqual([252, 135, 175, 255]);
+      expect(pixel(doc.textures[0]!.pixels, x + 5, y + 5)).toEqual([...item.color, 255]);
       colors.add(item.color.join(","));
     }
     expect(colors.size).toBe(6);
-    expect(doc.texture.pixels.filter((_, i) => i % 4 === 3).every((a) => a === 255)).toBe(true);
+    expect(doc.textures[0]!.pixels.filter((_, i) => i % 4 === 3).every((a) => a === 255)).toBe(true);
   });
 
   it("emits a deterministic ZIP which re-imports with exact face geometry and pixels", () => {
@@ -55,12 +55,12 @@ describe("asymmetric six-face Minecraft 1.21.4 diagnostic", () => {
       });
     }
     const texture = read3dMcRgbaPng(content[JAVA_PACK_PATHS.mainTexture]!);
-    expect(texture.pixels).toEqual(doc.texture.pixels);
+    expect(texture.pixels).toEqual(doc.textures[0]!.pixels);
     const report = inspectJava1214Pack(first.zip);
     expect(report.status).toBe("editable");
     if (report.status !== "editable") throw new Error(report.problems.join("; "));
     expect(report.document.cuboids[0]?.faces).toEqual(doc.cuboids[0]?.faces);
-    expect(report.document.texture.pixels).toEqual(doc.texture.pixels);
+    expect(report.document.textures[0]!.pixels).toEqual(doc.textures[0]!.pixels);
     expect(makeJava1214Pack(report.document).zip).toEqual(first.zip);
   });
 });

@@ -80,12 +80,12 @@ export function makeSixFaceDiagnosticDocument(): EditorDocument {
     }
     faces[entry.face] = {
       uv: [entry.col * 4, entry.row * 4, entry.col * 4 + 4, entry.row * 4 + 4],
-      rotation: 0
+      rotation: 0, textureId: "main"
     };
   }
 
   return parseDocument({
-    schemaVersion: 3,
+    schemaVersion: 2,
     id: "java-1214-six-face-diagnostic",
     name: "Six-face UV diagnostic",
     target: {
@@ -98,10 +98,9 @@ export function makeSixFaceDiagnosticDocument(): EditorDocument {
       color: "#ffffff", material: "texture",
       faces, visible: true, locked: false
     }],
-    textures: [{
+    texture: {
       id: "main", name: "six-face-asymmetric.png",
       width: FACE_TEXTURE_SIZE, height: FACE_TEXTURE_SIZE, pixels
-    }],
-    activeTextureId: "main"
+    }
   });
 }

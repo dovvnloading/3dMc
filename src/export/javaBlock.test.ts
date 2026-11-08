@@ -69,7 +69,7 @@ describe("Java Edition 1.21.4 experimental pack", () => {
     expect(model.elements[0].faces.north).toEqual({ uv: [0, 0, 16, 16], texture: "#painted" });
     expect(model.textures.painted).toBe("3dmc:block/main");
     expect(files[JAVA_PACK_PATHS.mainTexture]).toBeDefined();
-    expect(pngPixel(files[JAVA_PACK_PATHS.mainTexture]!)).toEqual(document.texture.pixels.slice(0, 4));
+    expect(pngPixel(files[JAVA_PACK_PATHS.mainTexture]!)).toEqual(document.textures[0]!.pixels.slice(0, 4));
     expect(pngPixel(files["assets/3dmc/textures/block/solid_1.png"]!))
       .toEqual([99, 126, 112, 255]);
   });
@@ -93,7 +93,7 @@ describe("Java Edition 1.21.4 experimental pack", () => {
   });
   it("rejects alpha, non-power-of-two, tinted textures and zero elements", () => {
     const initial = createSampleDocument();
-    const pixels = [...initial.texture.pixels];
+    const pixels = [...initial.textures[0]!.pixels];
     pixels[3] = 100;
     const transparent = setTexturePixels(initial, pixels);
     expect(inspectJava1214(transparent).some((i) => i.code === "TEXTURE_ALPHA")).toBe(true);

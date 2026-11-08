@@ -42,7 +42,7 @@ describe("Java pack importer", () => {
       expect(report.document.cuboids[i]?.material).toBe(source.cuboids[i]?.material);
       expect(report.document.cuboids[i]?.color).toBe(source.cuboids[i]?.color);
     }
-    expect(report.document.texture.pixels).toEqual(source.texture.pixels);
+    expect(report.document.textures[0]!.pixels).toEqual(source.textures[0]!.pixels);
     expect(report.notices.some((message) => /names/.test(message))).toBe(true);
     expect(makeJava1214Pack(report.document).zip).toEqual(packed.zip);
   });
@@ -51,13 +51,13 @@ describe("Java pack importer", () => {
     const report = inspectJava1214Pack(original());
     if (report.status !== "editable") throw new Error("Could not decode reference pack.");
     const moved = setAxisValue(report.document, "pack-element-0", "position", 0, 5);
-    const paint = drawStroke(moved.texture.pixels, 32, 32, [4, 5], [5, 6], "#123456", 1);
+    const paint = drawStroke(moved.textures[0]!.pixels, 32, 32, [4, 5], [5, 6], "#123456", 1);
     const edited = setTexturePixels(moved, paint);
     const reopened = inspectJava1214Pack(makeJava1214Pack(edited).zip);
     expect(reopened.status).toBe("editable");
     if (reopened.status !== "editable") throw new Error("Could not reimport edited pack.");
     expect(reopened.document.cuboids[0]?.from[0]).toBe(5);
-    expect(reopened.document.texture.pixels).toEqual(paint);
+    expect(reopened.document.textures[0]!.pixels).toEqual(paint);
   });
 
   it("rejects unsupported ZIP formats, entries, corrupt checksums and oversized archives", () => {
@@ -139,8 +139,8 @@ describe("strict exported PNG decoder", () => {
     const source = createSampleDocument();
     const png = unzipSync(original())[JAVA_PACK_PATHS.mainTexture]!;
     expect(read3dMcRgbaPng(png)).toEqual({
-      width: source.texture.width, height: source.texture.height,
-      pixels: source.texture.pixels
+      width: source.textures[0]!.width, height: source.textures[0]!.height,
+      pixels: source.textures[0]!.pixels
     });
   });
   it("rejects invalid CRC", () => {
@@ -171,7 +171,7 @@ describe("face UV authoring preserves export/import semantics", () => {
     if (imported.status !== "editable") throw new Error(imported.problems.join("; "));
     expect(imported.document.cuboids[0]?.faces.north).toEqual(doc.cuboids[0]?.faces.north);
     expect(imported.document.cuboids[0]?.faces.down).toEqual(doc.cuboids[0]?.faces.down);
-    expect(imported.document.texture.pixels).toEqual(doc.texture.pixels);
+    expect(imported.document.textures[0]!.pixels).toEqual(doc.textures[0]!.pixels);
     expect(makeJava1214Pack(imported.document).zip).toEqual(zip);
   });
 });
