@@ -1,6 +1,6 @@
 # 3dMc planning guide
 
-**Status:** proposed foundation, prepared 2026-11-08. The editor is implemented on main with a staged UV-authoring update; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
+**Status:** proposed foundation, prepared 2026-11-08. The editor is implemented on main with per-face UV authoring and a staged recovery/gesture hardening update; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
 
 ## The central decision
 
