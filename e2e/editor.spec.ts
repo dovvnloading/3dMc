@@ -90,6 +90,7 @@ test("experimental Java pack download and actionable geometry blockers", async (
   await expect(modal).toBeVisible();
   await expect(modal.getByText(/0 blockers/)).toBeVisible();
   await expect(modal.getByText(/not been checked in Minecraft/)).toBeVisible();
+  await page.screenshot({ path: "test-results/java-export-preflight.png" });
   const downloaded = page.waitForEvent("download");
   await modal.getByRole("button", { name: "Download experimental ZIP" }).click();
   const file = await downloaded;
