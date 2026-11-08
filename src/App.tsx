@@ -618,7 +618,7 @@ export function App() {
         <div className="scene-footer"><SectionHeading title="Assets" trailing={<span className="counter">{String(doc.textures.length).padStart(2, "0")}</span>}/>
           <div className="texture-slot-list" role="group" aria-label="Texture assets">{doc.textures.map(asset => <div key={asset.id} className={"texture-slot" + (doc.activeTextureId === asset.id ? " active" : "")}>
             <button type="button" aria-label={"Select texture " + asset.name} aria-pressed={doc.activeTextureId === asset.id} className="texture-slot-select" onClick={() => {
-              clearStroke(); setHistory(state => { const next = selectTexture(state.present, asset.id); return next === state.present ? state : { ...state, present: next }; });
+              clearStroke(); publishHistory(state => { const next = selectTexture(state.present, asset.id); return next === state.present ? state : { ...state, present: next }; });
             }}><Paintbrush size={16}/><span><strong>{asset.name}</strong><small>{asset.width}×{asset.height} · {asset.id === "main" ? "Main" : asset.id.slice(-5)}</small></span></button>
             <button type="button" aria-label={"Delete texture " + asset.name} disabled={doc.textures.length <= 1} onClick={() => {
               setDeletingTextureId(asset.id); setDeleteReplacementId(doc.textures.find(t => t.id !== asset.id)?.id ?? null);
@@ -666,7 +666,7 @@ export function App() {
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace} setFace={direction => {
               clearStroke(); setSelectedFace(direction);
-              setHistory(state => { const next = selectTexture(state.present, selected.faces[direction].textureId); return next === state.present ? state : { ...state, present: next }; });
+              publishHistory(state => { const next = selectTexture(state.present, selected.faces[direction].textureId); return next === state.present ? state : { ...state, present: next }; });
             }} commitDocument={commitDocument} textures={doc.textures} textureWidth={faceAsset?.width ?? texture.width} textureHeight={faceAsset?.height ?? texture.height}/>}
             <div className="inspector-group"><SectionHeading title="Transform" trailing={<SlidersHorizontal size={15} className="section-muted-icon"/>}/>
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/><AxisRow title="Size" selected={selected} property="size" commitDocument={commitDocument}/>
