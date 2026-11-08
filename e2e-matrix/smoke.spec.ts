@@ -2,8 +2,16 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
 test("core workspace and staged pixel work remain operable outside Chromium", async ({ page, browserName }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.stack ?? error.message));
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto("/");
-  await expect(page.getByRole("listbox", { name: "Scene elements" }).getByRole("option")).toHaveCount(7);
+  try {
+    await expect(page.getByRole("listbox", { name: "Scene elements" }).getByRole("option")).toHaveCount(7);
+  } catch (error) {
+    const body = (await page.locator("body").innerText()).slice(0, 2400);
+    throw new Error(`${browserName} did not initialize the editor. Visible document: ${body}. Browser errors: ${errors.join(" | ").slice(0, 3000)}. Assertion: ${String(error)}`);
+  }
   await expect(page.getByRole("button", { name: "Save project", exact: true })).toBeEnabled();
   await page.getByRole("tab", { name: "Paint" }).click();
   await page.getByRole("button", { name: "Pixel region" }).click();
