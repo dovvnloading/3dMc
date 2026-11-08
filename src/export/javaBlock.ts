@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from "fflate";
-import { isValidCuboid, parseDocument } from "../editor/domain";
+import { parseDocument } from "../editor/domain";
 import type { Cuboid, EditorDocument } from "../editor/domain";
 import { hexToRGB } from "../editor/pixels";
 import { encodeRgbaPng } from "./png";
@@ -71,10 +71,7 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
     issues.push(error("TEXTURE_ALPHA", "This opaque-only profile does not support translucent or transparent pixels."));
 
   for (const node of document.cuboids) {
-    if (!isValidCuboid(node)) {
-      issues.push(error("INVALID_CUBOID", `Element "${node.name}" has invalid dimensions or metadata.`, node.id));
-      continue;
-    }
+    // makeJava1214Pack() validates the full document before encoding.
     if (!insideJavaBounds(node)) {
       issues.push(error("ELEMENT_BOUNDS",
         `Element "${node.name}" extends outside Java model element bounds (-16 to 32 units). Move or resize it.`,
