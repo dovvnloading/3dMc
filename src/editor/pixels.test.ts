@@ -60,3 +60,30 @@ describe("four-connected bucket fill", () => {
     expect(floodFill(input, 5, 6, [0, 0], "#010203")).toBe(input);
   });
 });
+
+
+describe("bounded and diagonal-safe fill", () => {
+  it("does not cross a diagonal-only connection between equal RGBA pixels", () => {
+    const image: number[] = [];
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+      const marked = x === y;
+      image.push(marked ? 50 : 0, marked ? 60 : 0, marked ? 70 : 0, 255);
+    }
+    const changed = floodFill(image, 3, 3, [0, 0], "#c804e6");
+    const at = (x: number, y: number) =>
+      changed.slice((y * 3 + x) * 4, (y * 3 + x) * 4 + 4);
+    expect(at(0, 0)).toEqual([200, 4, 230, 255]);
+    expect(at(1, 1)).toEqual([50, 60, 70, 255]);
+    expect(at(2, 2)).toEqual([50, 60, 70, 255]);
+  });
+
+  it("fills the maximum 64×64 editable sheet without recursion or partial output", () => {
+    const pixels: number[] = [];
+    for (let i = 0; i < 64 * 64; i++) pixels.push(1, 2, 3, 128);
+    const result = floodFill(pixels, 64, 64, [31, 31], "#abcdef");
+    expect(result).toHaveLength(pixels.length);
+    expect(result.slice(0, 4)).toEqual([171, 205, 239, 255]);
+    expect(result.slice(-4)).toEqual([171, 205, 239, 255]);
+    expect(pixels.slice(0, 4)).toEqual([1, 2, 3, 128]);
+  });
+});
