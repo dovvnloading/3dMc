@@ -90,6 +90,11 @@ describe("multi-texture authored document", () => {
     }:n) };
     expect(() => parseDocument(dangling)).toThrow(/dangling/i);
     expect(() => parseDocument({...source,originalMystery:{secret:1}})).toThrow(/metadata/);
+    expect(() => parseDocument({...source,target:{...source.target, mystery:1}}))
+      .toThrow(/target metadata/);
+    expect(() => parseDocument({...source,cuboids:source.cuboids.map((n,i) =>
+      i === 0 ? {...n, unknown: "silently lost?"} : n)}))
+      .toThrow(/cuboid metadata/);
   });
 
   it("persists 2 textures and face assignments through native and Java round-trips", async () => {
@@ -114,6 +119,15 @@ describe("multi-texture authored document", () => {
     expect(roundtrip.document.cuboids[0]?.faces.north.textureId).toBe("texture_1");
     expect(roundtrip.document.textures[1]?.pixels).toEqual(detail().pixels);
     expect(makeJava1214Pack(roundtrip.document).zip).toEqual(pack.zip);
+  });
+
+
+  it("accepts full-length valid asset IDs and native archive path lengths", async () => {
+    const source = createSampleDocument();
+    const added = addTexture(source, {...detail(),id:"z".repeat(100)});
+    expect(added.textures).toHaveLength(2);
+    expect((await decodeNativeProject(await encodeNativeProject(added))).textures[1]?.id)
+      .toBe("z".repeat(100));
   });
 
   it("handles sixteen sheets with bounded total pixel memory", async () => {

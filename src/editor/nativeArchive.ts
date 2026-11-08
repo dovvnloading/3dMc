@@ -112,7 +112,7 @@ function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     const comment = u16(view, pos + 32);
     const offset = u32(view, pos + 42);
     const next = pos + 46 + length + extra + comment;
-    if (next > end || !length || length > 100 || extra || comment ||
+    if (next > end || !length || length > 180 || extra || comment ||
         (flags & ~0x0800) !== 0 || method !== 0 || size === 0xffffffff ||
         u32(view, pos + 20) !== size || offset === 0xffffffff)
       reject("Native ZIP contains unsupported compression, metadata or oversized entries.");
@@ -145,7 +145,7 @@ function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     const extra = u16(view, start + 28);
     const body = start + 30 + length + extra;
     const endOfBody = body + entry.size;
-    if (!length || length > 100 || extra || endOfBody > centralStart ||
+    if (!length || length > 180 || extra || endOfBody > centralStart ||
         u16(view, start + 6) !== entry.flags ||
         u16(view, start + 8) !== 0 ||
         u32(view, start + 14) !== entry.crc ||

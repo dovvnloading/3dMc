@@ -150,6 +150,15 @@ export function parseDocument(input: unknown): EditorDocument {
     !["schemaVersion", "id", "name", "target", "cuboids", "textures", "activeTextureId"].includes(key)))
     throw new Error("Unsupported source document metadata cannot be silently removed.");
 
+  if (!isLegacy) {
+    if (value.target && Object.keys(value.target).some(key =>
+      !["edition", "family", "candidateRelease", "status"].includes(key)))
+      throw new Error("Unsupported target metadata cannot be silently removed.");
+    if (Array.isArray(value.cuboids) && value.cuboids.some(node =>
+      !node || typeof node !== "object" || Object.keys(node).some(key =>
+        !["id", "name", "from", "to", "material", "color", "faces", "visible", "locked"].includes(key))))
+      throw new Error("Unsupported cuboid metadata cannot be silently removed.");
+  }
   const textures = isLegacy ? [inputRecord.texture] : inputRecord.textures;
   if (!Array.isArray(textures) || textures.length < 1 || textures.length > MAX_TEXTURE_SLOTS)
     throw new Error("A project requires 1–16 texture assets.");
