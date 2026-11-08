@@ -688,14 +688,16 @@ test("eraser changes alpha, makes one undo entry and cancels a dragged erase wit
   });
   const original = await rgba();
   await canvas.click({ position: { x: 9, y: 9 } });
-  await expect.poll(async () => (await rgba())[3]).toBe(0);
+  const clickedAlpha = async () => (await rgba())[(1 * 32 + 1) * 4 + 3];
+  await expect.poll(clickedAlpha).toBe(0);
   await page.screenshot({ path: "test-results/eraser-undo.png" });
 
   await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
   await expect.poll(rgba).toEqual(original);
   await page.getByRole("button", { name: /Redo \(Ctrl/ }).click();
   const erased = await rgba();
-  expect(erased[3]).toBe(0);
+  expect(erased[(1 * 32 + 1) * 4 + 3]).toBe(0);
+  expect(erased[3]).toBe(255); // Neighboring texel wasn't touched.
 
   const rect = await canvas.boundingBox();
   if (!rect) throw new Error("Paint canvas not visible.");

@@ -106,7 +106,7 @@ test("published paint tools erase and fill source RGBA pixels", async ({ page })
   await page.getByRole("tab", { name: "Paint" }).click();
   const canvas = page.locator(".texture-pixel-wrap canvas");
   const alpha = () => canvas.evaluate((node) =>
-    (node as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data[3]);
+    (node as HTMLCanvasElement).getContext("2d")!.getImageData(1, 1, 1, 1).data[3]);
   await page.getByRole("button", { name: "Pixel eraser (E)" }).click();
   await canvas.click({ position: { x: 8, y: 8 } });
   await expect.poll(alpha).toBe(0);
