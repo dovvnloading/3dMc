@@ -177,3 +177,21 @@ test("real shared resize preview cancels without a history entry", async ({ page
   expect(await source(page)).toEqual(original);
   await expect(page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true })).toBeDisabled();
 });
+
+test("two duplicate commands in one browser turn both commit without losing the second edit", async ({ page }) => {
+  const initial = await source(page);
+  await row(page, "Lantern body").click();
+  await page.evaluate(() => {
+    const duplicate = () => new KeyboardEvent("keydown", { key: "d", ctrlKey: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(duplicate());
+    window.dispatchEvent(duplicate());
+  });
+  await expect(rows(page)).toHaveCount(initial.cuboids.length + 2);
+  const after = await source(page);
+  expect(after.cuboids.filter(node => node.name === "Lantern body copy")).toHaveLength(2);
+  expect(new Set(after.cuboids.map(node => node.id)).size).toBe(after.cuboids.length);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
+  await expect(rows(page)).toHaveCount(initial.cuboids.length + 1);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
+  expect(await source(page)).toEqual(initial);
+});
