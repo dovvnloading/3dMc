@@ -155,7 +155,7 @@ export async function decodeBrowserPng(file: File): Promise<DecodedTexture> {
     };
   } catch (error) {
     if (error instanceof TextureImportError) throw error;
-    reject("The browser couldn't decode this PNG. Check that the file isn't damaged.");
+    return reject("The browser couldn't decode this PNG. Check that the file isn't damaged.");
   } finally {
     bitmap?.close();
   }

@@ -50,7 +50,11 @@ export function TextureImportDialog({
         <div className="png-import-preview">
           <div className="png-import-checker">
             <canvas ref={canvasRef} width={image.width} height={image.height}
-              style={{ width: 164, height: 164, objectFit: "contain", imageRendering: "pixelated" }}
+              style={{
+                width: Math.round(164 * image.width / Math.max(image.width, image.height)),
+                height: Math.round(164 * image.height / Math.max(image.width, image.height)),
+                imageRendering: "pixelated"
+              }}
               aria-label={"Preview of " + image.name}/>
           </div>
           <strong title={image.name}>{image.name}</strong>
