@@ -96,6 +96,6 @@ test("losing pointer capture cancels a pending pencil gesture without a history 
     await canvas.dispatchEvent("lostpointercapture", { bubbles: true, pointerId: 1 });
     await expect.poll(pixels).toEqual(initial);
     await page.mouse.up();
-    await expect(pixels()).toEqual(initial);
+    expect(await pixels()).toEqual(initial);
     await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
   });

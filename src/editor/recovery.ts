@@ -209,7 +209,9 @@ export async function readRecovery(): Promise<RecoveryCandidate | null> {
       latest.result as Checkpoint | undefined,
       previous.result as Checkpoint | undefined
     ]);
-    tx.onerror = () => reject(tx.error ?? new Error("Could not read recovery data."));
+    tx.onerror = () => reject(tx.error ?? new Error(
+      "Recovery read transaction failed or was aborted."
+    ));
     tx.onabort = () => reject(tx.error ?? new Error("Recovery read transaction aborted."));
   }).finally(() => db.close());
 
