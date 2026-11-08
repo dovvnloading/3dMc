@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { createSampleDocument, setAxisValue, setTexturePixels } from "../editor/domain";
+import { createSampleDocument, setAxisValue, setTexturePixels, updateFaceRotation, updateFaceUV } from "../editor/domain";
 import { makeJava1214Pack, JAVA_PACK_PATHS } from "../export/javaBlock";
 import { drawStroke } from "../editor/pixels";
 import { read3dMcStoredZip } from "./storedZip";
@@ -86,15 +86,19 @@ describe("Java pack importer", () => {
 
     const alteredUv = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.elements[0].faces.north.uv = [2, 0, 16, 16];
-    });
-    const uv = inspectJava1214Pack(alteredUv);
-    expect(uv.status).toBe("blocked");
-    if (uv.status === "blocked") expect(uv.problems.join()).toMatch(/UV editing/);
-
-    const hiddenField = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.elements[0].faces.north.rotation = 90;
     });
-    expect(inspectJava1214Pack(hiddenField).status).toBe("blocked");
+    const uv = inspectJava1214Pack(alteredUv);
+    expect(uv.status).toBe("editable");
+    if (uv.status === "editable") {
+      expect(uv.document.cuboids[0]?.faces.north.uv).toEqual([2, 0, 16, 16]);
+      expect(uv.document.cuboids[0]?.faces.north.rotation).toBe(90);
+    }
+
+    const invalidRotation = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
+      model.elements[0].faces.north.rotation = 45;
+    });
+    expect(inspectJava1214Pack(invalidRotation).status).toBe("blocked");
 
     const parent = alterJson(original(), JAVA_PACK_PATHS.model, (model) => {
       model.parent = "minecraft:block/cube_all";
@@ -143,5 +147,31 @@ describe("strict exported PNG decoder", () => {
     const png = unzipSync(original())[JAVA_PACK_PATHS.mainTexture]!.slice();
     png[32] = png[32]! ^ 1;
     expect(() => read3dMcRgbaPng(png)).toThrow();
+  });
+});
+
+describe("face UV authoring preserves export/import semantics", () => {
+  it("round trips quarter-turn rotations, mirrored rectangles and shared pixel bytes", () => {
+    let doc = createSampleDocument();
+    doc = updateFaceUV(doc, "body", "north", 0, 12);
+    doc = updateFaceUV(doc, "body", "north", 1, 3);
+    doc = updateFaceUV(doc, "body", "north", 2, 2);
+    doc = updateFaceUV(doc, "body", "north", 3, 13);
+    doc = updateFaceRotation(doc, "body", "north", 90);
+    doc = updateFaceRotation(doc, "body", "down", 270);
+    const zip = makeJava1214Pack(doc).zip;
+    const files = unzipSync(zip);
+    const model = JSON.parse(strFromU8(files[JAVA_PACK_PATHS.model]!));
+    expect(model.elements[0].faces.north).toEqual({
+      texture: "#painted", uv: [12, 3, 2, 13], rotation: 90
+    });
+    expect(model.elements[0].faces.down.rotation).toBe(270);
+    const imported = inspectJava1214Pack(zip);
+    expect(imported.status).toBe("editable");
+    if (imported.status !== "editable") throw new Error(imported.problems.join("; "));
+    expect(imported.document.cuboids[0]?.faces.north).toEqual(doc.cuboids[0]?.faces.north);
+    expect(imported.document.cuboids[0]?.faces.down).toEqual(doc.cuboids[0]?.faces.down);
+    expect(imported.document.texture.pixels).toEqual(doc.texture.pixels);
+    expect(makeJava1214Pack(imported.document).zip).toEqual(zip);
   });
 });

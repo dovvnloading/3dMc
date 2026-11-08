@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import { parseDocument } from "../editor/domain";
+import { FACE_DIRECTIONS } from "../editor/domain";
 import type { Cuboid, EditorDocument } from "../editor/domain";
 import { hexToRGB } from "../editor/pixels";
 import { encodeRgbaPng } from "./png";
@@ -93,15 +94,20 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
   return issues;
 }
 
-type Face = "down" | "up" | "north" | "south" | "west" | "east";
-const FACES: readonly Face[] = ["down", "up", "north", "south", "west", "east"] as const;
+// Source face directions come from the versioned domain model.
 
 export function buildJava1214Model(document: EditorDocument) {
   const textures: Record<string, string> = { particle: "3dmc:block/main", painted: "3dmc:block/main" };
   const elements = document.cuboids.map((node, i) => {
     const key = node.material === "texture" ? "painted" : `solid_${i}`;
     if (node.material === "solid") textures[key] = `3dmc:block/solid_${i}`;
-    const faces = Object.fromEntries(FACES.map((face) => [face, { uv: [0, 0, 16, 16], texture: "#" + key }]));
+    const faces = Object.fromEntries(FACE_DIRECTIONS.map((face) => {
+      const binding = node.faces[face];
+      return [face, {
+        uv: [...binding.uv], texture: "#" + key,
+        ...(binding.rotation === 0 ? {} : { rotation: binding.rotation })
+      }];
+    }));
     return { from: [...node.from], to: [...node.to], faces };
   });
   return { ambientocclusion: true, textures, elements };

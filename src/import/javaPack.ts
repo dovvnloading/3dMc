@@ -1,6 +1,7 @@
 
 import { parseDocument } from "../editor/domain";
-import type { Cuboid, EditorDocument, Vec3 } from "../editor/domain";
+import { FACE_DIRECTIONS } from "../editor/domain";
+import type { Cuboid, CuboidFaces, EditorDocument, FaceRotation, FaceUV, Vec3 } from "../editor/domain";
 import { inspectJava1214, JAVA_PACK_PATHS, RESOURCE_PACK_FORMAT } from "../export/javaBlock";
 import { read3dMcRgbaPng } from "./strictPng";
 import { read3dMcStoredZip } from "./storedZip";
@@ -10,7 +11,7 @@ export type PackImportReport =
   | { status: "blocked"; problems: string[] };
 
 const DECODER = new TextDecoder("utf-8", { fatal: true });
-const FACES = ["down", "up", "north", "south", "west", "east"] as const;
+const FACES = FACE_DIRECTIONS;
 
 function fail(path: string, message: string): never {
   throw new Error(path + ": " + message);
@@ -102,18 +103,31 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
     requiredKeys(faces, "element " + index + ":faces", FACES);
 
     let textureKey: string | null = null;
+    const faceData: Partial<CuboidFaces> = {};
     for (const face of FACES) {
-      const binding = asObject(faces[face], "element " + index + ":" + face, ["texture", "uv"]);
+      const binding = asObject(faces[face], "element " + index + ":" + face,
+        ["texture", "uv", "rotation"]);
       requiredKeys(binding, "element " + index + ":" + face, ["texture", "uv"]);
-      if (!Array.isArray(binding.uv) ||
-          binding.uv.length !== 4 || binding.uv.some((n, i) => n !== [0, 0, 16, 16][i])) {
-        fail("element " + index + ":" + face, "UV editing is not supported for this imported pack.");
+      if (!Array.isArray(binding.uv) || binding.uv.length !== 4 ||
+          binding.uv.some((n: unknown) => typeof n !== "number" ||
+            !Number.isFinite(n) || n < 0 || n > 16) ||
+          binding.uv[0] === binding.uv[2] || binding.uv[1] === binding.uv[3]) {
+        fail("element " + index + ":" + face,
+          "This face needs a nonzero UV rectangle within logical 0–16 coordinates.");
       }
+      const rotation = binding.rotation ?? 0;
+      if (rotation !== 0 && rotation !== 90 && rotation !== 180 && rotation !== 270)
+        fail("element " + index + ":" + face,
+          "Supported Java face rotations are 0°, 90°, 180° and 270°.");
       if (typeof binding.texture !== "string")
         fail("element " + index + ":" + face, "Texture reference is missing.");
       if (textureKey === null) textureKey = binding.texture;
       if (binding.texture !== textureKey)
         fail("element " + index + ":" + face, "Different per-face textures are not yet editable.");
+      faceData[face] = {
+        uv: [...binding.uv] as [number, number, number, number],
+        rotation: rotation as FaceRotation
+      } satisfies FaceUV;
     }
     const painted = textureKey === "#painted";
     const expectedSolidKey = "#solid_" + index;
@@ -135,7 +149,7 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
     nodes.push({
       id: "pack-element-" + index,
       name: "Imported cuboid " + String(index + 1).padStart(2, "0"),
-      from, to, color,
+      from, to, color, faces: faceData as CuboidFaces,
       material: painted ? "texture" : "solid",
       visible: true, locked: false
     });
@@ -164,7 +178,7 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
   let result: EditorDocument;
   try {
     result = parseDocument({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: "imported-java-1214-diamond-block",
       name: "Imported diamond block",
       target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },
@@ -196,7 +210,7 @@ export function inspectJava1214Pack(bytes: Uint8Array): PackImportReport {
       notices: [
         "The generated geometry and opaque texture pixels are editable and re-exportable.",
         "Java resource packs do not retain native part names, visibility, locks, or undo history; these values will be newly initialized.",
-        "Other resource packs, custom UVs, parent models, animation, and extra resources are not supported by this importer.",
+        "The six explicit face UV rectangles and quarter-turn rotations can be edited and re-exported; parent models, animations, and unrelated resources remain unsupported.",
         "Rendering compatibility in Minecraft 1.21.4 has not been verified."
       ]
     };

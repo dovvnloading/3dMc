@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addCuboid, createSampleDocument, deleteCuboid, duplicateCuboid,
-  parseDocument, setAxisValue, setTexturePixels, toggleFlag
+  parseDocument, setAxisValue, setTexturePixels, toggleFlag,
+  updateFaceUV, updateFaceRotation, FACE_DIRECTIONS
 } from "./domain";
 import { commit, createHistory, redo, undo } from "./history";
 import { drawStroke, readHex, uvToTexel } from "./pixels";
@@ -15,7 +16,7 @@ describe("canonical document", () => {
 
   it("rejects unsupported versions, invalid geometry, and oversized pixels", () => {
     const sample = createSampleDocument();
-    expect(() => parseDocument({ ...sample, schemaVersion: 2 })).toThrow(/version/i);
+    expect(() => parseDocument({ ...sample, schemaVersion: 3 })).toThrow(/version/i);
     expect(() => parseDocument({ ...sample, cuboids: [
       { ...sample.cuboids[0], to: [3, 12, 13] }
     ] })).toThrow(/cuboid/i);
@@ -73,5 +74,55 @@ describe("pixel addressing", () => {
     const pixels = drawStroke(base, 8, 8, [1, 1], [5, 1], "#123abc", 1);
     for (let x = 1; x <= 5; x++) expect(readHex(pixels, 8, [x, 1])).toBe("#123abc");
     expect(base.every((value) => value === 0)).toBe(true);
+  });
+});
+
+describe("face-aware native project migration", () => {
+  it("migrates legacy v1 cuboids to six full-sheet UV mappings without losing pixels", () => {
+    const sample = createSampleDocument();
+    const legacy = {
+      ...sample, schemaVersion: 1,
+      cuboids: sample.cuboids.map(({ faces: _faces, ...node }) => node)
+    };
+    const migrated = decodeProject(JSON.stringify(legacy));
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.texture.pixels).toEqual(sample.texture.pixels);
+    expect(migrated.cuboids.map((node) => node.from))
+      .toEqual(sample.cuboids.map((node) => node.from));
+    for (const node of migrated.cuboids) {
+      expect(Object.keys(node.faces).sort()).toEqual([...FACE_DIRECTIONS].sort());
+      for (const face of FACE_DIRECTIONS)
+        expect(node.faces[face]).toEqual({ uv: [0, 0, 16, 16], rotation: 0 });
+    }
+    expect(decodeProject(encodeProject(migrated))).toEqual(migrated);
+  });
+
+  it("commits a single face UV edit and rotation, with exact undo", () => {
+    const sample = createSampleDocument();
+    let history = createHistory(sample);
+    history = commit(history, updateFaceUV(history.present, "body", "north", 0, 2));
+    history = commit(history, updateFaceRotation(history.present, "body", "north", 90));
+    expect(history.present.cuboids[0]?.faces.north)
+      .toEqual({ uv: [2, 0, 16, 16], rotation: 90 });
+    history = undo(undo(history));
+    expect(history.present).toEqual(sample);
+    history = redo(redo(history));
+    expect(decodeProject(encodeProject(history.present))).toEqual(history.present);
+  });
+
+  it("blocks invalid UV spans, out-of-bounds values, unsupported angles and locked edits", () => {
+    const sample = createSampleDocument();
+    expect(updateFaceUV(sample, "body", "north", 0, 16)).toBe(sample);
+    expect(updateFaceUV(sample, "body", "north", 1, -2)).toBe(sample);
+    expect(updateFaceRotation(sample, "body", "north", 45 as 90)).toBe(sample);
+    const locked = toggleFlag(sample, "body", "locked");
+    expect(updateFaceUV(locked, "body", "north", 0, 8)).toBe(locked);
+    const wrong = {
+      ...sample, cuboids: sample.cuboids.map((node, i) =>
+        i === 0 ? { ...node, faces: { ...node.faces, north: {
+          uv: [4, 2, 4, 12], rotation: 90
+        } } } : node)
+    };
+    expect(() => parseDocument(wrong)).toThrow(/cuboids/i);
   });
 });
