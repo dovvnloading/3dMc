@@ -38,6 +38,12 @@ jobs:
         run: npm run build -- --mode github-pages
       - name: Test production site at /3dMc/ (not Vite dev)
         run: npx playwright test --config playwright.pages.config.ts
+      - name: Record reproducible source and release evidence
+        if: always()
+        run: |
+          mkdir -p test-results/evidence
+          git archive --format=tar.gz HEAD > test-results/evidence/source-snapshot.tar.gz
+          node scripts/release-evidence.mjs
       - name: Upload browser screenshot and failures
         if: always()
         uses: actions/upload-artifact@v4

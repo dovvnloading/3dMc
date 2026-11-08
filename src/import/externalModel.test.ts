@@ -36,7 +36,7 @@ describe("bounded external block-model preflight", () => {
     expect(await decodeNativeProject(archive)).toEqual(result.document);
     const exported = buildJava1214Model(result.document);
     for (const direction of FACE_DIRECTIONS) {
-      expect(exported.elements[0]!.faces[direction].uv).toEqual(model().elements[0]!.faces[direction]!.uv);
+      expect(exported.elements[0]!.faces[direction]!.uv).toEqual(model().elements[0]!.faces[direction]!.uv);
     }
   });
   it("resolves local parent geometry with child texture overrides and reports resolution", () => {

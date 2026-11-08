@@ -1,5 +1,5 @@
-import { FACE_DIRECTIONS, parseDocument } from "../editor/domain";
-import type { Cuboid, CuboidFaces, EditorDocument, FaceRotation, FaceUVRect, PixelTexture, Vec3 } from "../editor/domain";
+import { createDefaultFaces, FACE_DIRECTIONS, parseDocument } from "../editor/domain";
+import type { Cuboid, EditorDocument, FaceRotation, FaceUVRect, PixelTexture, Vec3 } from "../editor/domain";
 import { parseStrictJson } from "./strictJson";
 
 export interface LocalModelSource { readonly resource: string; readonly text: string; }
@@ -17,7 +17,7 @@ export interface ExternalModelImport {
   readonly plan: ExternalModelPlan;
   readonly unusedTextures: readonly string[];
 }
-const fail = (path: string, message: string): never => { throw new Error(`${path}: ${message}`); };
+function fail(path: string, message: string): never { throw new Error(`${path}: ${message}`); }
 function object(value: unknown, path: string, permitted?: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fail(path, "Expected an object.");
   const record = value as Record<string, unknown>;
@@ -95,7 +95,6 @@ export function inspectExternalModel(sources: readonly LocalModelSource[], root:
     }
     return resourceId(current);
   };
-  // Check all declared aliases, including unused ones, rather than hiding broken dependencies.
   for (const alias of aliases.keys()) resolve("#" + alias, canonicalRoot + ":textures");
   const used = new Set<string>();
   if (aliases.has("particle")) used.add(resolve("#particle", canonicalRoot + ":particle"));
@@ -149,14 +148,15 @@ export function materializeExternalModel(plan: ExternalModelPlan, images: readon
     const id = index === 0 ? "main" : "external_" + index; textureIds.set(resource, id);
     return { id, name: resource.slice(-100), width: image.width, height: image.height, pixels: [...image.pixels] };
   });
-  const cuboids: Cuboid[] = plan.elements.map((element, index) => ({
-    id: "external-part-" + index, name: "Imported part " + String(index + 1).padStart(2, "0"),
-    from: element.from, to: element.to, material: "texture", color: "#ffffff", visible: true, locked: false,
-    faces: Object.fromEntries(FACE_DIRECTIONS.map(direction => {
+  const cuboids: Cuboid[] = plan.elements.map((element, index) => {
+    const faces = createDefaultFaces();
+    for (const direction of FACE_DIRECTIONS) {
       const face = element.faces[direction]!;
-      return [direction, { uv: [...face.uv], rotation: face.rotation, textureId: textureIds.get(face.resource)! }];
-    })) as CuboidFaces
-  }));
+      faces[direction] = { uv: [...face.uv], rotation: face.rotation, textureId: textureIds.get(face.resource)! };
+    }
+    return { id: "external-part-" + index, name: "Imported part " + String(index + 1).padStart(2, "0"),
+      from: element.from, to: element.to, material: "texture", color: "#ffffff", visible: true, locked: false, faces };
+  });
   const document = parseDocument({ schemaVersion: 3, id: projectId, name: name.trim().slice(0, 100) || "Imported block model",
     target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },
     cuboids, textures, activeTextureId: "main" });
