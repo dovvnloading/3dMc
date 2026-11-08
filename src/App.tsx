@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  AlertCircle, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
+  AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eye, EyeOff,
   FolderOpen, FilePlus2, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
@@ -17,6 +17,8 @@ import type { History } from "./editor/history";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
 import { decodeNativeProject, encodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
 import { makeNewProject } from "./editor/templates";
+import { PRIMITIVE_PRESETS, addPrimitive, moveCuboid, setCuboidMaterial } from "./editor/primitives";
+import type { PrimitiveId } from "./editor/primitives";
 import type { NewProjectOptions } from "./editor/templates";
 import {
   claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter,
@@ -149,7 +151,15 @@ export function App() {
   const exportIssues = useMemo(() => inspectJava1214(doc), [doc]);
   const [selectedId, setSelectedId] = useState<string | null>("body");
   const [selectedFace, setSelectedFace] = useState<FaceDirection>("north");
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const selected = doc.cuboids.find((node) => node.id === selectedId) ?? null;
+  const selectedIndex = doc.cuboids.findIndex((node) => node.id === selectedId);
+  // Undoing a duplicate or deleting the active part must not strand selection
+  // on a missing ID. The next available element remains editable immediately.
+  useEffect(() => {
+    if (selectedId && !doc.cuboids.some((node) => node.id === selectedId))
+      setSelectedId(doc.cuboids[0]?.id ?? null);
+  }, [selectedId, doc.cuboids]);
   const [mode, setMode] = useState<Mode>("model");
   const [tool, setTool] = useState<Tool>("select");
   const [snap, setSnap] = useState(1);
@@ -180,6 +190,7 @@ export function App() {
   const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
   const [lastExport, setLastExport] = useState<{ revision: number; bytes: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const saveProjectRef = useRef<() => Promise<void>>(async () => undefined);
   const fileRef = useRef<HTMLInputElement>(null);
   const packFileRef = useRef<HTMLInputElement>(null);
   const activeRevision = useRef(history.revision);
@@ -392,6 +403,26 @@ export function App() {
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
       const command = event.metaKey || event.ctrlKey;
+      if (command && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setNewProjectOpen(true);
+        return;
+      }
+      if (command && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveProjectRef.current();
+        return;
+      }
+      if (command && event.key.toLowerCase() === "d" && selectedId && mode === "model") {
+        event.preventDefault();
+        const node = historyRef.current.present.cuboids.find((item) => item.id === selectedId);
+        if (node && !node.locked) {
+          const duplicatedId = crypto.randomUUID();
+          commitDocument((document) => duplicateCuboid(document, selectedId, duplicatedId));
+          setSelectedId(duplicatedId);
+        }
+        return;
+      }
       if (command && event.key.toLowerCase() === "z") {
         event.preventDefault(); if (event.shiftKey) runRedo(); else runUndo(); return;
       }
@@ -400,7 +431,7 @@ export function App() {
       }
       if (command || event.altKey) return;
       const key = event.key.toLowerCase();
-      if (key === "escape") { clearStroke(); switchTool("select"); }
+      if (key === "escape") { clearStroke(); setShapeMenuOpen(false); switchTool("select"); }
       if (key === "v") switchTool("select");
       if (key === "w" && mode === "model") switchTool("move");
       if (key === "r" && mode === "model") switchTool("resize");
@@ -454,6 +485,8 @@ export function App() {
       setSavingProject(false);
     }
   };
+
+  saveProjectRef.current = saveProject;
 
   const downloadJavaPack = () => {
     if (exportStatus === "building") return;
@@ -571,6 +604,7 @@ export function App() {
       setSelectedId(document.cuboids[0]?.id ?? null);
       setSelectedFace("north");
       setSearch("");
+      setShapeMenuOpen(false);
       setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null);
       setCandidate(null); setRecoveryStatus("unsaved");
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup.");
@@ -593,6 +627,15 @@ export function App() {
     const id = crypto.randomUUID();
     commitDocument((current) => addCuboid(current, id));
     setSelectedId(id); setMode("model"); switchTool("select");
+  };
+
+  const addShape = (primitive: PrimitiveId) => {
+    const id = crypto.randomUUID();
+    commitDocument((current) => addPrimitive(current, id, primitive));
+    setShapeMenuOpen(false);
+    setSelectedId(id);
+    setMode("model");
+    switchTool("select");
   };
 
   const viewPixels = draftPixels ?? doc.texture.pixels;
@@ -677,7 +720,22 @@ export function App() {
 
     <div className="editor-grid">
       <aside className="scene-panel" aria-label="Scene hierarchy">
-        <SectionHeading title="Scene" trailing={<IconButton label="Add cuboid" onClick={addElement}><Plus size={17}/></IconButton>}/>
+        <SectionHeading title="Scene" trailing={
+          <button type="button" className="shape-trigger" aria-label="Add primitive"
+            aria-expanded={shapeMenuOpen} aria-controls="shape-creation-menu"
+            onClick={() => setShapeMenuOpen((value) => !value)}>
+            <Plus size={15}/><span>Add shape</span><ChevronDown size={13}/>
+          </button>
+        }/>
+        {shapeMenuOpen && <div id="shape-creation-menu" className="shape-creation-menu"
+          role="menu" aria-label="Choose a primitive">
+          <div className="shape-menu-title">ADD A CUBOID PRIMITIVE</div>
+          {PRIMITIVE_PRESETS.map((shape) => <button type="button" role="menuitem"
+            key={shape.id} onClick={() => addShape(shape.id)}>
+            <Box size={16}/><span><strong>{shape.label}</strong>
+              <small>{shape.description}</small></span>
+          </button>)}
+        </div>}
         <div className="scene-search"><Search size={15}/><input value={search} aria-label="Filter scene elements"
           onChange={(event) => setSearch(event.target.value)} placeholder="Find an element…"/></div>
         <div className="scene-list" role="listbox" aria-label="Scene elements">
@@ -794,6 +852,19 @@ export function App() {
             </div>
             <div className="inspector-group">
               <SectionHeading title="Appearance"/>
+              <div className="form-group">
+                <div className="form-caption">Surface type</div>
+                <div className="material-switch" role="group" aria-label="Element material">
+                  <button type="button" aria-pressed={selected.material === "solid"}
+                    disabled={selected.locked}
+                    onClick={() => commitDocument((current) =>
+                      setCuboidMaterial(current, selected.id, "solid"))}>Solid color</button>
+                  <button type="button" aria-pressed={selected.material === "texture"}
+                    disabled={selected.locked}
+                    onClick={() => commitDocument((current) =>
+                      setCuboidMaterial(current, selected.id, "texture"))}>Painted</button>
+                </div>
+              </div>
               {selected.material === "texture" ? <>
                 <div className="surface-summary"><div className="texture-swatch" style={{ background: "#d1a65d" }}/>
                   <div><strong>{doc.texture.name}</strong><span>Shared texture · {doc.texture.width} × {doc.texture.height}</span></div></div>
@@ -816,6 +887,19 @@ export function App() {
                 }}><Copy size={15}/>Duplicate</button>
                 <button disabled={selected.locked} onClick={() =>
                   commitDocument((current) => deleteCuboid(current, selected.id))}><Trash2 size={15}/>Delete</button>
+              </div>
+              <div className="reorder-actions" role="group" aria-label="Scene ordering">
+                <button type="button" aria-label="Move selected element up"
+                  disabled={selected.locked || selectedIndex <= 0}
+                  onClick={() => commitDocument((current) =>
+                    moveCuboid(current, selected.id, "up"))}>
+                  <ArrowUp size={14}/>Move up</button>
+                <button type="button" aria-label="Move selected element down"
+                  disabled={selected.locked || selectedIndex < 0 ||
+                    selectedIndex >= doc.cuboids.length - 1}
+                  onClick={() => commitDocument((current) =>
+                    moveCuboid(current, selected.id, "down"))}>
+                  <ArrowDown size={14}/>Move down</button>
               </div>
               <label className="form-caption rename-label" htmlFor="element-name">Element name</label>
               <CommittedText id="element-name" label="Element name" className="text-control"
