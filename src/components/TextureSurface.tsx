@@ -27,7 +27,7 @@ const FACE = "texture-canvas";
 export function TextureSurface(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokePointer = useRef<number | null>(null);
-  const [zoom, setZoom] = useState(8);
+  const [zoom, setZoom] = useState(() => props.width >= 64 || props.height >= 64 ? 4 : 8);
   const [cursor, setCursor] = useState<Texel>([0, 0]);
   const region = props.face
     ? logicalUVToPixelRect(props.face.uv, props.width, props.height)

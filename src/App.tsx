@@ -702,7 +702,7 @@ export function App() {
         <SectionHeading title="Inspector" trailing={<Settings2 size={17} className="section-muted-icon"/>}/>
         {selected ? <>
           <div className="selection-heading"><div className="selection-glyph"><Box size={20}/></div>
-            <div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.id === "body" ? "Textured surface" : "Solid material"}</p></div></div>
+            <div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.material === "texture" ? "Textured surface" : "Solid material"}</p></div></div>
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace}
               setFace={setSelectedFace} commitDocument={commitDocument}
