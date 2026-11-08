@@ -176,7 +176,18 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .camera-views button { border:0; border-radius:4px; background:transparent; font-size:10px; font-weight:650; color:var(--secondary); min-width:30px; height:29px; padding:0 5px; }
 .camera-views button.current { color:var(--accent); background:var(--selected); }
 .camera-views button:not(.current):hover { background:var(--control); }
-.webgl-fallback { padding:90px 38px; color:var(--secondary); max-width:400px; line-height:1.7; }
+.webgl-fallback {
+  display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
+  gap:14px; padding:clamp(24px,6vw,72px); max-width:680px; min-height:100%;
+  color:var(--secondary); line-height:1.65;
+}
+.webgl-fallback strong { font-size:17px; font-weight:700; color:var(--text); }
+.webgl-fallback p { margin:0; font-size:13px; }
+.webgl-fallback button {
+  border:1px solid var(--interactive-border); border-radius:8px; background:var(--raised);
+  color:var(--text); padding:9px 15px; font-size:12px; font-weight:650;
+}
+.webgl-fallback button:hover { border-color:var(--accent); color:var(--accent); }
 .texture-editor {
   width:296px; flex-shrink:0; display:flex; flex-direction:column; min-height:0;
   border-left:1px solid var(--divider); background:#1a1d22;
