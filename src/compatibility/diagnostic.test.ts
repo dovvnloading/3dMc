@@ -14,7 +14,7 @@ function pixel(pixels: number[], x: number, y: number): number[] {
 describe("asymmetric six-face Minecraft 1.21.4 diagnostic", () => {
   it("builds distinct editable UV regions and asymmetric colored corner markers", () => {
     const doc = makeSixFaceDiagnosticDocument();
-    expect(doc.schemaVersion).toBe(2);
+    expect(doc.schemaVersion).toBe(3);
     expect(doc.cuboids).toHaveLength(1);
     expect(doc.textures[0]!.width).toBe(64);
     expect(doc.textures[0]!.height).toBe(64);

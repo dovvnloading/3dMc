@@ -123,6 +123,6 @@ describe("face-aware native project migration", () => {
           uv: [4, 2, 4, 12], rotation: 90
         } } } : node)
     };
-    expect(() => parseDocument(wrong)).toThrow(/cuboids/i);
+    expect(() => parseDocument(wrong)).toThrow(/cuboid/i);
   });
 });
