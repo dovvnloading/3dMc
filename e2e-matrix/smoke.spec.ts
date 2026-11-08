@@ -12,6 +12,12 @@ test("core workspace and staged pixel work remain operable outside Chromium", as
     const body = (await page.locator("body").innerText()).slice(0, 2400);
     throw new Error(`${browserName} did not initialize the editor. Visible document: ${body}. Browser errors: ${errors.join(" | ").slice(0, 3000)}. Assertion: ${String(error)}`);
   }
+  const fallback = page.getByRole("status", { name: "3D preview unavailable" });
+  if (await fallback.count()) {
+    await expect(fallback).toContainText("Scene, numeric inspector, 2D Paint tools");
+    await expect(fallback.getByRole("button", { name: "Retry 3D rendering" })).toBeVisible();
+    // A blocked headless GPU is not evidence that real Firefox lacks WebGL.
+  }
   await expect(page.getByRole("button", { name: "Save project", exact: true })).toBeEnabled();
   await page.getByRole("tab", { name: "Paint" }).click();
   await page.getByRole("button", { name: "Pixel region" }).click();
