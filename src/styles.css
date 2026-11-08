@@ -533,3 +533,25 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
   background: rgba(7, 12, 15, .5);
   pointer-events: auto;
 }
+
+
+/* Separately labeled fixture must never be confused with current project export. */
+.diagnostic-fixture {
+  margin: 14px 0 8px;
+  padding: 14px;
+  border: 1px solid #4b786e;
+  border-radius: 9px;
+  background: #20322f;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 13px;
+}
+.diagnostic-fixture>div { flex: 1 1 260px; }
+.diagnostic-fixture strong { font-size: 12px; color: var(--accent); }
+.diagnostic-fixture p {
+  font-size: 11px; line-height: 1.6; margin: 6px 0 0;
+  color: #c5d4cf;
+}
+.diagnostic-fixture button { flex: 0 1 auto; min-height: 35px; }
