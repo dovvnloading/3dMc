@@ -166,7 +166,8 @@ function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
 
 function AssetMesh(props: MeshProps) {
   const { node, selectedId, mode, tool } = props;
-  const anchor = useRef<THREE.Group>(null);
+  const anchor = useRef<THREE.Group>(null!);
+  const { invalidate } = useThree();
   const draggingGizmo = useRef(false), cancelledGizmo = useRef(false);
   const worldPosition = center(node);
   const initialPosition: Vec3 = props.groupOrigin ?
@@ -180,7 +181,7 @@ function AssetMesh(props: MeshProps) {
     (tool === "move" || tool === "resize") ? tool : null;
   const rollbackGizmo = () => {
     cancelledGizmo.current = true; draggingGizmo.current = false;
-    anchor.current?.position.set(...initialPosition); anchor.current?.scale.set(1, 1, 1);
+    anchor.current?.position.set(...initialPosition); anchor.current?.scale.set(1, 1, 1); invalidate();
   };
   useEffect(() => { rollbackGizmo(); }, [props.cancelToken, activeGizmo, node, props.groupOrigin]);
   useEffect(() => {
@@ -246,7 +247,7 @@ function AssetMesh(props: MeshProps) {
     {selectedId === node.id && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
   </group>;
   if (!activeGizmo) return mesh;
-  return <TransformControls mode={activeGizmo === "move" ? "translate" : "scale"}
+  return <TransformControls object={anchor} mode={activeGizmo === "move" ? "translate" : "scale"}
     translationSnap={props.snap / WORLD} scaleSnap={0.125} size={0.74}
     onMouseDown={() => { draggingGizmo.current = true; cancelledGizmo.current = false; }}
     onMouseUp={() => {
