@@ -78,6 +78,8 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
       count !== view.getUint16(end + 8, true)) reject("ZIP file count exceeds the supported format.");
   const centralSize = view.getUint32(end + 12, true);
   const centralStart = view.getUint32(end + 16, true);
+  if (view.getUint16(end + 20, true) !== 0)
+    reject("ZIP comments are not supported by this exact-subset importer.");
   if (centralStart === 0xffffffff || centralSize === 0xffffffff ||
       centralStart + centralSize !== end) reject("ZIP directory offsets are invalid.");
 
@@ -99,6 +101,8 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     const extraLength = view.getUint16(pos + 30, true);
     const commentLength = view.getUint16(pos + 32, true);
     const localOffset = view.getUint32(pos + 42, true);
+    if (extraLength !== 0 || commentLength !== 0)
+      reject("ZIP entry extras or comments are outside the generated-pack contract.");
     if (size > LIMITS.file || compressed !== size || size === 0xffffffff ||
         localOffset === 0xffffffff) reject("ZIP entry is oversized or uses unsupported compression.");
     const next = pos + 46 + nameLength + extraLength + commentLength;

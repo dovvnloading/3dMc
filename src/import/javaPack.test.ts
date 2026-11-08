@@ -107,6 +107,13 @@ describe("Java pack importer", () => {
     expect(inspectJava1214Pack(noncanonical).status).toBe("blocked");
   });
 
+  it("refuses modifications to descriptive metadata that it cannot preserve", () => {
+    const changed = alterJson(original(), JAVA_PACK_PATHS.metadata, (metadata) => {
+      metadata.pack.description += " custom notes";
+    });
+    expect(inspectJava1214Pack(changed).status).toBe("blocked");
+  });
+
   it("rejects invalid resource pack format and alpha without accepting a partial import", () => {
     const wrong = alterJson(original(), JAVA_PACK_PATHS.metadata, (metadata) => {
       metadata.pack.pack_format = 97;

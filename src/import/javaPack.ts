@@ -61,7 +61,7 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
   const pack = asObject(meta.pack, "pack.mcmeta:pack", ["pack_format", "description"]);
   requiredKeys(pack, "pack.mcmeta:pack", ["pack_format", "description"]);
   if (pack.pack_format !== RESOURCE_PACK_FORMAT || typeof pack.description !== "string" ||
-      !pack.description.startsWith("3dMc experimental block visual - Java Edition 1.21.4")) {
+      pack.description !== "3dMc experimental block visual - Java Edition 1.21.4") {
     fail("pack.mcmeta", "This is not a 3dMc Java 1.21.4 experimental export (format 46).");
   }
 
