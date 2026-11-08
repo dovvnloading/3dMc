@@ -13,7 +13,7 @@ const original = () => makeJava1214Pack(createSampleDocument()).zip;
 function repack(
   src: Uint8Array,
   change: (files: Record<string, Uint8Array>) => void,
-  level = 0
+  level: 0 | 6 = 0
 ): Uint8Array {
   const files = unzipSync(src);
   change(files);
