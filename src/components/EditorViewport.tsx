@@ -23,6 +23,7 @@ interface ViewportProps {
   view: ViewRequest;
   snap: number;
   painting: boolean;
+  cancelToken: number;
   onSelect: (id: string | null) => void;
   onSelectFace: (face: FaceDirection) => void;
   onBeginPaint: (texel: Texel, face: string) => void;
@@ -93,7 +94,7 @@ function useTextureMap({ width, height, pixels }: {
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
 "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
-"onCancelPaint" | "onSample" | "onTransform"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
+"onCancelPaint" | "onSample" | "onTransform" | "cancelToken"> & { node: Cuboid; texture: THREE.Texture; width: number; height: number };
 
 function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
   const [sx, sy, sz] = dimensions(node);
@@ -117,8 +118,10 @@ function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
 }
 
 function AssetMesh(props: MeshProps) {
-  const { node, selectedId, mode, tool, painting } = props;
+  const { node, selectedId, mode, tool } = props;
   const anchor = useRef<THREE.Group>(null);
+  const draggingGizmo = useRef(false);
+  const cancelledGizmo = useRef(false);
   const initialPosition = center(node);
   const geometry = useMemo(() => {
     const box = new THREE.BoxGeometry(...dimensions(node));
@@ -129,6 +132,27 @@ function AssetMesh(props: MeshProps) {
   const isSelected = selectedId === node.id;
   const activeGizmo = isSelected && mode === "model" && !node.locked &&
     (tool === "move" || tool === "resize") ? tool : null;
+  const rollbackGizmo = () => {
+    cancelledGizmo.current = true;
+    draggingGizmo.current = false;
+    anchor.current?.position.set(...center(node));
+    anchor.current?.scale.set(1, 1, 1);
+  };
+  useEffect(() => {
+    rollbackGizmo();
+  }, [props.cancelToken, activeGizmo]);
+  useEffect(() => {
+    const abort = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && draggingGizmo.current) rollbackGizmo();
+    };
+    const lostFocus = () => { if (draggingGizmo.current) rollbackGizmo(); };
+    window.addEventListener("keydown", abort, true);
+    window.addEventListener("blur", lostFocus);
+    return () => {
+      window.removeEventListener("keydown", abort, true);
+      window.removeEventListener("blur", lostFocus);
+    };
+  }, [node]);
 
   const onHit = (event: ThreeEvent<PointerEvent>): { texel: Texel; face: string } | null => {
     const direction = faceFromTriangle(event.faceIndex ?? -1);
@@ -154,7 +178,7 @@ function AssetMesh(props: MeshProps) {
     props.onBeginPaint(hit.texel, hit.face);
   };
   const handleMove = (event: ThreeEvent<PointerEvent>) => {
-    if (!painting || mode !== "paint" || tool !== "pencil") return;
+    if (mode !== "paint" || tool !== "pencil" || (event.buttons & 1) === 0) return;
     const hit = onHit(event);
     if (hit) props.onContinuePaint(hit.texel, hit.face);
   };
@@ -196,13 +220,17 @@ function AssetMesh(props: MeshProps) {
 
   return <TransformControls mode={activeGizmo === "move" ? "translate" : "scale"}
     translationSnap={props.snap / WORLD} scaleSnap={0.125} size={0.74}
+    onMouseDown={() => {
+      draggingGizmo.current = true;
+      cancelledGizmo.current = false;
+    }}
     onMouseUp={() => {
       const object = anchor.current;
-      if (!object) return;
-      props.onTransform(node.id, vec(object.position.toArray()), vec(object.scale.toArray()));
-      // Restore presentation while the domain commit updates the node.
-      object.position.set(...initialPosition);
-      object.scale.set(1, 1, 1);
+      const shouldCommit = !!object && draggingGizmo.current && !cancelledGizmo.current;
+      const position = object ? vec(object.position.toArray()) : null;
+      const scale = object ? vec(object.scale.toArray()) : null;
+      rollbackGizmo();
+      if (shouldCommit && position && scale) props.onTransform(node.id, position, scale);
     }}>
     {mesh}
   </TransformControls>;

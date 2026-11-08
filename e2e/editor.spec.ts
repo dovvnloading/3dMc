@@ -77,6 +77,10 @@ test("opening a project commits a fresh local checkpoint before the next reload"
   await page.getByRole("dialog").getByRole("button", { name: "Open project" }).click();
   await expect(page.getByText("Saved on this device")).toBeVisible();
   await page.reload();
+  // A reload creates a new runtime identity, so the previous lease cannot
+  // silently be reused. Recover only after an explicit takeover.
+  await expect(page.getByRole("dialog", { name: "Another tab controls local recovery" })).toBeVisible();
+  await page.getByRole("button", { name: "Take over editing" }).click();
   await expect(page.getByText("Continue a local session?")).toBeVisible();
   await expect(page.getByText(/Recovery import proof/).first()).toBeVisible();
 });
@@ -239,4 +243,112 @@ test("invalid face UV edits do not create corrupted documents", async ({ page })
   await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
   await mapping.getByRole("button", { name: "North" }).click();
   await expect(u1).toHaveValue("0");
+});
+
+
+test("canceling a drag restores every texture byte without adding history", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const sample = () => canvas.evaluate((node) => {
+    const element = node as HTMLCanvasElement;
+    const ctx = element.getContext("2d");
+    if (!ctx) throw new Error("Missing pixel canvas");
+    return Array.from(ctx.getImageData(0, 0, element.width, element.height).data);
+  });
+  const original = await sample();
+  const rect = await canvas.boundingBox();
+  if (!rect) throw new Error("Texture canvas not visible");
+  await page.mouse.move(rect.x + 6, rect.y + 6);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 130, rect.y + 90, { steps: 8 });
+  await expect.poll(sample).not.toEqual(original);
+  await page.keyboard.press("Escape");
+  await expect.poll(sample).toEqual(original);
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
+
+  await page.mouse.move(rect.x + 12, rect.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 40, rect.y + 55, { steps: 4 });
+  await canvas.dispatchEvent("pointercancel", { bubbles: true, pointerId: 1 });
+  await expect.poll(sample).toEqual(original);
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
+});
+
+test("two browser tabs cannot silently overwrite one another's recovery", async ({ page, context }) => {
+  await page.goto("/");
+  const width = page.getByRole("textbox", { name: "X size" });
+  await width.fill("12");
+  await width.press("Enter");
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+
+  const second = await context.newPage();
+  await second.goto("/");
+  const blocked = second.getByRole("dialog", { name: "Another tab controls local recovery" });
+  await expect(blocked).toBeVisible();
+  await blocked.getByRole("button", { name: "Take over editing" }).click();
+  await expect(second.getByText("Continue a local session?")).toBeVisible();
+  await second.getByRole("button", { name: "Recover project" }).click();
+  const secondWidth = second.getByRole("textbox", { name: "X size" });
+  await expect(secondWidth).toHaveValue("12");
+  await secondWidth.fill("13");
+  await secondWidth.press("Enter");
+  await expect(second.getByText("Saved on this device")).toBeVisible();
+
+  // The earlier tab's old writer generation is now rejected, including if it
+  // resumes after suspension and tries to commit a delayed checkpoint.
+  await page.bringToFront();
+  await expect(page.getByRole("dialog", { name: "Another tab controls local recovery" })).toBeVisible();
+
+  const third = await context.newPage();
+  await third.goto("/");
+  await third.getByRole("dialog", { name: "Another tab controls local recovery" })
+    .getByRole("button", { name: "Take over editing" }).click();
+  await expect(third.getByText("Continue a local session?")).toBeVisible();
+  await third.getByRole("button", { name: "Recover project" }).click();
+  await expect(third.getByRole("textbox", { name: "X size" })).toHaveValue("13");
+});
+
+test("stale checkpoint generations fail atomically and the last good backup survives corruption", async ({ page }) => {
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const recovery = await import("/src/editor/recovery.ts");
+    const { createSampleDocument } = await import("/src/editor/domain.ts");
+    const old = await recovery.claimRecoveryWriter("stale-ci-owner", true);
+    const newest = await recovery.claimRecoveryWriter("fresh-ci-owner", true);
+    if (!old.granted || !newest.granted) throw new Error("Could not establish test writer generations");
+    const source = createSampleDocument();
+    let staleRejected = false;
+    try {
+      await recovery.saveRecovery({ ...source, name: "Must not publish" }, 99, old.lease);
+    } catch (error) { staleRejected = error instanceof recovery.RecoveryOwnershipLost; }
+    await recovery.saveRecovery({ ...source, name: "Previous checkpoint" }, 1, newest.lease);
+    await recovery.saveRecovery({ ...source, name: "Latest checkpoint" }, 2, newest.lease);
+
+    // Damage the newest checkpoint but leave its previous independently hashed.
+    await new Promise<void>((resolve, reject) => {
+      const dbRequest = indexedDB.open("3dmc-recovery-v1", 2);
+      dbRequest.onerror = () => reject(dbRequest.error);
+      dbRequest.onsuccess = () => {
+        const db = dbRequest.result;
+        const tx = db.transaction("checkpoints", "readwrite");
+        const query = tx.objectStore("checkpoints").get("latest");
+        query.onsuccess = () => {
+          const value = query.result as { contents: string; digest: string };
+          tx.objectStore("checkpoints").put({ ...value, contents: "{broken" });
+        };
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    });
+    const fallback = await recovery.readRecovery();
+    return { staleRejected, name: fallback?.document.name, fallback: fallback?.fallback };
+  });
+  expect(result).toEqual({
+    staleRejected: true,
+    name: "Previous checkpoint",
+    fallback: true
+  });
 });
