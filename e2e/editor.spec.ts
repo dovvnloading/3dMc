@@ -43,7 +43,7 @@ test("model dimensions, undo/redo, paint, and portable project reopening", async
   expect(download.suggestedFilename()).toMatch(/\.3dmc\.json$/);
   const path = await download.path();
   if (!path) throw new Error("Download was not saved in the browser test");
-  await page.locator('input[type="file"]').setInputFiles(path);
+  await page.locator('input[accept=".json,application/json"]').setInputFiles(path);
   await expect(page.getByRole("dialog", { name: "Open this project?" })).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Open project" }).click();
   await expect(page.getByRole("textbox", { name: "X size" })).toHaveValue("12");
@@ -73,7 +73,7 @@ test("opening a project commits a fresh local checkpoint before the next reload"
   const path = await download.path();
   if (!path) throw new Error("Project download missing");
 
-  await page.locator('input[type="file"]').setInputFiles(path);
+  await page.locator('input[accept=".json,application/json"]').setInputFiles(path);
   await page.getByRole("dialog").getByRole("button", { name: "Open project" }).click();
   await expect(page.getByText("Saved on this device")).toBeVisible();
   await page.reload();
@@ -127,7 +127,7 @@ test("round-trips an experimental pack through import, edit and export", async (
   await page.locator('input[accept=".zip,application/zip"]').setInputFiles(path);
   const importDialog = page.getByRole("dialog", { name: "Import editable block pack?" });
   await expect(importDialog).toBeVisible();
-  await expect(importDialog.getByText(/geometry and opaque texture pixels/)).toBeVisible();
+  await expect(importDialog.locator(".import-notices").getByText(/geometry and opaque texture pixels/)).toBeVisible();
   await expect(importDialog.getByText(/do not retain native part names/)).toBeVisible();
   await page.screenshot({ path: "test-results/java-pack-import.png" });
   await importDialog.getByRole("button", { name: "Import as editable project" }).click();
