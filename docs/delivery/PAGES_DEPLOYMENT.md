@@ -11,7 +11,7 @@ A successful `npm run build` in CI does **not** deploy its files. The earlier ed
 The repository now has `.github/workflows/deploy-pages.yml`:
 
 1. On a push to `main`, install locked dependencies with Node 22.
-2. Build with `DEPLOY_TARGET=github-pages npm run build` so Vite writes JavaScript, CSS and public assets under the `/3dMc/` base path.
+2. Build with `npm run build -- --mode github-pages` so Vite writes JavaScript, CSS and public assets under the `/3dMc/` base path.
 3. Run Chromium smoke tests against the compiled site served at `http://127.0.0.1:4174/3dMc/` using `npm run preview`.
 4. Upload **`dist/` only**, then publish it using GitHub's official Pages artifact deployment actions. Source code is never the deployed site.
 
@@ -31,10 +31,10 @@ GitHub's Pages source setting is an administrative control; changing a workflow 
 ## Troubleshooting
 
 - **Editor loading text stays visible:** Pages is probably still publishing repository source, or a JS bundle was blocked. Verify the publishing source is GitHub Actions and check the Pages workflow.
-- **404 for `/assets/... ` rather than `/3dMc/assets/...`:** The bundle was built with the wrong Vite base. Only publish the `DEPLOY_TARGET=github-pages` build.
+- **404 for `/assets/... ` rather than `/3dMc/assets/...`:** The bundle was built with the wrong Vite base. Only publish the `Vite --mode github-pages` build.
 - **Editor displays an explicit startup error:** Use the visible error message and browser console to report a runtime failure; this differs from a build/hosting problem.
 - **White page after a successful deploy:** Check DevTools → Network for missing JS/CSS and Console for a runtime error. Confirm your browser isn't using a stale service-worker or HTML cache. The repository does not intentionally register a service worker.
-- **Local preview works but hosted site doesn't:** Test the actual compiled Pages build with `DEPLOY_TARGET=github-pages npm run build`, then `DEPLOY_TARGET=github-pages npm run preview -- --host 127.0.0.1 --port 4174` and navigate to `/3dMc/`.
+- **Local preview works but hosted site doesn't:** Test the actual compiled Pages build with `npm run build -- --mode github-pages`, then `npm run preview -- --mode github-pages --host 127.0.0.1 --port 4174` and navigate to `/3dMc/`.
 
 ## Evidence requirement
 

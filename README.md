@@ -8,7 +8,7 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
-The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`.
+The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.
 
 ## Project status
 

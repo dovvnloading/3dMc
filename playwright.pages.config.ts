@@ -22,7 +22,7 @@ export default defineConfig({
     }
   }],
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4174 --strictPort",
+    command: "npm run preview -- --mode github-pages --host 127.0.0.1 --port 4174 --strictPort",
     url: "http://127.0.0.1:4174/3dMc/",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000

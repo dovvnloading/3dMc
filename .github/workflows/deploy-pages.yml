@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      DEPLOY_TARGET: github-pages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,7 +24,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Build React app for /3dMc/
-        run: npm run build
+        run: npm run build -- --mode github-pages
       - name: Install Chromium for production smoke test
         run: npx playwright install --with-deps chromium
       - name: Test compiled production app under /3dMc/

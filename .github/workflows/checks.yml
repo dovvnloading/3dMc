@@ -31,13 +31,9 @@ jobs:
       - name: Browser workflow smoke
         run: npm run test:e2e
       - name: Build GitHub Pages production bundle
-        run: npm run build
-        env:
-          DEPLOY_TARGET: github-pages
+        run: npm run build -- --mode github-pages
       - name: Test production site at /3dMc/ (not Vite dev)
         run: npx playwright test --config playwright.pages.config.ts
-        env:
-          DEPLOY_TARGET: github-pages
       - name: Upload browser screenshot and failures
         if: always()
         uses: actions/upload-artifact@v4
