@@ -2,7 +2,7 @@
 import { parseDocument } from "../editor/domain";
 import { FACE_DIRECTIONS } from "../editor/domain";
 import type { Cuboid, CuboidFaces, EditorDocument, FaceRotation, FaceUV, Vec3 } from "../editor/domain";
-import { inspectJava1214, JAVA_PACK_PATHS, RESOURCE_PACK_FORMAT } from "../export/javaBlock";
+import { inspectJava1214, JAVA_PACK_PATHS, MIN_JAVA_TEXTURE_SIZE, RESOURCE_PACK_FORMAT } from "../export/javaBlock";
 import { read3dMcRgbaPng } from "./strictPng";
 import { read3dMcStoredZip } from "./storedZip";
 
@@ -49,7 +49,7 @@ function hexChannel(value: number): string {
   return value.toString(16).padStart(2, "0");
 }
 
-function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
+function inspectOwnExport(files: Map<string, Uint8Array>): { document: EditorDocument; legacySolids: boolean } {
   const get = (path: string) => {
     const bytes = files.get(path);
     if (!bytes) fail(path, "Required resource is missing.");
@@ -111,6 +111,7 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
     fail("model:textures", "Particle texture must reference the main image.");
 
   const nodes: Cuboid[] = [];
+  let legacySolids = false;
    for (let index = 0; index < model.elements.length; index++) {
     const element = asObject(model.elements[index], "element " + index, ["from","to","faces"]);
     requiredKeys(element, "element " + index, ["from","to","faces"]);
@@ -161,8 +162,12 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
         fail("model:textures", "Missing solid-color texture alias.");
       const path = "assets/3dmc/textures/block/solid_" + index + ".png";
       const rgba = read3dMcRgbaPng(get(path));
-      if (rgba.width !== 1 || rgba.height !== 1 || rgba.pixels[3] !== 255)
-        fail(path, "A solid texture must contain one opaque RGBA pixel.");
+      const legacy = rgba.width === 1 && rgba.height === 1;
+      const current = rgba.width === MIN_JAVA_TEXTURE_SIZE && rgba.height === MIN_JAVA_TEXTURE_SIZE;
+      if ((!legacy && !current) || rgba.pixels[3] !== 255 ||
+          rgba.pixels.some((channel, i) => channel !== rgba.pixels[i % 4]))
+        fail(path, "A solid texture must be a uniform opaque 1×1 legacy or 16×16 RGBA image.");
+      legacySolids ||= legacy;
       color = "#" + rgba.pixels.slice(0,3).map(hexChannel).join("");
        expectedPaths.add(path);
     }
@@ -199,9 +204,11 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
   } catch (error) {
     fail("model", error instanceof Error ? error.message : "Imported source cannot be validated.");
   }
-  const blockers = inspectJava1214(document).filter(i => i.severity === "error");
+  // Legacy packs with smaller source images remain editable without silent
+  // resizing; the export preflight requires the creator to replace them.
+  const blockers = inspectJava1214(document).filter(i => i.severity === "error" && i.code !== "TEXTURE_TOO_SMALL");
   if (blockers.length) fail("compatibility", blockers.map(i => i.message).join(" "));
-  return document;
+  return { document, legacySolids };
 }
 
 /**
@@ -212,15 +219,21 @@ function inspectOwnExport(files: Map<string, Uint8Array>): EditorDocument {
 export function inspectJava1214Pack(bytes: Uint8Array): PackImportReport {
   try {
     const files = read3dMcStoredZip(bytes);
-    const document = inspectOwnExport(files);
+    const { document, legacySolids } = inspectOwnExport(files);
+    const hasSmallTexture = document.textures.some(texture => texture.width < MIN_JAVA_TEXTURE_SIZE);
     return {
       status: "editable",
       document,
       paths: Array.from(files.keys()),
       notices: [
-        "The generated geometry and opaque texture pixels are editable and re-exportable.",
+        hasSmallTexture
+          ? "The generated geometry and opaque texture pixels are editable; a small image needs replacement before re-export."
+          : "The generated geometry and opaque texture pixels are editable and re-exportable.",
         "Resource packs do not retain native part names, visibility, locks, or undo history; imported editor metadata is initialized.",
         "Per-face texture aliases, UV rectangles and quarter-turns are retained within the supported 16-texture profile; parent models and unrelated resources remain unsupported.",
+        ...(legacySolids ? ["Legacy 1×1 solid-color images will be regenerated as 16×16 images when exported; their colors are retained."] : []),
+        ...(hasSmallTexture
+          ? ["This legacy pack contains an image smaller than 16×16. It remains editable at its original size; replace it with a 16×16, 32×32, or 64×64 image before exporting."] : []),
         "Rendering compatibility in Minecraft 1.21.4 has not been verified."
       ]
     };

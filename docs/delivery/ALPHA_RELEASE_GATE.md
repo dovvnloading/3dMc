@@ -28,11 +28,15 @@ The project's limited target is browser-authored static Minecraft Java block vis
 
 Follow the [six-face worksheet](../compatibility/SIX_FACE_GAME_CHECK.md) on an exact **Java Edition 1.21.4** client. Record the project revision and Git commit that produced the diagnostic and authored ZIPs. Preserve original files; changing pack bytes after export invalidates the comparison. On Linux/macOS use `sha256sum <filename.zip>` (macOS may use `shasum -a 256`); in Windows PowerShell use `Get-FileHash <filename.zip> -Algorithm SHA256`. Record any errors or warnings from `latest.log`, with personal paths redacted.
 
+[A November 9, 2026 automation-operated client run](../evidence/java-1.21.4-2026-11-09/REPORT.md) records unchanged packs, screenshots and redacted logs. It found a block-atlas mipmap defect; the linked candidate fixed the warning in a second game session. This partial evidence does not replace the independent human game review required by #22 and is pinned to the revisions in that report.
+
 Do not count parser/exporter round-tripping or the 3D preview as an independent oracle. A game-side face failure triggers a defect/fix, a fresh original ZIP and another complete game run.
 
 ### Named-device benchmark minimum
 
 For both devices record OS/CPU/GPU/driver, RAM, browser/version, viewport, DPR, refresh rate, power mode, cache/network condition, workload fixture and timestamp source. Run repeated cold launch, camera navigation, selection/transform, 2D/3D paint, undo, local recovery/save, native reopen and Java export. Preserve raw samples, not just averages. Apply the *proposed* targets from [quality gates](QUALITY_GATES.md): p95 frame interval ≤20 ms, input-to-render-submission ≤50 ms, selection/undo ≤100 ms, initial editor usable ≤3 s, local save acknowledgement ≤2 s, reference export ≤2 s. If any miss, record the result and mitigation/narrower published support envelope—never silently convert a target into a measurement.
+
+[A November 9, 2026 Windows/NVIDIA desktop run](../evidence/device-windows-2026-11-09/REPORT.md) records the 1/4/16-sheet resource workload and 100 automated project replacements with raw measurements. It covers one configuration and does not satisfy the named-device matrix or the latency targets.
 
 Specifically test lost capture, blur/Escape, hidden-tab resume, another-tab takeover, blocked/quota storage, corrupted latest checkpoint, native backup and renderer context loss. Repeat 1/4/16-sheet GPU resource checks and 100 project switches, noting measurement limitations.
 

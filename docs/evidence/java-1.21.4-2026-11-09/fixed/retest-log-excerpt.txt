@@ -1,0 +1,11 @@
+Redacted resource and atlas excerpts from the isolated Java 1.21.4 retest session, November 9, 2026.
+Whole-session WARN/ERROR line count: 0. No player identifiers or unrelated log content are included.
+
+[06:34:04] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-diamond-block-java-1.21.4-experimental.zip
+[06:34:06] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:35:53] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[06:35:54] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:37:07] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-diamond-block-java-1.21.4-experimental.zip
+[06:37:08] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:38:36] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-java-1.21.4-six-face-orientation-test.zip
+[06:38:37] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas

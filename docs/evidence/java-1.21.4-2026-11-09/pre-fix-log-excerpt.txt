@@ -1,0 +1,23 @@
+Redacted excerpts from the isolated Java 1.21.4 session, November 9, 2026.
+The client also logged a profile-service lookup error at 06:00:59; its URL, identifier, and response are omitted.
+No model/texture loading error was found; atlas mipmap warnings occurred on both lantern-pack loads.
+In atlas dimensions, the final component is the mip level reported by Minecraft.
+
+[06:01:00] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[06:01:02] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:02:10] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-java-1.21.4-six-face-orientation-test.zip
+[06:02:11] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:13:20] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[06:13:20] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:14:36] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-java-1.21.4-six-face-orientation-test.zip
+[06:14:36] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:15:50] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-diamond-block-java-1.21.4-experimental.zip
+[06:15:50] [Worker-Main-4/WARN]: Texture 3dmc:block/solid_4 with size 1x1 limits mip level from 4 to 0
+[06:15:50] [Worker-Main-4/WARN]: minecraft:textures/atlas/blocks.png: dropping miplevel from 4 to 0, because of minimum power of two: 1
+[06:15:50] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/blocks.png-atlas
+[06:23:53] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[06:23:54] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[06:24:59] [Render thread/INFO]: Reloading ResourceManager: vanilla, file/3dmc-diamond-block-java-1.21.4-experimental.zip
+[06:24:59] [Worker-Main-19/WARN]: Texture 3dmc:block/solid_4 with size 1x1 limits mip level from 4 to 0
+[06:24:59] [Worker-Main-19/WARN]: minecraft:textures/atlas/blocks.png: dropping miplevel from 4 to 0, because of minimum power of two: 1
+[06:24:59] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/blocks.png-atlas
