@@ -32,7 +32,7 @@ The in-process publication queue controls ordering before asynchronous hashing. 
 - Offline/secure-context policy, mobile/touch input, real user studies, GPU memory and frame-time benchmarks.
 - [Java 1.21.4 in-game verification](https://github.com/dovvnloading/3dMc/issues/22), including asymmetric six-face fixtures, is a separate gate. Successful browser/codec tests cannot satisfy it.
 
-See [Issue #23](https://github.com/dovvnloading/3dMc/issues/23) for the remaining real-device reliability and performance evidence. The prior administrative closure of #6 and #8 did not satisfy those checks.
+See the [Windows/NVIDIA device run](../evidence/device-windows-2026-11-09/REPORT.md) for recorded resource and project-replacement measurements.
 
 
 ## Additional transaction-abort and lost-capture tests

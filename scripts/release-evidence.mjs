@@ -17,13 +17,12 @@ const record = {
     sixFaceDiagnosticZip: sha256('test-results/six-face-orientation-test.zip'),
     textureResourceMeasurements: sha256('test-results/performance/texture-lifecycle.json')
   },
-  manualGates: {
-    minecraftJava1214: 'pending: unchanged artifact, six faces, version, SHA and logs',
-    namedHardwareInputLatency: 'pending: measured real-device trace',
-    pointerTrackpadDeviceMatrix: 'pending: real hardware beyond browser automation',
-    creatorRepeatUseStudies: 'pending: observed creator tasks, cohort counts and findings'
+  additionalChecks: {
+    minecraftJava1214: 'A limited client run is recorded in docs/evidence/java-1.21.4-2026-11-09/REPORT.md; CI does not rerun Minecraft.',
+    hardware: 'A local NVIDIA desktop run is recorded in docs/evidence/device-windows-2026-11-09/REPORT.md; CI does not test every device.',
+    accessibility: 'Keyboard workflows are automated; screen-reader behavior is not measured by this run.'
   },
-  compatibilityClaim: 'Experimental/unverified Java 1.21.4 visual replacement. No release certification is inferred from CI.'
+  compatibilityClaim: 'Experimental Java static-block replacement. The recorded Minecraft run covers a narrow 1.21.4 fixture, not every exported model.'
 };
 mkdirSync('test-results/evidence', { recursive: true });
 writeFileSync('test-results/evidence/release-evidence.json', JSON.stringify(record, null, 2) + '\n');

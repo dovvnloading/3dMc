@@ -311,7 +311,7 @@ export function EditorViewport(props: ViewportProps) {
   return <div className={"viewport-canvas viewport-" + props.mode}>
     <ViewportFailureBoundary>
       <Canvas camera={{ position: [2.9, 2.35, 3.2], fov: 40, near: 0.01, far: 100 }}
-      frameloop="demand" shadows dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}
+      frameloop="demand" shadows="percentage" dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}
       fallback={<div className="webgl-fallback">3D rendering is unavailable. Your project remains editable through the Scene and Inspector.</div>}
       onPointerMissed={event => {
         if (props.mode === "model" && props.tool === "select" && !event.ctrlKey && !event.metaKey && !event.shiftKey) props.onSelect(null);

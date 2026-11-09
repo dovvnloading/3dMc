@@ -93,7 +93,7 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
   }
 
   issues.push(warning("NOT_GAME_VERIFIED",
-    "The ZIP is structurally tested, but this generated artifact has not been checked in Minecraft Java 1.21.4."));
+    "Experimental output: check this pack in Minecraft Java 1.21.4 to confirm its appearance."));
   issues.push(warning("VISUAL_REPLACEMENT_ONLY",
     "This pack changes every diamond block's visual model, not collision, lighting, crafting, or gameplay."));
   issues.push(warning("PREVIEW_APPROXIMATE",

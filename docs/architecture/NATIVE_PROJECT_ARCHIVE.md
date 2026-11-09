@@ -46,4 +46,4 @@ The Assets panel lists up to 16 texture sheets with stable IDs, names, dimension
 
 The face inspector chooses which texture each face reads. Normalized logical UVs 0–16 and quarter-turn rotations are independent of the sheet's pixel dimensions. 2D and 3D painting address the assigned image, not a different active sheet. Browser-started downloads are not proof of durable user-owned storage. IndexedDB checkpoints are separately retained and fenced by writer generation.
 
-Java resource-pack export is a separate experimental profile; it may lose native-only names and flags and does not prove Minecraft game rendering. See [Issue #22](https://github.com/dovvnloading/3dMc/issues/22).
+Java resource-pack export is a separate experimental profile; it may lose native-only names and flags. See the [Minecraft 1.21.4 game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) for the fixtures actually tested.

@@ -1,6 +1,6 @@
 # PNG import, replacement and export — first texture workflow
 
-**Status:** Implemented for up to 16 named, independently editable RGBA textures. Exact Java resource-pack rendering still requires independent Minecraft 1.21.4 verification in [Issue #22](https://github.com/dovvnloading/3dMc/issues/22).
+**Status:** Implemented for up to 16 named, independently editable RGBA textures. The [Minecraft 1.21.4 game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) records the fixtures tested in game.
 
 ## Creator workflow
 

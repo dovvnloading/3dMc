@@ -1,6 +1,6 @@
 # Java 1.21.4: six-face game verification worksheet
 
-**Status:** Automated fixture generation and import/export tests are available. **Real Minecraft client inspection has NOT been performed.** Record the actual game check in [active verification gate #22](https://github.com/dovvnloading/3dMc/issues/22) before any claim of verified Java compatibility. Historical #4 was closed administratively without this evidence.
+**Status:** The diagnostic and an authored lantern were inspected in Minecraft Java 1.21.4. The [recorded game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) contains the unchanged packs, screenshots, hashes and logs for that run.
 
 ## Generate the exact test pack
 
@@ -24,6 +24,8 @@ The cube replaces the *visual model* of every minecraft:diamond_block. It uses o
 
 Each tile has **white at upper-left**, **black at upper-right**, **yellow at lower-left** and **pink at lower-right**. The arrow and letter reveal flips and quarter-turns that a symmetric tile would conceal. These are authored expectations, **not observed Minecraft results**.
 
+For the up and down views, use camera yaw 180° when comparing these corner positions; yaw 0° rotates the whole view by 180°. Record the heading with each screenshot.
+
 ## Record independent in-game evidence
 
 In a clean creative test world:
@@ -45,8 +47,8 @@ Suggested evidence worksheet:
 | Up | | | | | | | |
 | Down | | | | | | | |
 
-Attach screenshots, table, app commit, ZIP SHA-256, relevant `latest.log` excerpts and client release to [active Issue #22](https://github.com/dovvnloading/3dMc/issues/22). Independently repeat this with the **unchanged authored lantern ZIP** (not just the diagnostic fixture); retain both hashes.
+Record screenshots, the table, app commit, ZIP SHA-256, relevant `latest.log` excerpts and client release. Also check an **unchanged authored lantern ZIP** (not just the diagnostic fixture); retain both hashes.
 
 ## What CI proves—and what it doesn't
 
-Automated tests check exact six-tile locations, distinct colors, asymmetric corner bytes, all six model-face UV references, PNG bytes, deterministic ZIP packaging, semantic import/re-export and a browser download/reopen workflow. They **do not** prove Minecraft-side face orientation, rotation, lighting or texture parity. Keep [#22](https://github.com/dovvnloading/3dMc/issues/22) and [parent release gate #19](https://github.com/dovvnloading/3dMc/issues/19) open until independent testing is recorded. The closed/not-planned #4/#6 issues did not constitute passing evidence.
+Automated tests check exact six-tile locations, distinct colors, asymmetric corner bytes, all six model-face UV references, PNG bytes, deterministic ZIP packaging, semantic import/re-export and a browser download/reopen workflow. The [game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) adds a real-client observation for the tested 1.21.4 fixtures; it does not establish rendering for every possible pack or version.

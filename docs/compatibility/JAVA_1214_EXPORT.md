@@ -63,7 +63,7 @@ ZIP inspection rejects oversized archives, unexpected paths, repeated names, non
 
 Native-only part names, visibility/lock flags, the source project ID and undo history do not exist in the resource pack, so they are **reinitialized visibly** after import. Saving a native project preserves these attributes going forward. Semantic round-trip tests check geometry, colors and opaque texture bytes and require the exporter to regenerate identical ZIP bytes for current output. Legacy packs with 1×1 solid-color images retain their colors on import but re-export with 16×16 images, so their ZIP bytes change.
 
-The active in-game verification issue is [#22](https://github.com/dovvnloading/3dMc/issues/22). Passing import/export byte tests still does not prove Minecraft rendering fidelity.
+The [game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) records Minecraft 1.21.4 observations for an unchanged diagnostic pack and authored lantern. Import/export byte tests alone do not prove Minecraft rendering fidelity.
 
 ## Per-face UV authoring (schema v2)
 
@@ -77,7 +77,7 @@ The Three.js BoxGeometry per-face UV attributes are derived from these canonical
 
 The Java 1.21.4 exporter writes each authored rectangle and its optional nonzero quarter-turn field, and the strict importer now reconstructs those fields rather than rejecting them. Import/export fidelity is claimed only for this limited explicit subset. Independent unit fixtures check UV scaling at 16, 32 and 64 pixels, reversed bounds, quarter turns including the down face, native migration and semantic round-trips.
 
-**Compatibility remains experimental:** actual Minecraft 1.21.4 six-face orientation and sampling must still be checked in-game under [Issue #22](https://github.com/dovvnloading/3dMc/issues/22). An internally consistent preview and codec pair cannot certify that result.
+**Compatibility remains experimental:** the [six-face fixture was checked in Minecraft 1.21.4](../evidence/java-1.21.4-2026-11-09/REPORT.md). Other models, packs and game versions may render differently.
 
 
 ## Experimental multi-texture extension (schema v3)
@@ -86,4 +86,4 @@ The native editor can assign separate textures to each cuboid face. Java pack JS
 
 The first v3 source migration preserves legacy v2 face UVs and rotation, assigning their old shared sheet stable ID \`main\`. The Vite editor stores each sheet as one validated RGBA buffer, and the R3F renderer disposes maps when the resource key changes. Tests cover source migration, exact per-face aliases and deterministic native and experimental game-pack reimport.
 
-**Still not certified in Minecraft Java 1.21.4.** An internally consistent browser renderer/JSON importer is not a substitute for the six-face in-game evidence in [Issue #22](https://github.com/dovvnloading/3dMc/issues/22).
+The recorded Minecraft 1.21.4 run covers the diagnostic and lantern examples, not every multi-texture model. Check the exported pack in the intended game version.

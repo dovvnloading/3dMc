@@ -32,4 +32,4 @@ Other existing workflows test two-tab writer-generation fencing, intentional tak
 
 Headless Chromium/SwiftShader timings are a regression baseline, not a hardware SLA. Real-device profiling still requires a named browser/OS/GPU, time-to-render and GPU memory observations, 2D/3D stroke latency and six-face visual inspection.
 
-Minecraft Java Edition 1.21.4 pack verification is an active real-game requirement in [#22](https://github.com/dovvnloading/3dMc/issues/22); named-device/GPU performance and interruption checks are [#23](https://github.com/dovvnloading/3dMc/issues/23). These automated tests support engineering readiness but do **not** close [Creator Alpha release gate #19](https://github.com/dovvnloading/3dMc/issues/19).
+The [Minecraft 1.21.4 game check](../evidence/java-1.21.4-2026-11-09/REPORT.md) and [Windows/NVIDIA device run](../evidence/device-windows-2026-11-09/REPORT.md) record what was exercised locally.
