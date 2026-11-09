@@ -99,3 +99,98 @@ test("losing pointer capture cancels a pending pencil gesture without a history 
     expect(await pixels()).toEqual(initial);
     await expect(page.getByRole("button", { name: /Undo \(Ctrl/ })).toBeDisabled();
   });
+
+test("oversized snapshots reject as a promise, retain the last valid save and remain portable", async ({ page }) => {
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const recovery = await import("/src/editor/recovery.ts");
+    const { createSampleDocument } = await import("/src/editor/domain.ts");
+    const { encodeProject, MAX_PROJECT_BYTES } = await import("/src/editor/project.ts");
+    const { encodeNativeProject, decodeNativeProject } = await import("/src/editor/nativeArchive.ts");
+    const claim = await recovery.claimRecoveryWriter("oversized-snapshot-test", true);
+    if (!claim.granted) throw new Error("Could not claim recovery writer.");
+    const source = createSampleDocument();
+    await recovery.saveRecovery({ ...source, name: "Last acknowledged project" }, 71, claim.lease);
+
+    // This is valid under the bounded part/sheet native schema but exceeds
+    // the smaller JSON checkpoint budget. The portable ZIP must still work.
+    const large = {
+      ...source,
+      name: "Large valid source",
+      cuboids: Array.from({ length: 1300 }, (_, index) => ({
+        ...source.cuboids[0]!, id: "node-" + index, name: "Part " + index
+      })),
+      textures: Array.from({ length: 16 }, (_, index) => ({
+        id: index === 0 ? "main" : "sheet-" + index,
+        name: "Sheet " + index, width: 64, height: 64,
+        pixels: new Array<number>(64 * 64 * 4).fill(255)
+      }))
+    };
+    const bytes = new TextEncoder().encode(encodeProject(large)).byteLength;
+    const native = await encodeNativeProject(large);
+    const reopened = await decodeNativeProject(native);
+
+    let synchronousThrow = false;
+    let pending: Promise<void> | null = null;
+    try { pending = recovery.saveRecovery(large, 72, claim.lease); }
+    catch { synchronousThrow = true; }
+    let failure: unknown = null;
+    if (pending) try { await pending; } catch (error) { failure = error; }
+    const recovered = await recovery.readRecovery();
+    return {
+      bytes, limit: MAX_PROJECT_BYTES, synchronousThrow,
+      rejectedWithSize: failure instanceof recovery.RecoverySnapshotTooLarge,
+      helpfulMessage: failure instanceof Error && /download a .3dmc source backup/i.test(failure.message),
+      recoveredName: recovered?.document.name, revision: recovered?.revision,
+      fallback: recovered?.fallback, nativeBytes: native.byteLength,
+      portableName: reopened.name, portableParts: reopened.cuboids.length
+    };
+  });
+  expect(result.bytes).toBeGreaterThan(result.limit);
+  expect(result.synchronousThrow).toBe(false);
+  expect(result.rejectedWithSize).toBe(true);
+  expect(result.helpfulMessage).toBe(true);
+  expect(result).toMatchObject({
+    recoveredName: "Last acknowledged project", revision: 71, fallback: false,
+    portableName: "Large valid source", portableParts: 1300
+  });
+  expect(result.nativeBytes).toBeLessThanOrEqual(3_000_000);
+});
+
+test("invalid newest checkpoint metadata falls back to the previous verified revision", async ({ page }) => {
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const recovery = await import("/src/editor/recovery.ts");
+    const { createSampleDocument } = await import("/src/editor/domain.ts");
+    const claim = await recovery.claimRecoveryWriter("corrupt-metadata-test", true);
+    if (!claim.granted) throw new Error("Could not claim recovery writer.");
+    const source = createSampleDocument();
+    await recovery.saveRecovery({ ...source, name: "Previous verified source" }, 81, claim.lease);
+    await recovery.saveRecovery({ ...source, name: "Newest source" }, 82, claim.lease);
+
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("3dmc-recovery-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction("checkpoints", "readwrite");
+        const store = tx.objectStore("checkpoints");
+        const request = store.get("latest");
+        request.onsuccess = () => store.put({
+          ...request.result as object, revision: -1, savedAt: "invalid-date"
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    } finally { db.close(); }
+    const recovered = await recovery.readRecovery();
+    return { name: recovered?.document.name, revision: recovered?.revision,
+      fallback: recovered?.fallback };
+  });
+  expect(result).toEqual({
+    name: "Previous verified source", revision: 81, fallback: true
+  });
+});
