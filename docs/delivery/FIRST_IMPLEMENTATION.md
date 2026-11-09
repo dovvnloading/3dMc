@@ -1,6 +1,6 @@
 # First executable slice
 
-**Status:** executable main-branch foundation with a face-aware UV feature slice under review.
+**Status:** executable main-branch foundation with face-aware UV authoring implemented. The remaining Creator Alpha release checks are tracked in [#19](https://github.com/dovvnloading/3dMc/issues/19).
 
 This change begins implementation and is deliberately not a claim that S0 or S1 quality gates have passed. It contains a real React/Three.js application, with a versioned cuboid/texture document and a bounded Java 1.21.4 experimental model and pack codec.
 

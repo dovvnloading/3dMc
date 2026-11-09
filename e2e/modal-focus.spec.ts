@@ -1,0 +1,108 @@
+import { expect, test } from "@playwright/test";
+
+test("export dialog contains keyboard focus, scopes shortcuts and restores its opener", async ({ page }) => {
+  await page.goto("/");
+  const opener = page.getByRole("button", { name: "Minecraft export" });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+  const first = dialog.getByRole("combobox", { name: "Target profile" });
+  const last = dialog.getByRole("button", { name: "Download experimental ZIP" });
+  await first.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(last).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Control+d");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await expect(page.getByText("Lantern body copy", { exact: true })).toHaveCount(0);
+});
+
+test("project and creator dialogs cancel with Escape and return focus", async ({ page }) => {
+  await page.goto("/");
+  const newProject = page.getByRole("button", { name: "New project" });
+  await newProject.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Create a new project" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox", { name: "New project name" })).toBeFocused();
+  const first = dialog.getByRole("button", { name: "Close new project" });
+  const last = dialog.getByRole("button", { name: "Create project", exact: true });
+  await last.focus();
+  await page.keyboard.press("Tab");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(last).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(newProject).toBeFocused();
+
+  const library = page.getByRole("button", { name: "Library", exact: true });
+  await library.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Local project library" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Local project library" })).toHaveCount(0);
+  await expect(library).toBeFocused();
+});
+
+test("opening a native project has a keyboard-cancellable confirmation", async ({ page }) => {
+  await page.goto("/");
+  const save = page.getByRole("button", { name: "Save project" });
+  const pending = page.waitForEvent("download");
+  await save.click();
+  const download = await pending;
+  const path = await download.path();
+  if (!path) throw new Error("Native source was not retained by the browser");
+  await save.focus();
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  const dialog = page.getByRole("dialog", { name: "Open this project?" });
+  await expect(dialog).toBeVisible();
+  const cancel = dialog.getByRole("button", { name: "Cancel" });
+  const open = dialog.getByRole("button", { name: "Open project" });
+  await cancel.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(open).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(save).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+});
+
+test("recovery ownership dialog cannot be dismissed without a decision", async ({ context, page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+  const width = page.getByRole("textbox", { name: "X size" });
+  await width.fill("12");
+  await width.press("Enter");
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("/");
+  const dialog = second.getByRole("dialog", { name: "Another tab controls local recovery" });
+  await expect(dialog).toBeVisible();
+  const backup = dialog.getByRole("button", { name: "Download backup" });
+  const takeover = dialog.getByRole("button", { name: "Take over editing" });
+  await takeover.focus();
+  await second.keyboard.press("Tab");
+  await expect(backup).toBeFocused();
+  await second.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await takeover.click();
+  const recovery = second.getByRole("dialog", { name: "Continue a local session?" });
+  await expect(recovery).toBeVisible();
+  const keep = recovery.getByRole("button", { name: "Keep current workspace" });
+  const recover = recovery.getByRole("button", { name: "Recover project" });
+  await recover.focus();
+  await second.keyboard.press("Tab");
+  await expect(keep).toBeFocused();
+  await second.keyboard.press("Escape");
+  await expect(recovery).toBeVisible();
+  await recover.click();
+  await expect(recovery).toHaveCount(0);
+  await expect(second.getByRole("textbox", { name: "X size" })).toHaveValue("12");
+  await second.close();
+});

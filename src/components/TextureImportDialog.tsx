@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ImagePlus, Info, X } from "lucide-react";
 import type { DecodedTexture, TextureImportPolicy } from "../editor/textureImport";
 import { canAdoptPngDimensions } from "../editor/textureImport";
+import { ModalDialog } from "./ModalDialog";
 
 interface Props {
   image: DecodedTexture;
@@ -28,15 +29,7 @@ export function TextureImportDialog({
   const targetWidth = policy === "use-png-size" ? image.width : currentWidth;
   const targetHeight = policy === "use-png-size" ? image.height : currentHeight;
   const resamples = image.width !== targetWidth || image.height !== targetHeight;
-  return <div className="modal-shade png-import-shade">
-    <div className="png-import-modal" role="dialog" aria-modal="true"
-      aria-labelledby="png-import-title"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          onClose();
-        }
-      }}>
+  return <ModalDialog className="png-import-modal" labelledBy="png-import-title" onCancel={onClose}>
       <header className="png-import-heading">
         <div className="png-import-symbol"><ImagePlus size={23}/></div>
         <div>
@@ -114,6 +107,5 @@ export function TextureImportDialog({
           <ImagePlus size={16}/>{isAdding ? "Add texture asset" : "Replace shared texture"}
         </button>
       </footer>
-    </div>
-  </div>;
+  </ModalDialog>;
 }
