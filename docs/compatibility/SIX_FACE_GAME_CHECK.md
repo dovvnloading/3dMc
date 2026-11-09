@@ -1,6 +1,6 @@
 # Java 1.21.4: six-face game verification worksheet
 
-**Status:** Automated fixture generation and import/export tests are available. **Real Minecraft client inspection has NOT been performed.** Do not close [#4](https://github.com/dovvnloading/3dMc/issues/4) based on Chromium tests alone.
+**Status:** Automated fixture generation and import/export tests are available. **Real Minecraft client inspection has NOT been performed.** Record the actual game check in [active verification gate #22](https://github.com/dovvnloading/3dMc/issues/22) before any claim of verified Java compatibility. Historical #4 was closed administratively without this evidence.
 
 ## Generate the exact test pack
 
@@ -45,8 +45,8 @@ Suggested evidence worksheet:
 | Up | | | | | | | |
 | Down | | | | | | | |
 
-Attach screenshots, table, app commit, ZIP SHA-256 and client release to [Issue #4](https://github.com/dovvnloading/3dMc/issues/4).
+Attach screenshots, table, app commit, ZIP SHA-256, relevant `latest.log` excerpts and client release to [active Issue #22](https://github.com/dovvnloading/3dMc/issues/22). Independently repeat this with the **unchanged authored lantern ZIP** (not just the diagnostic fixture); retain both hashes.
 
 ## What CI proves—and what it doesn't
 
-Automated tests check exact six-tile locations, distinct colors, asymmetric corner bytes, all six model-face UV references, PNG bytes, deterministic ZIP packaging, semantic import/re-export and a browser download/reopen workflow. They **do not** prove Minecraft-side face orientation, rotation, lighting or texture parity. Keep [#4](https://github.com/dovvnloading/3dMc/issues/4) and remaining [#6](https://github.com/dovvnloading/3dMc/issues/6) evidence gates open until independent testing is recorded.
+Automated tests check exact six-tile locations, distinct colors, asymmetric corner bytes, all six model-face UV references, PNG bytes, deterministic ZIP packaging, semantic import/re-export and a browser download/reopen workflow. They **do not** prove Minecraft-side face orientation, rotation, lighting or texture parity. Keep [#22](https://github.com/dovvnloading/3dMc/issues/22) and [parent release gate #19](https://github.com/dovvnloading/3dMc/issues/19) open until independent testing is recorded. The closed/not-planned #4/#6 issues did not constitute passing evidence.

@@ -1,6 +1,6 @@
 # Quality gates and evidence
 
-**Status:** proposed acceptance contract. These are targets and measurement plans, not measured results. The repository currently contains the planning foundation; it does not yet contain an implemented editor or these test harnesses. Calibrate budgets during S0, record changes with reasons, and report pending checks explicitly. This document is the source of truth for study counts and quantitative acceptance targets.
+**Status:** active acceptance contract with **proposed numeric targets, not certified measurements**. The editor and CI test harnesses are implemented, but real-device/browser measurements, Minecraft client tests, independent accessibility review and creator studies remain pending under [Creator Alpha gate #19](https://github.com/dovvnloading/3dMc/issues/19) and the [evidence packet protocol](ALPHA_RELEASE_GATE.md). Calibrate budgets with evidence, record changes with reasons, and report pending checks explicitly. This document remains the source of truth for study counts and quantitative acceptance targets.
 
 Read alongside the [roadmap](ROADMAP.md), [backlog](BACKLOG.md), [workspace specification](../design/WORKSPACE_SPEC.md), and [compatibility contract](../architecture/COMPATIBILITY.md). A narrower supported workflow can pass a gate. An unreliable workflow cannot earn an exception because it is a prototype.
 
