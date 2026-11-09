@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { unzipSync, strFromU8, unzlibSync } from "fflate";
 import { createSampleDocument, setAxisValue, setTexturePixels, updateFaceRotation, updateFaceUV } from "../editor/domain";
 import { crc32, encodeRgbaPng } from "./png";
+import { read3dMcRgbaPng } from "../import/strictPng";
 import {
   buildJava1214Model, inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS,
   makeJava1214Pack, RESOURCE_PACK_FORMAT
@@ -72,6 +73,9 @@ describe("Java Edition 1.21.4 experimental pack", () => {
     expect(pngPixel(files[JAVA_PACK_PATHS.mainTexture]!)).toEqual(document.textures[0]!.pixels.slice(0, 4));
     expect(pngPixel(files["assets/3dmc/textures/block/solid_1.png"]!))
       .toEqual([99, 126, 112, 255]);
+    const solid = read3dMcRgbaPng(files["assets/3dmc/textures/block/solid_1.png"]!);
+    expect([solid.width, solid.height]).toEqual([16, 16]);
+    expect(solid.pixels.every((channel, i) => channel === [99, 126, 112, 255][i % 4])).toBe(true);
   });
   it("exports hidden elements and locked elements without changing source", () => {
     const original = createSampleDocument();
@@ -102,6 +106,13 @@ describe("Java Edition 1.21.4 experimental pack", () => {
     const tinted = { ...initial, cuboids: initial.cuboids.map((node, i) =>
       i === 0 ? { ...node, color: "#dddddd" } : node) };
     expect(inspectJava1214(tinted).some((i) => i.code === "UNSUPPORTED_TINT")).toBe(true);
+  });
+  it("blocks small source sheets that would lower the game's block-atlas mip level", () => {
+    const initial = createSampleDocument();
+    const small = { ...initial, textures: [{ ...initial.textures[0]!, width: 8, height: 8,
+      pixels: Array.from({ length: 8 * 8 }, () => [12, 34, 56, 255]).flat() }] };
+    expect(inspectJava1214(small).some(issue => issue.code === "TEXTURE_TOO_SMALL")).toBe(true);
+    expect(() => makeJava1214Pack(small)).toThrow(JavaExportBlocked);
   });
   it("keeps project names out of exported paths", () => {
     const document = { ...createSampleDocument(), name: "../unsafe/\\path" };

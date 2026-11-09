@@ -8,7 +8,7 @@
 - **Replacement:** Visual model of the existing `minecraft:diamond_block`. This does not add a new vanilla block, change collision, supply light, or alter gameplay.
 - **Blockstate dispatch:** `assets/minecraft/blockstates/diamond_block.json` uses an explicit single empty variant pointing to `3dmc:block/lantern`. A resource pack can override a vanilla model via a blockstate/model reference; do not assume the game's default stone blockstate selects a single model.
 - **Model:** `assets/3dmc/models/block/lantern.json`, with explicit `elements`, six face bindings, explicit per-face logical 0–16 UV rectangles, optional quarter-turn rotation fields, and namespaced texture references. Newly created cuboids default to full-sheet `[0,0,16,16]`.
-- **Images:** `assets/3dmc/textures/block/main.png` holds the editable opaque RGBA pixel sheet. Solid-color elements each receive an independently encoded 1×1 PNG, so viewport-only solid colors aren't silently lost.
+- **Images:** `assets/3dmc/textures/block/main.png` holds the editable opaque RGBA pixel sheet. Solid-color elements each receive a uniform 16×16 PNG, preserving their colors without reducing the 1.21.4 block atlas's default four mip levels. Export requires source sheets to be square power-of-two images from 16×16 through 64×64; smaller legacy source sheets remain importable at their original size and must be replaced before export.
 - **Metadata:** `pack.mcmeta` contains `pack.pack_format = 46`.
 - **ZIP:** Flat expected resource paths, uncompressed ZIP entries, fixed file timestamps. Repeated exports of the same document have identical bytes in the same runtime environment.
 - **Preview truth:** The browser viewport is an editor approximation. Face orientation, shading, and in-game output still need independent comparison using asymmetric six-face fixtures; the generator does not claim parity.
@@ -61,7 +61,7 @@ This is **not** a general Minecraft resource-pack importer. A valid ZIP containi
 
 ZIP inspection rejects oversized archives, unexpected paths, repeated names, non-stored/compressed entries, malformed directories/local headers, mismatched sizes and CRCs, and overlapping/untracked bytes. The PNG decoder accepts only the bounded RGBA8/filter-0 output from our encoder and checks PNG chunk CRCs plus zlib Adler-32 using a fixed-size inflate buffer.
 
-Native-only part names, visibility/lock flags, the source project ID and undo history do not exist in the resource pack, so they are **reinitialized visibly** after import. Saving a native project preserves these attributes going forward. Semantic round-trip tests check geometry, colors and opaque texture bytes and require the exporter to regenerate identical ZIP bytes for its own original output.
+Native-only part names, visibility/lock flags, the source project ID and undo history do not exist in the resource pack, so they are **reinitialized visibly** after import. Saving a native project preserves these attributes going forward. Semantic round-trip tests check geometry, colors and opaque texture bytes and require the exporter to regenerate identical ZIP bytes for current output. Legacy packs with 1×1 solid-color images retain their colors on import but re-export with 16×16 images, so their ZIP bytes change.
 
 The active in-game verification issue is [#22](https://github.com/dovvnloading/3dMc/issues/22). Passing import/export byte tests still does not prove Minecraft rendering fidelity.
 

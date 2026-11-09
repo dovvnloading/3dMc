@@ -10,6 +10,8 @@ export const RESOURCE_PACK_FORMAT = 46 as const;
 export const REPLACEMENT_BLOCK = "minecraft:diamond_block" as const;
 export const REPLACEMENT_NAME = "diamond_block" as const;
 export const GAME_EXPORT_VERIFIED = false as const;
+// Java 1.21.4's default four mip levels need at least 16 pixels per side.
+export const MIN_JAVA_TEXTURE_SIZE = 16 as const;
 
 export const JAVA_PACK_PATHS = {
   metadata: "pack.mcmeta",
@@ -68,6 +70,9 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
     if (!powerOfTwo(t.width) || t.width !== t.height || t.width > 64)
       issues.push(error("TEXTURE_DIMENSIONS", "Texture " + t.name +
         " must be square, power-of-two, and at most 64×64 texels."));
+    else if (t.width < MIN_JAVA_TEXTURE_SIZE)
+      issues.push(error("TEXTURE_TOO_SMALL", "Texture " + t.name +
+        " is smaller than 16×16. Replace it with a 16×16, 32×32, or 64×64 image before export to preserve Minecraft's block-atlas mipmaps."));
     if (t.pixels.some((part, i) => i % 4 === 3 && part !== 255))
       issues.push(error("TEXTURE_ALPHA", "Texture " + t.name +
         " uses alpha. This Java 1.21.4 profile supports opaque pixels only."));
@@ -159,7 +164,9 @@ export function makeJava1214Pack(document: EditorDocument): JavaPackResult {
   source.cuboids.forEach((node, i) => {
     if (node.material !== "solid") return;
     const [r, g, b] = hexToRGB(node.color);
-    files[`assets/3dmc/textures/block/solid_${i}.png`] = encodeRgbaPng(1, 1, [r, g, b, 255]);
+    const pixels = Array.from({ length: MIN_JAVA_TEXTURE_SIZE ** 2 }, () => [r, g, b, 255]).flat();
+    files[`assets/3dmc/textures/block/solid_${i}.png`] =
+      encodeRgbaPng(MIN_JAVA_TEXTURE_SIZE, MIN_JAVA_TEXTURE_SIZE, pixels);
   });
 
   // The fixed DOS epoch and insertion ordering make repeated exports byte-identical.
