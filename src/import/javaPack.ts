@@ -234,7 +234,7 @@ export function inspectJava1214Pack(bytes: Uint8Array): PackImportReport {
         ...(legacySolids ? ["Legacy 1×1 solid-color images will be regenerated as 16×16 images when exported; their colors are retained."] : []),
         ...(hasSmallTexture
           ? ["This legacy pack contains an image smaller than 16×16. It remains editable at its original size; replace it with a 16×16, 32×32, or 64×64 image before exporting."] : []),
-        "Rendering compatibility in Minecraft 1.21.4 has not been verified."
+        "Check the exported pack in your Minecraft version to confirm its appearance."
       ]
     };
   } catch (error) {

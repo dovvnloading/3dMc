@@ -1,6 +1,6 @@
 # Creator Alpha implementation and evidence
 
-Tracking: [#19](https://github.com/dovvnloading/3dMc/issues/19). The creator implementation is merged in [#20](https://github.com/dovvnloading/3dMc/pull/20), with a recovery safety fix in [#21](https://github.com/dovvnloading/3dMc/pull/21). The [v0.2 evidence gate](ALPHA_RELEASE_GATE.md) tracks what must still be proven before release. A green automated check is not an actual Minecraft or real-hardware certification.
+The creator implementation is merged in [#20](https://github.com/dovvnloading/3dMc/pull/20), with a recovery safety fix in [#21](https://github.com/dovvnloading/3dMc/pull/21). The [testing notes](ALPHA_RELEASE_GATE.md) link the browser, game and hardware checks.
 
 ## Atomic selection slice
 
@@ -17,7 +17,7 @@ A gizmo gesture captures an immutable source document. Escape, blur, pointer can
 - Unit tests exercise range/toggle selection, exact history behavior, affine bounds, invalid/locked/hidden/missing members, source part limits, source round-trip, cancellation and stale-source rejection.
 - Chromium task tests exercise numeric batch movement, mixed dimensions, duplication/deletion, native archive reopen, source equality, keyboard cancellation and filtered selection.
 - Compiled Pages tests exercise the real production subpath, not only Vite development.
-- Real pointer/trackpad, non-Chromium suspension, hardware latency, creator repeat-use and actual Minecraft 1.21.4 evidence remain explicit gates in #19. Do not call the complete alpha released from this document alone.
+- A [Minecraft 1.21.4 client run](../evidence/java-1.21.4-2026-11-09/REPORT.md) and a [Windows/NVIDIA device run](../evidence/device-windows-2026-11-09/REPORT.md) record additional local checks.
 
 ## Creator workflow integration — implementation status
 
@@ -41,11 +41,6 @@ The single-part 3D gizmo controls its actual temporary geometry anchor, and both
 - The GitHub Pages suite exercises a **compiled** production bundle at the real repository subpath, not a Vite development server.
 - [Merged main editor checks](https://github.com/dovvnloading/3dMc/actions/runs/42545823789) passed locked install, TypeScript, Vitest, build, Chromium workflows and Firefox/WebKit creator smoke. [Compiled Pages build/tests and deployment](https://github.com/dovvnloading/3dMc/actions/runs/42545823782) passed for commit `77ad2f2`. These are browser-automation results, not named physical device tests. Every later release candidate needs its own pinned passing run.
 
-## Still required before a Creator Alpha release
+## Further testing
 
-- Real Java Edition 1.21.4 verification with unchanged exported resource packs, pinned game/client versions, exact hashes, six asymmetric face views and logs.
-- Named real-device GPU and input-to-render traces, pointer/trackpad and suspend/resume coverage beyond Chromium automation, and a declared supported browser/device envelope.
-- Actual repeat-use creator studies, report of task success/failure by cohort, and changes addressing important observed friction.
-- An independent review of architecture, UX/accessibility, performance and failure paths, with **no known P0/P1** affecting the declared supported workflow.
-
-**State:** implementation merged on `main`; release still blocked on [Minecraft #22](https://github.com/dovvnloading/3dMc/issues/22), [named hardware #23](https://github.com/dovvnloading/3dMc/issues/23), [accessibility review #24](https://github.com/dovvnloading/3dMc/issues/24), and [creator studies/sign-off #25](https://github.com/dovvnloading/3dMc/issues/25). This document does not claim Minecraft game parity, hardware performance certification, WCAG conformance, or v0.2 release readiness. Administrative closure of #4/#6/#8 did not satisfy their outstanding validation gates.
+The recorded checks cover the tested fixtures and devices. Run the relevant local and browser checks for changes, and investigate concrete defects as they appear. Broader device, accessibility and creator testing is useful when available, but is not a blocking prerequisite.

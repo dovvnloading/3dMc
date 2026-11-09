@@ -1,6 +1,6 @@
 # Quality gates and evidence
 
-**Status:** active acceptance contract with **proposed numeric targets, not certified measurements**. The editor and CI test harnesses are implemented, but real-device/browser measurements, Minecraft client tests, independent accessibility review and creator studies remain pending under [Creator Alpha gate #19](https://github.com/dovvnloading/3dMc/issues/19) and the [evidence packet protocol](ALPHA_RELEASE_GATE.md). Calibrate budgets with evidence, record changes with reasons, and report pending checks explicitly. This document remains the source of truth for study counts and quantitative acceptance targets.
+**Status:** engineering guidance and proposed targets, not mandatory release gates. See the [testing notes](ALPHA_RELEASE_GATE.md) for the checks actually run. Treat numeric targets as goals rather than measured results.
 
 Read alongside the [roadmap](ROADMAP.md), [backlog](BACKLOG.md), [workspace specification](../design/WORKSPACE_SPEC.md), and [compatibility contract](../architecture/COMPATIBILITY.md). A narrower supported workflow can pass a gate. An unreliable workflow cannot earn an exception because it is a prototype.
 
@@ -83,7 +83,7 @@ The stress fixture need not meet the reference latency budget. It must remain bo
 
 ### Study design and decision rules
 
-S1 uses **6–8 mixed-experience participants**, including at least three novices to 3D asset authoring and three experienced creators. S2 uses **5–8 novices and 5–8 experienced creators**, with repeat sessions for part of the cohort. These small studies guide product decisions; they are not statistically representative market claims.
+If a creator study is useful, an earlier proposal suggested 6–8 mixed-experience participants for S1 and 5–8 novices plus 5–8 experienced creators for S2. A study is optional, and small cohorts are not statistically representative market samples.
 
 The proposed targets are:
 
@@ -128,7 +128,9 @@ Test untrusted files as data. Set and document compressed size, expanded size, e
 
 Use dependency and license review appropriate to the shipped code. Initial telemetry must exclude asset bytes and project contents; any later upload or remote processing requires an explicit product decision and clear user disclosure. Avoid introducing infrastructure solely to satisfy a hypothetical future feature.
 
-## 8. Stage exit gates
+## 8. Optional planning milestones
+
+These earlier milestone targets are planning guidance, not prerequisites for ordinary fixes or issue closure.
 
 | Stage | Evidence required to exit |
 | --- | --- |

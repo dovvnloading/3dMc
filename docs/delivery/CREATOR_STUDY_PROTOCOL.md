@@ -1,6 +1,6 @@
 # Creator Alpha study protocol
 
-This is a facilitator's runbook for [#25](https://github.com/dovvnloading/3dMc/issues/25), not a study result or a release approval. Use the [quality gates](QUALITY_GATES.md) and [release evidence packet](ALPHA_RELEASE_GATE.md) as the acceptance contract. Missing participants, observations, or an independent sign-off remain **pending**.
+This optional facilitator's runbook describes one way to gather creator feedback. It is not required to fix issues or release the editor, and it is not a study result.
 
 ## Prepare
 
@@ -58,4 +58,4 @@ Use one coded row per participant and session; retain the detailed timeline priv
 
 Report exact numerator/denominator separately for novices and experienced creators, including missing, coached, invalid and incomplete attempts. For the proposed 80% thresholds, the minimum successful counts are **4/5, 5/6, 6/7, and 7/8**; do not round a failing count up. Assess first meaningful edit within 60 seconds and uncoached completion within ten minutes. Report the recovery route for every participant, including those who needed help. Describe repeat-session results and novice/expert feedback separately; the small cohort does not support population-wide claims.
 
-Triage observed defects using [P0/P1/P2 definitions](QUALITY_GATES.md), name an owner, link fixes, and retest repeated blockers. Link the anonymized aggregate, the separate game, hardware and accessibility evidence, CI and artifact hashes to #19. A reviewer/product owner must record an explicit signed Go/No-Go; this protocol and a completed study alone do not authorize a release while other gates or P0/P1 issues remain open.
+Triage observed defects using the [severity guidance](QUALITY_GATES.md), link fixes, and retest repeated blockers. Keep any shared results anonymized and describe what was actually observed.

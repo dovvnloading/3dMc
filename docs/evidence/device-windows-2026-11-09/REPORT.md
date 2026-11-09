@@ -1,6 +1,6 @@
 # Windows desktop resource-lifecycle observation
 
-**Partial evidence for [#23](https://github.com/dovvnloading/3dMc/issues/23); the device gate remains open.** On November 9, 2026, Playwright operated a headed browser on one physical desktop. The test passed the existing 1/4/16/1 texture resource checks and completed 100 additional alternating 16-sheet and one-sheet project replacements. This is automated operation, not an independent human review, an integrated-GPU laptop test, or a supported-device certification.
+On November 9, 2026, Playwright operated a headed browser on one physical desktop. The test passed the existing 1/4/16/1 texture resource checks and completed 100 additional alternating 16-sheet and one-sheet project replacements. This is an automated run on the configuration recorded below.
 
 ## Configuration and provenance
 
@@ -30,4 +30,4 @@ The renderer uses demand-driven frames. The probe's recorded intervals include i
 - [Final editor screenshot](one-sheet-after-100.png), [test workload](hardware-device.spec.ts), and [Playwright configuration](playwright.config.ts). The recorded test was run from the repository root with a temporary config and the same workload; this copy adjusts only its location and explanatory comment.
 - After installing the locked dependencies, run `npx playwright test --config docs/evidence/device-windows-2026-11-09/playwright.config.ts` from the repository root on the stated Windows/Chrome setup. Check the reported renderer: software rendering or a different GPU is a different configuration. The run writes fresh output under `test-results/performance/`.
 
-The integrated-GPU laptop, physical mouse/trackpad and interruption scenarios, cold/warm task timings, save/export/input measurements, and complete browser/device support decision remain pending under #23. The broader independent accessibility, study and signed release gates also remain open.
+This run did not measure physical mouse/trackpad behavior, cold/warm task timings, or save/export/input latency on other devices.

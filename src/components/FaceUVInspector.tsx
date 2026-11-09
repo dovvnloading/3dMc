@@ -117,7 +117,7 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
       onClick={reset}><RotateCcw size={14}/>Reset this face to full texture</button>
     <p className="face-uv-note">
       A texture is shared by every face that references its pixels.
-      The editor preview uses the authored mapping; Minecraft rendering remains unverified.
+      The editor preview uses the authored mapping; check your pack in Minecraft to confirm its appearance.
     </p>
   </section>;
 }
