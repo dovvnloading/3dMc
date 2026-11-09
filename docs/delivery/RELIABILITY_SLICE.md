@@ -28,11 +28,11 @@ The in-process publication queue controls ordering before asynchronous hashing. 
 ## Remaining work
 
 - Full pointer/trackpad hardware matrix, gizmo lost-capture torture cases, native file-saver durability and per-device latency measurements.
-- Deliberate quota-exhaustion and transaction-abort fault injection across browsers. Single-file recovery is a bounded JSON snapshot; a future asset blob graph requires reachability-based GC.
+- Expand quota and transaction-abort fault injection beyond the existing Chromium cases. Single-file recovery is a bounded JSON snapshot; a future asset blob graph requires reachability-based GC.
 - Offline/secure-context policy, mobile/touch input, real user studies, GPU memory and frame-time benchmarks.
-- [Java 1.21.4 in-game verification](https://github.com/dovvnloading/3dMc/issues/4), including asymmetric six-face fixtures, is a separate gate. Successful browser/codec tests cannot satisfy it.
+- [Java 1.21.4 in-game verification](https://github.com/dovvnloading/3dMc/issues/22), including asymmetric six-face fixtures, is a separate gate. Successful browser/codec tests cannot satisfy it.
 
-See [Issue #8](https://github.com/dovvnloading/3dMc/issues/8) for remaining reliability tasks and [Issue #6](https://github.com/dovvnloading/3dMc/issues/6) for the UV performance/evidence gate.
+See [Issue #23](https://github.com/dovvnloading/3dMc/issues/23) for the remaining real-device reliability and performance evidence. The prior administrative closure of #6 and #8 did not satisfy those checks.
 
 
 ## Additional transaction-abort and lost-capture tests
