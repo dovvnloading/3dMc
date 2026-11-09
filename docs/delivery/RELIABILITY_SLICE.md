@@ -11,6 +11,7 @@
 - The second tab opens in a read-only modal, offering **Download backup** and **Take over editing**. A takeover reads the latest verified checkpoint, then asks the user to recover it or keep the current in-memory workspace before allowing edits.
 - A reload is a new runtime identity. If another lease remains active, the user must explicitly take over rather than have the application guess that the former editor closed.
 - Saves acknowledge only the active writer generation, project session and document revision. A failed checkpoint leaves the native project download action available.
+- The JSON autosave is deliberately bounded to 1.5 MB, which is smaller than the portable native .3dmc archive budget. A too-large valid project rejects its autosave **before opening a write transaction**, retains the last acknowledged checkpoint, and shows a specific download-backup warning instead of falsely reporting "Saved on this device". Saving a portable .3dmc remains available.
 
 ## Storage contract
 
@@ -36,6 +37,6 @@ See [Issue #8](https://github.com/dovvnloading/3dMc/issues/8) for remaining reli
 
 ## Additional transaction-abort and lost-capture tests
 
-The recovery browser suite now injects a real IndexedDB read-transaction abort and checks that the read rejects promptly instead of hanging. Another scenario aborts a readwrite transaction during checkpoint publication and confirms the last acknowledged source is intact. A third scenario cancels a pencil stroke by losing pointer capture, verifying identical pixels and no new undo entry.
+The recovery browser suite now injects a real IndexedDB read-transaction abort and checks that the read rejects promptly instead of hanging. Another scenario aborts a readwrite transaction during checkpoint publication and confirms the last acknowledged source is intact. A third scenario cancels a pencil stroke by losing pointer capture, verifying identical pixels and no new undo entry. Oversized source tests now check that a native-valid 2,000-part/16-sheet document cannot be acknowledged as recoverable under the smaller JSON limit; the prior checkpoint remains readable and a portable .3dmc archive round-trips. Corrupted revision/timestamp metadata also triggers previous-checkpoint fallback.
 
 If an IndexedDB version upgrade is blocked by an older tab, a late-opened database connection is now closed rather than leaked after the failure was already reported. These are Chromium fault injections, not a certification for every browser or device suspension pattern.

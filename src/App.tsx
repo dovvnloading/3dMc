@@ -25,7 +25,7 @@ import { makeNewProject } from "./editor/templates";
 import { PRIMITIVE_PRESETS, addPrimitive, moveCuboid, setCuboidMaterial } from "./editor/primitives";
 import type { PrimitiveId } from "./editor/primitives";
 import type { NewProjectOptions } from "./editor/templates";
-import { claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, RecoveryOwnershipLost } from "./editor/recovery";
+import { claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, RecoveryOwnershipLost, RecoverySnapshotTooLarge } from "./editor/recovery";
 import type { RecoveryCandidate, RecoveryLease } from "./editor/recovery";
 import { floodFill, readHex } from "./editor/pixels";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
@@ -321,7 +321,11 @@ export function App() {
       setRecoveryStatus("saving");
       saveRecovery(snapshot, revision, lease).then(() => { if (current()) setRecoveryStatus("saved"); }).catch((error: unknown) => {
         if (!current()) return;
-        if (error instanceof RecoveryOwnershipLost) markWriterLost(); else setRecoveryStatus("failed");
+        if (error instanceof RecoveryOwnershipLost) markWriterLost();
+        else {
+          setRecoveryStatus("failed");
+          if (error instanceof RecoverySnapshotTooLarge) setNotice(error.message);
+        }
       });
     }, 700);
     return () => window.clearTimeout(timer);
@@ -536,7 +540,7 @@ export function App() {
   const matching = doc.cuboids.filter(node => node.name.toLowerCase().includes(search.toLowerCase()));
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = writerStatus === "blocked" ? "Other tab owns recovery" : writerStatus === "failed" ? "Recovery unavailable — download backup" :
-    recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save unavailable" :
+    recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save failed · download backup" :
     writerStatus === "checking" ? "Checking recovery ownership…" : "Unsaved local changes";
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>

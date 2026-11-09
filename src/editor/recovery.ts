@@ -33,6 +33,14 @@ export class RecoveryOwnershipLost extends Error {
   }
 }
 
+/** The editor must never acknowledge a checkpoint its own reader would reject. */
+export class RecoverySnapshotTooLarge extends Error {
+  constructor(readonly actualBytes: number) {
+    super(`Local recovery snapshot (${(actualBytes / 1_000_000).toFixed(2)} MB) exceeds the 1.5 MB limit. Download a .3dmc source backup; these changes were not saved locally.`);
+    this.name = "RecoverySnapshotTooLarge";
+  }
+}
+
 const DATABASE = "3dmc-recovery-v1";
 const STORE = "checkpoints";
 const OWNERS = "ownership";
@@ -183,10 +191,17 @@ function publish(entry: Checkpoint, lease: RecoveryLease): Promise<void> {
  * supplied by the generation check inside publish(). An old queued write may
  * fail safely but can never publish after a later ownership takeover.
  */
-export function saveRecovery(
+export async function saveRecovery(
   document: EditorDocument, revision: number, lease: RecoveryLease
 ): Promise<void> {
+  // Encode/validate before taking a place in the write queue or opening an
+  // IndexedDB transaction. readRecovery refuses records above this same byte
+  // limit, so accepting one here would produce a false "saved" confirmation.
+  if (!Number.isSafeInteger(revision) || revision < 0)
+    throw new Error("Recovery revision must be a nonnegative safe integer.");
   const contents = encodeProject(document);
+  const byteLength = new TextEncoder().encode(contents).byteLength;
+  if (byteLength > MAX_PROJECT_BYTES) throw new RecoverySnapshotTooLarge(byteLength);
   const operation = queue.catch(() => undefined).then(async () => {
     const entry: Checkpoint = {
       key: "latest", contents, revision,
@@ -218,7 +233,10 @@ export async function readRecovery(): Promise<RecoveryCandidate | null> {
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
     if (!record || typeof record.contents !== "string" ||
-        new TextEncoder().encode(record.contents).length > MAX_PROJECT_BYTES) continue;
+        !Number.isSafeInteger(record.revision) || record.revision < 0 ||
+        typeof record.savedAt !== "string" ||
+        !Number.isFinite(Date.parse(record.savedAt)) ||
+        new TextEncoder().encode(record.contents).byteLength > MAX_PROJECT_BYTES) continue;
     try {
       if (await digest(record.contents) !== record.digest) continue;
       const document = decodeProject(record.contents);
