@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Build, domain and browser tests
@@ -38,11 +42,41 @@ jobs:
         run: npm run build -- --mode github-pages
       - name: Test production site at /3dMc/ (not Vite dev)
         run: npx playwright test --config playwright.pages.config.ts
+      - name: Record reproducible source and release evidence
+        if: always()
+        run: |
+          mkdir -p test-results/evidence
+          git archive --format=tar.gz HEAD > test-results/evidence/source-snapshot.tar.gz
+          node scripts/release-evidence.mjs
       - name: Upload browser screenshot and failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: editor-workspace-smoke
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cross_browser:
+    name: Firefox and WebKit creator smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Firefox and WebKit engines
+        run: npx playwright install --with-deps firefox webkit
+      - name: Run non-Chromium creator smoke
+        run: npx playwright test --config playwright.matrix.config.ts
+      - name: Upload non-Chromium failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-browser-matrix
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
