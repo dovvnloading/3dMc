@@ -112,12 +112,12 @@ test("oversized snapshots reject as a promise, retain the last valid save and re
     const source = createSampleDocument();
     await recovery.saveRecovery({ ...source, name: "Last acknowledged project" }, 71, claim.lease);
 
-    // This is valid under the 2,000-part/16-sheet native schema but exceeds
+    // This is valid under the bounded part/sheet native schema but exceeds
     // the smaller JSON checkpoint budget. The portable ZIP must still work.
     const large = {
       ...source,
       name: "Large valid source",
-      cuboids: Array.from({ length: 2000 }, (_, index) => ({
+      cuboids: Array.from({ length: 1300 }, (_, index) => ({
         ...source.cuboids[0]!, id: "node-" + index, name: "Part " + index
       })),
       textures: Array.from({ length: 16 }, (_, index) => ({
@@ -152,7 +152,7 @@ test("oversized snapshots reject as a promise, retain the last valid save and re
   expect(result.helpfulMessage).toBe(true);
   expect(result).toMatchObject({
     recoveredName: "Last acknowledged project", revision: 71, fallback: false,
-    portableName: "Large valid source", portableParts: 2000
+    portableName: "Large valid source", portableParts: 1300
   });
   expect(result.nativeBytes).toBeLessThanOrEqual(3_000_000);
 });

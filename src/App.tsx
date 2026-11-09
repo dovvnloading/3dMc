@@ -540,7 +540,7 @@ export function App() {
   const matching = doc.cuboids.filter(node => node.name.toLowerCase().includes(search.toLowerCase()));
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = writerStatus === "blocked" ? "Other tab owns recovery" : writerStatus === "failed" ? "Recovery unavailable — download backup" :
-    recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save failed · download backup" :
+    recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save unavailable · download backup" :
     writerStatus === "checking" ? "Checking recovery ownership…" : "Unsaved local changes";
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
