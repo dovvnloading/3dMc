@@ -7,6 +7,7 @@ import { drawStroke } from "../editor/pixels";
 import { read3dMcStoredZip } from "./storedZip";
 import { inspectJava1214Pack } from "./javaPack";
 import { read3dMcRgbaPng } from "./strictPng";
+import { encodeRgbaPng } from "../export/png";
 
 const original = () => makeJava1214Pack(createSampleDocument()).zip;
 
@@ -58,6 +59,45 @@ describe("Java pack importer", () => {
     if (reopened.status !== "editable") throw new Error("Could not reimport edited pack.");
     expect(reopened.document.cuboids[0]?.from[0]).toBe(5);
     expect(reopened.document.textures[0]!.pixels).toEqual(paint);
+  });
+
+  it("imports legacy 1×1 solid colors and regenerates them as 16×16", () => {
+    const legacy = repack(original(), files => {
+      files["assets/3dmc/textures/block/solid_1.png"] = encodeRgbaPng(1, 1, [99, 126, 112, 255]);
+    });
+    const report = inspectJava1214Pack(legacy);
+    expect(report.status).toBe("editable");
+    if (report.status !== "editable") throw new Error(report.problems.join("; "));
+    expect(report.document.cuboids[1]?.color).toBe("#637e70");
+    expect(report.notices.some(notice => notice.includes("Legacy 1×1"))).toBe(true);
+    const next = read3dMcRgbaPng(unzipSync(makeJava1214Pack(report.document).zip)["assets/3dmc/textures/block/solid_1.png"]!);
+    expect([next.width, next.height, ...next.pixels.slice(0, 4)]).toEqual([16, 16, 99, 126, 112, 255]);
+  });
+
+  it("rejects nonuniform or translucent generated solid images instead of discarding their pixels", () => {
+    const rgba = Array.from({ length: 16 * 16 }, () => [99, 126, 112, 255]).flat();
+    for (const index of [4, 7]) {
+      const invalid = [...rgba];
+      invalid[index] = 0;
+      const pack = repack(original(), files => {
+        files["assets/3dmc/textures/block/solid_1.png"] = encodeRgbaPng(16, 16, invalid);
+      });
+      const report = inspectJava1214Pack(pack);
+      expect(report.status).toBe("blocked");
+      if (report.status === "blocked") expect(report.problems.join()).toMatch(/uniform opaque/);
+    }
+  });
+
+  it("preserves legacy small source images on import and blocks unsafe re-export", () => {
+    const pixels = Array.from({ length: 8 * 8 }, () => [12, 34, 56, 255]).flat();
+    const legacy = repack(original(), files => { files[JAVA_PACK_PATHS.mainTexture] = encodeRgbaPng(8, 8, pixels); });
+    const report = inspectJava1214Pack(legacy);
+    expect(report.status).toBe("editable");
+    if (report.status !== "editable") throw new Error(report.problems.join("; "));
+    expect([report.document.textures[0]?.width, report.document.textures[0]?.height]).toEqual([8, 8]);
+    expect(report.document.textures[0]?.pixels).toEqual(pixels);
+    expect(report.notices.some(notice => notice.includes("smaller than 16×16"))).toBe(true);
+    expect(() => makeJava1214Pack(report.document)).toThrow();
   });
 
   it("rejects unsupported ZIP formats, entries, corrupt checksums and oversized archives", () => {
