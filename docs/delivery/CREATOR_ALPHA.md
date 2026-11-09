@@ -1,6 +1,6 @@
 # Creator Alpha implementation and evidence
 
-Tracking: [#19](https://github.com/dovvnloading/3dMc/issues/19). Implementation is reviewed in [#20](https://github.com/dovvnloading/3dMc/pull/20). A green automated check is not an actual Minecraft or real-hardware certification.
+Tracking: [#19](https://github.com/dovvnloading/3dMc/issues/19). The creator implementation is merged in [#20](https://github.com/dovvnloading/3dMc/pull/20), with a recovery safety fix in [#21](https://github.com/dovvnloading/3dMc/pull/21). The [v0.2 evidence gate](ALPHA_RELEASE_GATE.md) tracks what must still be proven before release. A green automated check is not an actual Minecraft or real-hardware certification.
 
 ## Atomic selection slice
 
@@ -39,7 +39,7 @@ The single-part 3D gizmo controls its actual temporary geometry anchor, and both
 - Additional Chromium workflows open real dialogs and assert exact native source bytes/values before and after canceled region edits, atomic face-image reassignment, rejected/accepted JSON+PNG external imports, and verified local snapshot restoration.
 - Rapid same-turn duplicate keyboard commands are checked as *two* separate, recoverable and undoable document changes.
 - The GitHub Pages suite exercises a **compiled** production bundle at the real repository subpath, not a Vite development server.
-- [Integrated Chromium/production checks, November 8, 2026](https://github.com/dovvnloading/3dMc/actions/runs/42534869914) passed on the reviewed draft branch. A separate Firefox/WebKit smoke matrix is being added as an explicit additional gate; record its actual result before claiming browser support.
+- [Merged main editor checks](https://github.com/dovvnloading/3dMc/actions/runs/42545823789) passed locked install, TypeScript, Vitest, build, Chromium workflows and Firefox/WebKit creator smoke. [Compiled Pages build/tests and deployment](https://github.com/dovvnloading/3dMc/actions/runs/42545823782) passed for commit `77ad2f2`. These are browser-automation results, not named physical device tests. Every later release candidate needs its own pinned passing run.
 
 ## Still required before a Creator Alpha release
 
@@ -48,4 +48,4 @@ The single-part 3D gizmo controls its actual temporary geometry anchor, and both
 - Actual repeat-use creator studies, report of task success/failure by cohort, and changes addressing important observed friction.
 - An independent review of architecture, UX/accessibility, performance and failure paths, with **no known P0/P1** affecting the declared supported workflow.
 
-**State:** implementation under review in PR #20. This document does not claim Minecraft game parity, hardware performance certification, or v0.2 release readiness. Administrative closure of #4/#6/#8 did not satisfy their outstanding validation gates.
+**State:** implementation merged on `main`; release still blocked on [Minecraft #22](https://github.com/dovvnloading/3dMc/issues/22), [named hardware #23](https://github.com/dovvnloading/3dMc/issues/23), [accessibility review #24](https://github.com/dovvnloading/3dMc/issues/24), and [creator studies/sign-off #25](https://github.com/dovvnloading/3dMc/issues/25). This document does not claim Minecraft game parity, hardware performance certification, WCAG conformance, or v0.2 release readiness. Administrative closure of #4/#6/#8 did not satisfy their outstanding validation gates.
