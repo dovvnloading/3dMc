@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, FilePlus2, FlaskConical, Layers3, Save, Sparkles, X } from "lucide-react";
 import type { ProjectTemplate, NewProjectOptions, TextureResolution } from "../editor/templates";
 import { PROJECT_TEMPLATES } from "../editor/templates";
+import { ModalDialog } from "./ModalDialog";
 
 interface Props {
   onClose: () => void;
@@ -43,15 +44,8 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
     }
   };
 
-  return <div className="modal-shade new-project-shade">
-    <div className="new-project-modal" role="dialog" aria-modal="true"
-      aria-labelledby="new-project-title"
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !creating) {
-          event.stopPropagation();
-          onClose();
-        }
-      }}>
+  return <ModalDialog className="new-project-modal" labelledBy="new-project-title"
+    onCancel={() => { if (!creating) onClose(); }}>
       <header className="new-project-heading">
         <div className="new-project-symbol"><Layers3 size={24} strokeWidth={1.7}/></div>
         <div>
@@ -65,7 +59,7 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
 
       <div className="new-project-form">
         <label className="new-project-label" htmlFor="new-project-name">Project name</label>
-        <input autoFocus id="new-project-name" aria-label="New project name"
+        <input data-dialog-initial-focus id="new-project-name" aria-label="New project name"
           className="new-project-name" value={name} maxLength={100}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
@@ -119,6 +113,5 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
           </button>
         </div>
       </footer>
-    </div>
-  </div>;
+  </ModalDialog>;
 }

@@ -112,7 +112,7 @@ At the declared minimum supported viewport and at 125% and 200% browser zoom, es
 
 ## 7. Engineering verification and input safety
 
-The current planning-only change needs document/link consistency checks. Application checks below become required as their implementation arrives; do not report them as existing or passing today.
+The following checks apply at the stated cadence. Report actual runs and their commit; the existence of a test harness alone is not a passing result.
 
 | Cadence | Required verification |
 | --- | --- |
