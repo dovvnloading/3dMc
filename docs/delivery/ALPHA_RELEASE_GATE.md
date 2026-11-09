@@ -46,6 +46,8 @@ A keyboard-only person must be able to accomplish core tasks through hierarchy/n
 
 The S2 study requires 5–8 novices **and** 5–8 experienced creators, with repeat-use participants. Report unassisted completion counts for the 60-second first edit and ten-minute full edit–paint–undo–preview–reopen–export task, as well as recovery discovery. Compare against the 80% goal with exact denominators and split cohorts. Ask for participant consent and avoid collecting private asset contents.
 
+Use the [facilitator study protocol](CREATOR_STUDY_PROTOCOL.md) for consistent prompts, consent handling, a disposable storage-failure exercise and the session record. The protocol is preparation, not evidence that participant sessions occurred.
+
 ## Evidence packet template — fill with measured facts only
 
 Copy this into the final issue comment or a linked `docs/evidence/v0.2/<commit>/` record. `PENDING` is valid before testing; unverified values must never be filled with guesses.
