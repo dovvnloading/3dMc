@@ -1,0 +1,1681 @@
+{
+  "engine": "Google Chrome 156.0.8078.80 (headed, Playwright)",
+  "browserDetails": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+    "devicePixelRatio": 1,
+    "viewport": [
+      1440,
+      900
+    ],
+    "visibilityState": "visible",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (NVIDIA)"
+  },
+  "replacements": [
+    {
+      "replacement": 1,
+      "sheets": 16,
+      "elapsedMs": 487,
+      "jsHeapUsedBytes": 94294644,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 29,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 131.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 2,
+      "sheets": 1,
+      "elapsedMs": 456,
+      "jsHeapUsedBytes": 103601308,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 34,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 131.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 3,
+      "sheets": 16,
+      "elapsedMs": 361,
+      "jsHeapUsedBytes": 91137884,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 39,
+        "frameIntervalP50Ms": 70,
+        "frameIntervalP95Ms": 131.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 4,
+      "sheets": 1,
+      "elapsedMs": 474,
+      "jsHeapUsedBytes": 49106264,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 44,
+        "frameIntervalP50Ms": 70,
+        "frameIntervalP95Ms": 131.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 5,
+      "sheets": 16,
+      "elapsedMs": 447,
+      "jsHeapUsedBytes": 58412672,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 49,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 6,
+      "sheets": 1,
+      "elapsedMs": 457,
+      "jsHeapUsedBytes": 66992644,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 53,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 133.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 7,
+      "sheets": 16,
+      "elapsedMs": 445,
+      "jsHeapUsedBytes": 78290460,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 58,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 133.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 8,
+      "sheets": 1,
+      "elapsedMs": 437,
+      "jsHeapUsedBytes": 84022844,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 62,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 9,
+      "sheets": 16,
+      "elapsedMs": 495,
+      "jsHeapUsedBytes": 71364876,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 67,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 10,
+      "sheets": 1,
+      "elapsedMs": 258,
+      "jsHeapUsedBytes": 92568300,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 71,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 143.80000001192093,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 11,
+      "sheets": 16,
+      "elapsedMs": 460,
+      "jsHeapUsedBytes": 79261516,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 76,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 143.80000001192093,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 12,
+      "sheets": 1,
+      "elapsedMs": 323,
+      "jsHeapUsedBytes": 78297292,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 81,
+        "frameIntervalP50Ms": 80.29999995231628,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 13,
+      "sheets": 16,
+      "elapsedMs": 395,
+      "jsHeapUsedBytes": 87930900,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 86,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 14,
+      "sheets": 1,
+      "elapsedMs": 440,
+      "jsHeapUsedBytes": 99773492,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 91,
+        "frameIntervalP50Ms": 80.29999995231628,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 15,
+      "sheets": 16,
+      "elapsedMs": 344,
+      "jsHeapUsedBytes": 100949564,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 96,
+        "frameIntervalP50Ms": 80.29999995231628,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 16,
+      "sheets": 1,
+      "elapsedMs": 443,
+      "jsHeapUsedBytes": 109149484,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 101,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 17,
+      "sheets": 16,
+      "elapsedMs": 428,
+      "jsHeapUsedBytes": 114988352,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 106,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 18,
+      "sheets": 1,
+      "elapsedMs": 292,
+      "jsHeapUsedBytes": 110467060,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 111,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 19,
+      "sheets": 16,
+      "elapsedMs": 528,
+      "jsHeapUsedBytes": 125814320,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 116,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 20,
+      "sheets": 1,
+      "elapsedMs": 275,
+      "jsHeapUsedBytes": 44245388,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 120,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 21,
+      "sheets": 16,
+      "elapsedMs": 437,
+      "jsHeapUsedBytes": 61358716,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 125,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 22,
+      "sheets": 1,
+      "elapsedMs": 425,
+      "jsHeapUsedBytes": 71275528,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 129,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 23,
+      "sheets": 16,
+      "elapsedMs": 310,
+      "jsHeapUsedBytes": 67539364,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 134,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 24,
+      "sheets": 1,
+      "elapsedMs": 458,
+      "jsHeapUsedBytes": 76123528,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 139,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 25,
+      "sheets": 16,
+      "elapsedMs": 433,
+      "jsHeapUsedBytes": 84616980,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 144,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 160.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 26,
+      "sheets": 1,
+      "elapsedMs": 390,
+      "jsHeapUsedBytes": 85317184,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 148,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 160.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 27,
+      "sheets": 16,
+      "elapsedMs": 512,
+      "jsHeapUsedBytes": 78648080,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 153,
+        "frameIntervalP50Ms": 80.30000001192093,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 28,
+      "sheets": 1,
+      "elapsedMs": 307,
+      "jsHeapUsedBytes": 99646080,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 157,
+        "frameIntervalP50Ms": 80.30000001192093,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 29,
+      "sheets": 16,
+      "elapsedMs": 492,
+      "jsHeapUsedBytes": 88618076,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 162,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 30,
+      "sheets": 1,
+      "elapsedMs": 292,
+      "jsHeapUsedBytes": 109433088,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 166,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 31,
+      "sheets": 16,
+      "elapsedMs": 411,
+      "jsHeapUsedBytes": 96512312,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 171,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 32,
+      "sheets": 1,
+      "elapsedMs": 473,
+      "jsHeapUsedBytes": 106613060,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 175,
+        "frameIntervalP50Ms": 80.60000002384186,
+        "frameIntervalP95Ms": 151.89999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 33,
+      "sheets": 16,
+      "elapsedMs": 283,
+      "jsHeapUsedBytes": 108808924,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 180,
+        "frameIntervalP50Ms": 80.30000001192093,
+        "frameIntervalP95Ms": 151.89999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 34,
+      "sheets": 1,
+      "elapsedMs": 453,
+      "jsHeapUsedBytes": 118345052,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 185,
+        "frameIntervalP50Ms": 80.29999995231628,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 35,
+      "sheets": 16,
+      "elapsedMs": 415,
+      "jsHeapUsedBytes": 124028832,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 190,
+        "frameIntervalP50Ms": 80.30000001192093,
+        "frameIntervalP95Ms": 153.5,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 36,
+      "sheets": 1,
+      "elapsedMs": 292,
+      "jsHeapUsedBytes": 119804388,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 195,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 37,
+      "sheets": 16,
+      "elapsedMs": 484,
+      "jsHeapUsedBytes": 53371260,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 200,
+        "frameIntervalP50Ms": 80.30000001192093,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 38,
+      "sheets": 1,
+      "elapsedMs": 291,
+      "jsHeapUsedBytes": 74123924,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 205,
+        "frameIntervalP50Ms": 80,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 39,
+      "sheets": 16,
+      "elapsedMs": 360,
+      "jsHeapUsedBytes": 61637944,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 210,
+        "frameIntervalP50Ms": 80.29999995231628,
+        "frameIntervalP95Ms": 152.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 40,
+      "sheets": 1,
+      "elapsedMs": 342,
+      "jsHeapUsedBytes": 71742240,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 215,
+        "frameIntervalP50Ms": 79.70000004768372,
+        "frameIntervalP95Ms": 151.89999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 41,
+      "sheets": 16,
+      "elapsedMs": 278,
+      "jsHeapUsedBytes": 73363024,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 220,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 151.89999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 42,
+      "sheets": 1,
+      "elapsedMs": 308,
+      "jsHeapUsedBytes": 75733776,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 225,
+        "frameIntervalP50Ms": 79,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 43,
+      "sheets": 16,
+      "elapsedMs": 378,
+      "jsHeapUsedBytes": 89659192,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 230,
+        "frameIntervalP50Ms": 79.09999996423721,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 44,
+      "sheets": 1,
+      "elapsedMs": 242,
+      "jsHeapUsedBytes": 85594752,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 234,
+        "frameIntervalP50Ms": 78.79999995231628,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 45,
+      "sheets": 16,
+      "elapsedMs": 311,
+      "jsHeapUsedBytes": 89505288,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 239,
+        "frameIntervalP50Ms": 78.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 46,
+      "sheets": 1,
+      "elapsedMs": 376,
+      "jsHeapUsedBytes": 100864680,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 244,
+        "frameIntervalP50Ms": 78.60000002384186,
+        "frameIntervalP95Ms": 151.60000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 47,
+      "sheets": 16,
+      "elapsedMs": 378,
+      "jsHeapUsedBytes": 106496108,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 249,
+        "frameIntervalP50Ms": 78.59999996423721,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 48,
+      "sheets": 1,
+      "elapsedMs": 259,
+      "jsHeapUsedBytes": 102607916,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 254,
+        "frameIntervalP50Ms": 76.69999998807907,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 49,
+      "sheets": 16,
+      "elapsedMs": 396,
+      "jsHeapUsedBytes": 117027424,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 259,
+        "frameIntervalP50Ms": 77.69999998807907,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 50,
+      "sheets": 1,
+      "elapsedMs": 308,
+      "jsHeapUsedBytes": 61632556,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 263,
+        "frameIntervalP50Ms": 76.69999998807907,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 51,
+      "sheets": 16,
+      "elapsedMs": 310,
+      "jsHeapUsedBytes": 69588036,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 267,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 52,
+      "sheets": 1,
+      "elapsedMs": 342,
+      "jsHeapUsedBytes": 83069900,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 272,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 53,
+      "sheets": 16,
+      "elapsedMs": 344,
+      "jsHeapUsedBytes": 89506332,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 276,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 54,
+      "sheets": 1,
+      "elapsedMs": 275,
+      "jsHeapUsedBytes": 91134908,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 281,
+        "frameIntervalP50Ms": 73.5,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 55,
+      "sheets": 16,
+      "elapsedMs": 413,
+      "jsHeapUsedBytes": 79192364,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 286,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 56,
+      "sheets": 1,
+      "elapsedMs": 329,
+      "jsHeapUsedBytes": 87415016,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 290,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 57,
+      "sheets": 16,
+      "elapsedMs": 345,
+      "jsHeapUsedBytes": 98616632,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 295,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 58,
+      "sheets": 1,
+      "elapsedMs": 358,
+      "jsHeapUsedBytes": 110617748,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 300,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 59,
+      "sheets": 16,
+      "elapsedMs": 361,
+      "jsHeapUsedBytes": 117350912,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 305,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 60,
+      "sheets": 1,
+      "elapsedMs": 342,
+      "jsHeapUsedBytes": 99129532,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 310,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 61,
+      "sheets": 16,
+      "elapsedMs": 428,
+      "jsHeapUsedBytes": 116085484,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 315,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 62,
+      "sheets": 1,
+      "elapsedMs": 291,
+      "jsHeapUsedBytes": 117957172,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 320,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 63,
+      "sheets": 16,
+      "elapsedMs": 394,
+      "jsHeapUsedBytes": 128709300,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 325,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 64,
+      "sheets": 1,
+      "elapsedMs": 375,
+      "jsHeapUsedBytes": 137913076,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 330,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 65,
+      "sheets": 16,
+      "elapsedMs": 344,
+      "jsHeapUsedBytes": 137831860,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 335,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 66,
+      "sheets": 1,
+      "elapsedMs": 389,
+      "jsHeapUsedBytes": 147124380,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 339,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 144.5999999642372,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 67,
+      "sheets": 16,
+      "elapsedMs": 394,
+      "jsHeapUsedBytes": 133989400,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 344,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 140.30000001192093,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 68,
+      "sheets": 1,
+      "elapsedMs": 259,
+      "jsHeapUsedBytes": 63178084,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 349,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 139,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 69,
+      "sheets": 16,
+      "elapsedMs": 378,
+      "jsHeapUsedBytes": 76002160,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 354,
+        "frameIntervalP50Ms": 73.90000003576279,
+        "frameIntervalP95Ms": 139,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 70,
+      "sheets": 1,
+      "elapsedMs": 375,
+      "jsHeapUsedBytes": 80458884,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 359,
+        "frameIntervalP50Ms": 72.90000003576279,
+        "frameIntervalP95Ms": 139,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 71,
+      "sheets": 16,
+      "elapsedMs": 579,
+      "jsHeapUsedBytes": 70579608,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 364,
+        "frameIntervalP50Ms": 72.5,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 72,
+      "sheets": 1,
+      "elapsedMs": 373,
+      "jsHeapUsedBytes": 80604524,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 369,
+        "frameIntervalP50Ms": 72.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 73,
+      "sheets": 16,
+      "elapsedMs": 378,
+      "jsHeapUsedBytes": 89059908,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 374,
+        "frameIntervalP50Ms": 72.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 74,
+      "sheets": 1,
+      "elapsedMs": 442,
+      "jsHeapUsedBytes": 101463320,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 379,
+        "frameIntervalP50Ms": 72.90000003576279,
+        "frameIntervalP95Ms": 149.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 75,
+      "sheets": 16,
+      "elapsedMs": 472,
+      "jsHeapUsedBytes": 87128816,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 384,
+        "frameIntervalP50Ms": 73.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 76,
+      "sheets": 1,
+      "elapsedMs": 453,
+      "jsHeapUsedBytes": 94119440,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 389,
+        "frameIntervalP50Ms": 73.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 77,
+      "sheets": 16,
+      "elapsedMs": 443,
+      "jsHeapUsedBytes": 105493816,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 394,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 78,
+      "sheets": 1,
+      "elapsedMs": 372,
+      "jsHeapUsedBytes": 109356312,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 399,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 79,
+      "sheets": 16,
+      "elapsedMs": 427,
+      "jsHeapUsedBytes": 122513668,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 404,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 80,
+      "sheets": 1,
+      "elapsedMs": 276,
+      "jsHeapUsedBytes": 118004356,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 409,
+        "frameIntervalP50Ms": 74,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 81,
+      "sheets": 16,
+      "elapsedMs": 392,
+      "jsHeapUsedBytes": 128770636,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 414,
+        "frameIntervalP50Ms": 74.10000002384186,
+        "frameIntervalP95Ms": 146.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 82,
+      "sheets": 1,
+      "elapsedMs": 377,
+      "jsHeapUsedBytes": 136032532,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 419,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 146.79999995231628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 83,
+      "sheets": 16,
+      "elapsedMs": 310,
+      "jsHeapUsedBytes": 136394924,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 424,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 146.79999995231628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 84,
+      "sheets": 1,
+      "elapsedMs": 373,
+      "jsHeapUsedBytes": 146301588,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 429,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 85,
+      "sheets": 16,
+      "elapsedMs": 395,
+      "jsHeapUsedBytes": 133214160,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 434,
+        "frameIntervalP50Ms": 75.59999996423721,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 86,
+      "sheets": 1,
+      "elapsedMs": 276,
+      "jsHeapUsedBytes": 63015916,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 438,
+        "frameIntervalP50Ms": 76,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 87,
+      "sheets": 16,
+      "elapsedMs": 411,
+      "jsHeapUsedBytes": 75701296,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 443,
+        "frameIntervalP50Ms": 76,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 88,
+      "sheets": 1,
+      "elapsedMs": 373,
+      "jsHeapUsedBytes": 80082020,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 448,
+        "frameIntervalP50Ms": 76,
+        "frameIntervalP95Ms": 149.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 89,
+      "sheets": 16,
+      "elapsedMs": 361,
+      "jsHeapUsedBytes": 70386204,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 453,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 149.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 90,
+      "sheets": 1,
+      "elapsedMs": 390,
+      "jsHeapUsedBytes": 82688000,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 457,
+        "frameIntervalP50Ms": 76,
+        "frameIntervalP95Ms": 149.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 91,
+      "sheets": 16,
+      "elapsedMs": 364,
+      "jsHeapUsedBytes": 88361892,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 462,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 149.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 92,
+      "sheets": 1,
+      "elapsedMs": 321,
+      "jsHeapUsedBytes": 92019948,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 467,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 149.9000000357628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 93,
+      "sheets": 16,
+      "elapsedMs": 378,
+      "jsHeapUsedBytes": 89166460,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 472,
+        "frameIntervalP50Ms": 76.10000002384186,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 94,
+      "sheets": 1,
+      "elapsedMs": 276,
+      "jsHeapUsedBytes": 112978972,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 477,
+        "frameIntervalP50Ms": 74.39999997615814,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 95,
+      "sheets": 16,
+      "elapsedMs": 361,
+      "jsHeapUsedBytes": 98594456,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 481,
+        "frameIntervalP50Ms": 76.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 96,
+      "sheets": 1,
+      "elapsedMs": 326,
+      "jsHeapUsedBytes": 109247568,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 485,
+        "frameIntervalP50Ms": 76.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 97,
+      "sheets": 16,
+      "elapsedMs": 360,
+      "jsHeapUsedBytes": 55038264,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 489,
+        "frameIntervalP50Ms": 76.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 98,
+      "sheets": 1,
+      "elapsedMs": 275,
+      "jsHeapUsedBytes": 58412704,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 494,
+        "frameIntervalP50Ms": 76.5,
+        "frameIntervalP95Ms": 147.10000002384186,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 99,
+      "sheets": 16,
+      "elapsedMs": 393,
+      "jsHeapUsedBytes": 72101412,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 499,
+        "frameIntervalP50Ms": 77.09999996423721,
+        "frameIntervalP95Ms": 146.79999995231628,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "replacement": 100,
+      "sheets": 1,
+      "elapsedMs": 342,
+      "jsHeapUsedBytes": 80445428,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 503,
+        "frameIntervalP50Ms": 77.09999996423721,
+        "frameIntervalP95Ms": 146.79999995231628,
+        "pixelRatio": 1
+      }
+    }
+  ],
+  "environment": "Windows desktop, headed Chrome, hardware renderer verified through WEBGL_debug_renderer_info; automation-operated; not a complete device or human-input audit",
+  "model": "16 independently referenced 64x64 RGBA sheets, cuboid per sheet",
+  "recordedAt": "2026-11-09T12:01:30.533Z",
+  "measurements": [
+    {
+      "sheetCount": 1,
+      "importAndReadyMs": 552,
+      "jsHeapUsedBytes": 44503660,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 7,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 99.69999998807907,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "sheetCount": 4,
+      "importAndReadyMs": 547,
+      "jsHeapUsedBytes": 56927768,
+      "webgl": {
+        "gpuTextures": 7,
+        "gpuGeometries": 7,
+        "drawCalls": 52,
+        "triangles": 172,
+        "renderedFrames": 12,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 104.39999997615814,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "sheetCount": 16,
+      "importAndReadyMs": 775,
+      "jsHeapUsedBytes": 68413024,
+      "webgl": {
+        "gpuTextures": 19,
+        "gpuGeometries": 19,
+        "drawCalls": 196,
+        "triangles": 460,
+        "renderedFrames": 18,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 162.80000001192093,
+        "pixelRatio": 1
+      }
+    },
+    {
+      "sheetCount": 1,
+      "importAndReadyMs": 705,
+      "jsHeapUsedBytes": 78952656,
+      "webgl": {
+        "gpuTextures": 4,
+        "gpuGeometries": 4,
+        "drawCalls": 16,
+        "triangles": 100,
+        "renderedFrames": 24,
+        "frameIntervalP50Ms": 81.09999996423721,
+        "frameIntervalP95Ms": 162.80000001192093,
+        "pixelRatio": 1
+      }
+    }
+  ]
+}

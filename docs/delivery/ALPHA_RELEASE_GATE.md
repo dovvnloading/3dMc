@@ -36,6 +36,8 @@ Do not count parser/exporter round-tripping or the 3D preview as an independent 
 
 For both devices record OS/CPU/GPU/driver, RAM, browser/version, viewport, DPR, refresh rate, power mode, cache/network condition, workload fixture and timestamp source. Run repeated cold launch, camera navigation, selection/transform, 2D/3D paint, undo, local recovery/save, native reopen and Java export. Preserve raw samples, not just averages. Apply the *proposed* targets from [quality gates](QUALITY_GATES.md): p95 frame interval ≤20 ms, input-to-render-submission ≤50 ms, selection/undo ≤100 ms, initial editor usable ≤3 s, local save acknowledgement ≤2 s, reference export ≤2 s. If any miss, record the result and mitigation/narrower published support envelope—never silently convert a target into a measurement.
 
+[A November 9, 2026 Windows/NVIDIA desktop run](../evidence/device-windows-2026-11-09/REPORT.md) records the 1/4/16-sheet resource workload and 100 automated project replacements with raw measurements. It covers one configuration and does not satisfy the named-device matrix or the latency targets.
+
 Specifically test lost capture, blur/Escape, hidden-tab resume, another-tab takeover, blocked/quota storage, corrupted latest checkpoint, native backup and renderer context loss. Repeat 1/4/16-sheet GPU resource checks and 100 project switches, noting measurement limitations.
 
 ### Creator and accessibility evidence
