@@ -10,6 +10,8 @@ Build a professional Minecraft authoring workspace around one reliable loop: **c
 
 ## Reading paths
 
+**Current expansion milestone:** [Full-scale expansion plan](delivery/FULL_SCALE_EXPANSION_PLAN.md). This is the working reference for next-cycle priorities and completion criteria, reviewed against `main` at `552b14466f258a308b575a9bcd3717527aab18a1`. It keeps the older roadmap and backlog available for reconciliation in the first cycle.
+
 For a product review, read the [product brief](product/PRODUCT_BRIEF.md), [workspace specification](design/WORKSPACE_SPEC.md), and [roadmap](delivery/ROADMAP.md).
 
 For implementation, start with the [decision register](decisions/DECISIONS.md), [technical design](architecture/TECHNICAL_DESIGN.md), [compatibility strategy](architecture/COMPATIBILITY.md), and [backlog](delivery/BACKLOG.md). The [quality gates](delivery/QUALITY_GATES.md) define completion.

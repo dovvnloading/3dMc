@@ -27,6 +27,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 | [Design system](docs/design/DESIGN_SYSTEM.md) | The visual language, component contracts, accessibility, and design review standards |
 | [Technical design](docs/architecture/TECHNICAL_DESIGN.md) | Document state, rendering, commands, painting, persistence, workers, and module boundaries |
 | [Compatibility strategy](docs/architecture/COMPATIBILITY.md) | Asset families, format profiles, import/export fidelity, and version evidence |
+| [Full-scale expansion plan](docs/delivery/FULL_SCALE_EXPANSION_PLAN.md) | Current expansion milestone: priority workstreams, implementation cycles, coordination, and definition of done |
 | [Delivery roadmap](docs/delivery/ROADMAP.md) | Stages, dependencies, staffing assumptions, and the first two sprints |
 | [Quality gates](docs/delivery/QUALITY_GATES.md) | Testing goals and engineering guidance |
 | [Implementation backlog](docs/delivery/BACKLOG.md) | Ordered work packages with acceptance criteria and dependencies |
