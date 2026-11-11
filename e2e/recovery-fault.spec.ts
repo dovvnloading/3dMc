@@ -232,3 +232,100 @@ test("pack-wide recovery preserves every editable model and fences displaced wri
   expect(report).toEqual({ restored: "pack", fallback: false, modelCount: 2,
     modelName: "Recovered second", pixel: 57, active: "model-2", staleRejected: true, revision: 41 });
 });
+
+
+test("pack-wide aborted writes and a corrupt newest checkpoint retain the previous complete pack", async ({ page }) => {
+  await page.goto("/");
+  const report = await page.evaluate(async () => {
+    const recovery = await import("/src/editor/recovery.ts");
+    const { createSampleDocument } = await import("/src/editor/domain.ts");
+    const { indexLegacyProject } = await import("/src/pack/packDocument.ts");
+
+    const first = createSampleDocument();
+    const second = { ...createSampleDocument(), id: "pack-fault-source", name: "Earlier intact model" };
+    second.textures[0]!.pixels[3] = 77;
+    const pack = indexLegacyProject(first);
+    pack.models.push({
+      id: "pack-fault-model", sourceDocumentId: second.id,
+      resource: { namespace: "3dmc", path: "block/fault_model" },
+      replaces: { namespace: "minecraft", path: "iron_block" },
+      provenance: "editor",
+      textures: [{ sourceTextureId: "main", textureAssetId: "pack-fault-texture" }]
+    });
+    pack.textures.push({
+      id: "pack-fault-texture", sourceDocumentId: second.id, sourceTextureId: "main",
+      resource: { namespace: "3dmc", path: "block/fault_texture" }
+    });
+    pack.activeModelId = "pack-fault-model";
+    const claim = await recovery.claimRecoveryWriter("pack-fault-test", true);
+    if (!claim.granted) throw new Error("Could not claim recovery ownership");
+
+    await recovery.savePackRecovery(pack, [first, second], 91, claim.lease);
+
+    const originalPut = IDBObjectStore.prototype.put;
+    let interrupted = false;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof originalPut>) {
+      const request = originalPut.apply(this, args);
+      const entry = args[0] as { key?: string } | null;
+      if (!interrupted && this.name === "checkpoints" && entry?.key === "latest") {
+        interrupted = true;
+        this.transaction.abort();
+      }
+      return request;
+    };
+    let rejected = false;
+    try {
+      await recovery.savePackRecovery(pack,
+        [first, { ...second, name: "Incomplete write" }], 92, claim.lease);
+    } catch (error) {
+      rejected = error instanceof Error;
+    } finally {
+      IDBObjectStore.prototype.put = originalPut;
+    }
+    const afterAbort = await recovery.readAnyRecovery();
+
+    await recovery.savePackRecovery(pack,
+      [first, { ...second, name: "Newest content" }], 93, claim.lease);
+
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("3dmc-recovery-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction("checkpoints", "readwrite");
+        const store = tx.objectStore("checkpoints");
+        const request = store.get("latest");
+        request.onsuccess = () => store.put({
+          ...request.result as object, digest: "0".repeat(64)
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    } finally { db.close(); }
+
+    const fallback = await recovery.readAnyRecovery();
+    return {
+      interrupted, rejected,
+      abortRevision: afterAbort?.revision,
+      abortKind: afterAbort?.kind,
+      fallbackRevision: fallback?.revision,
+      fallbackKind: fallback?.kind,
+      fallbackUsed: fallback?.fallback,
+      fallbackActiveModel: fallback?.kind === "pack" ? fallback.pack.activeModelId : "",
+      sourceNames: fallback?.kind === "pack" ? fallback.sources.map(doc => doc.name) : [],
+      sourcePixel: fallback?.kind === "pack" ?
+        fallback.sources[1]?.textures[0]?.pixels[3] : null
+    };
+  });
+  expect(report).toEqual({
+    interrupted: true, rejected: true,
+    abortRevision: 91, abortKind: "pack",
+    fallbackRevision: 91, fallbackKind: "pack", fallbackUsed: true,
+    fallbackActiveModel: "pack-fault-model",
+    sourceNames: ["Copper Lantern", "Earlier intact model"],
+    sourcePixel: 77
+  });
+});
