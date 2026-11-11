@@ -171,7 +171,7 @@ export function parsePackDocument(input: unknown): PackDocument {
       fail("Unrecognized model provenance.");
     return {
       id: modelId, sourceDocumentId, resource: modelResource, replaces,
-      textures: bindings, provenance: m.provenance
+      textures: bindings, provenance: m.provenance as PackModelAsset["provenance"]
     };
   });
   unique(models.map(model => model.id), "model IDs");
