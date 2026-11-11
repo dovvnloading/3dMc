@@ -157,7 +157,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
       manifestRaw.sources.length > MAX_NATIVE_PACK_SOURCES)
     fail("Native pack has an invalid number of source documents.");
 
-  const sourceEntries: SourceEntry[] = manifestRaw.sources.map((raw, i) => {
+  const sourceEntries: SourceEntry[] = (manifestRaw.sources as unknown[]).map((raw, i) => {
     const s = object(raw, ["id", "document", "textures"], "manifest source " + i);
     if (typeof s.id !== "string" || s.id.length < 1 || s.id.length > 100 ||
         s.document !== docPath(i) || !Array.isArray(s.textures) ||
@@ -167,7 +167,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
           path.startsWith("models/" + i + "/textures/")) ||
         new Set(s.textures).size !== s.textures.length)
       fail("Native pack source paths or IDs are invalid.");
-    return { id: s.id, document: s.document, textures: s.textures as string[] };
+    return { id: s.id as string, document: s.document as string, textures: s.textures as string[] };
   });
   if (new Set(sourceEntries.map(s => s.id)).size !== sourceEntries.length)
     fail("Native pack has duplicate source document IDs.");
@@ -199,7 +199,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
     if (raw.schemaVersion !== 3 || raw.id !== entry.id || !Array.isArray(raw.textures) ||
         raw.textures.length !== entry.textures.length)
       fail("Native pack source document is incompatible or misidentified.");
-    const textures = raw.textures.map((value, position) => {
+    const textures = (raw.textures as unknown[]).map((value, position) => {
       const descriptor = object(value, ["id", "name", "width", "height", "path"],
         "source texture descriptor");
       const path = entry.textures[position]!;

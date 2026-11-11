@@ -15,7 +15,7 @@ function fixtures(): { pack: PackDocument; sources: EditorDocument[] } {
     ...source, id: "second-editable-source", name: "Second lantern",
     cuboids: source.cuboids.map((node, i) => i === 0
       ? { ...node, name: "Saved layer", locked: true, visible: false,
-        faces: { ...node.faces, north: { ...node.faces.north, rotation: 90 } } }
+        faces: { ...node.faces, north: { ...node.faces.north, rotation: 90 as const } } }
       : node),
     textures: source.textures.map(t => ({
       ...t, name: "Second image.png",
