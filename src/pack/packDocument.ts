@@ -129,7 +129,7 @@ export function parsePackDocument(input: unknown): PackDocument {
       raw.textures.length > MAX_PACK_TEXTURES)
     fail("Pack index requires 1–512 texture assets.");
 
-  const textures: PackTextureAsset[] = raw.textures.map((item, index) => {
+  const textures: PackTextureAsset[] = (raw.textures as unknown[]).map((item, index) => {
     const t = record(item, ["id", "sourceDocumentId", "sourceTextureId", "resource"],
       "texture " + index);
     return {
@@ -143,7 +143,7 @@ export function parsePackDocument(input: unknown): PackDocument {
   unique(textures.map(t => gameFilePath("textures", t.resource)), "texture paths");
   const textureById = new Map(textures.map(t => [t.id, t]));
 
-  const models: PackModelAsset[] = raw.models.map((item, index) => {
+  const models: PackModelAsset[] = (raw.models as unknown[]).map((item, index) => {
     const m = record(item, [
       "id", "sourceDocumentId", "resource", "replaces", "textures", "provenance"
     ], "model " + index);
@@ -155,7 +155,7 @@ export function parsePackDocument(input: unknown): PackDocument {
       fail("This profile only plans one vanilla minecraft blockstate replacement per model.");
     if (!Array.isArray(m.textures) || m.textures.length < 1 || m.textures.length > 16)
       fail("Each model must bind 1–16 textures.");
-    const bindings: PackTextureBinding[] = m.textures.map((entry, position) => {
+    const bindings: PackTextureBinding[] = (m.textures as unknown[]).map((entry, position) => {
       const b = record(entry, ["sourceTextureId", "textureAssetId"],
         "model " + modelId + " texture binding " + position);
       const sourceTextureId = identifier(b.sourceTextureId, "source texture ID");
@@ -220,7 +220,7 @@ export function verifyPackSources(pack: PackDocument, sources: readonly EditorDo
   const byId = new Map(documents.map(doc => [doc.id, doc]));
   for (const model of index.models) {
     const doc = byId.get(model.sourceDocumentId);
-    if (!doc) fail("Source model " + model.sourceDocumentId + " is missing.");
+    if (!doc) throw new PackIndexError("Source model " + model.sourceDocumentId + " is missing.");
     if (doc.target.edition !== "java" || doc.target.family !== "static-block" ||
         doc.target.candidateRelease !== "1.21.4")
       fail("Source model " + model.sourceDocumentId + " targets an unsupported Minecraft profile.");
