@@ -74,9 +74,28 @@ interface DirectoryEntry {
   flags: number;
 }
 
-function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
-  if (bytes.byteLength < 22 || bytes.byteLength > MAX_NATIVE_BYTES)
-    reject("Native archive is empty, damaged or exceeds the 3 MB import limit.");
+/** Shared strict ZIP envelope for legacy and pack-aware native projects. */
+export interface NativeZipLimits {
+  maxArchiveBytes: number;
+  minEntries: number;
+  maxEntries: number;
+  isAllowedPath: (name: string) => boolean;
+  maxEntryBytes: (name: string) => number;
+}
+
+const LEGACY_ZIP_LIMITS: NativeZipLimits = {
+  maxArchiveBytes: MAX_NATIVE_BYTES, minEntries: NATIVE_FILES.length, maxEntries: 18,
+  isAllowedPath: (name) => NATIVE_FILES.includes(name as typeof NATIVE_FILES[number]) ||
+    /^textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(name),
+  maxEntryBytes: (name) => name === NATIVE_FILES[0] ? MAX_MANIFEST_BYTES :
+    name === NATIVE_FILES[1] ? MAX_DOCUMENT_BYTES : MAX_IMAGE_BYTES
+};
+
+export function readExactStoredZip(bytes: Uint8Array,
+                                   limits: NativeZipLimits = LEGACY_ZIP_LIMITS): Map<string, Uint8Array> {
+  if (bytes.byteLength < 22 || bytes.byteLength > limits.maxArchiveBytes)
+    reject("Native archive is empty, damaged or exceeds the " +
+      (limits === LEGACY_ZIP_LIMITS ? "3 MB" : "pack") + " import limit.");
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const end = bytes.length - 22;
@@ -85,8 +104,8 @@ function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     reject("Native archive requires an unmodified single-disk ZIP directory without comments.");
 
   const count = u16(view, end + 10);
-  if (count < NATIVE_FILES.length || count > 18 || u16(view, end + 8) !== count)
-    reject("Native archive requires a bounded 3–18 source files.");
+  if (count < limits.minEntries || count > limits.maxEntries || u16(view, end + 8) !== count)
+    reject("Native archive requires a bounded number of source files.");
 
   const centralStart = u32(view, end + 16);
   const centralSize = u32(view, end + 12);
@@ -94,8 +113,6 @@ function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
       centralStart + centralSize !== end)
     reject("Native archive directory offsets are invalid.");
 
-  const isAllowed = (name: string) => NATIVE_FILES.includes(name as typeof NATIVE_FILES[number]) ||
-    /^textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(name);
   const entries: DirectoryEntry[] = [];
   const seen = new Set<string>();
   let pos = centralStart;
@@ -120,13 +137,12 @@ function readExactStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     let name: string;
     try { name = utf8.decode(bytes.subarray(pos + 46, pos + 46 + length)); }
     catch { reject("Native archive has an invalid file path."); }
-    if (!isAllowed(name) || seen.has(name))
+    if (!limits.isAllowedPath(name) || seen.has(name))
       reject("Native archive includes a missing, duplicate or unexpected path: " + name);
-    const max = name === NATIVE_FILES[0] ? MAX_MANIFEST_BYTES :
-      name === NATIVE_FILES[1] ? MAX_DOCUMENT_BYTES : MAX_IMAGE_BYTES;
+    const max = limits.maxEntryBytes(name);
     if (size > max) reject("Native archive file is too large: " + name);
     total += size;
-    if (total > MAX_NATIVE_BYTES) reject("Native archive contents exceed the size budget.");
+    if (total > limits.maxArchiveBytes) reject("Native archive contents exceed the size budget.");
 
     entries.push({ name, offset, size, crc: u32(view, pos + 16), flags });
     seen.add(name);
