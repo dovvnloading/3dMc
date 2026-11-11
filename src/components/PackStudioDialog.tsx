@@ -19,6 +19,9 @@ import "./pack-studio.css";
 interface Props {
   source: EditorDocument;
   onClose: () => void;
+  session?: PackSession;
+  onChange?: (session: PackSession) => void;
+  onOpenPack?: (session: PackSession) => Promise<boolean>;
 }
 
 const makeId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -28,10 +31,12 @@ const makeId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
  * Opening and saving a pack is all-or-nothing; it never flattens or silently
  * imports v3 into the single-model editor or its local recovery checkpoints.
  */
-export function PackStudioDialog({ source, onClose }: Props) {
-  const [session, setSession] = useState<PackSession>(
+export function PackStudioDialog({ source, onClose, session: external, onChange, onOpenPack }: Props) {
+  const [local, setLocal] = useState<PackSession>(
     () => createPackSession(indexLegacyProject(source), [source])
   );
+  const session = external ?? local;
+  const setSession = onChange ?? setLocal;
   const [lastSavedRevision, setLastSavedRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -61,6 +66,7 @@ export function PackStudioDialog({ source, onClose }: Props) {
   };
 
   const close = () => {
+    if (external) { onClose(); return; }
     if (dirty && !confirmClose) {
       setConfirmClose(true);
       return;
@@ -88,10 +94,11 @@ export function PackStudioDialog({ source, onClose }: Props) {
     }
   };
 
-  const loadPending = () => {
+  const loadPending = async () => {
     if (!pending) return;
+    if (onOpenPack && !(await onOpenPack(pending))) return;
     sessionRef.current = pending;
-    setSession(pending);
+    if (!onOpenPack) setSession(pending);
     setLastSavedRevision(pending.revision);
     setPending(null);
     setMessage("Source pack loaded. All models and textures were retained.");
@@ -204,7 +211,7 @@ export function PackStudioDialog({ source, onClose }: Props) {
       <div>
         <span className="export-kicker">JAVA 1.21.4 · EXPERIMENTAL PACK WORKSPACE</span>
         <h2 id="pack-studio-title"><Layers3 size={20}/>Pack Studio</h2>
-        <p>Assemble and preserve multiple editable models without replacing the open editor. Live editing of secondary models is a later integration step.</p>
+        <p>Manage multiple editable models in one workspace. Close this panel and choose a model in Scene to edit it in 3D.</p>
       </div>
       <button className="text-button quiet" type="button" onClick={close}>Close</button>
     </div>
@@ -227,7 +234,7 @@ export function PackStudioDialog({ source, onClose }: Props) {
 
     {pending && <div className="pack-studio-confirm" role="group" aria-label="Confirm source pack replacement">
       <p>Replace this Pack Studio session with <strong>{pending.present.pack.name}</strong> ({pending.present.pack.models.length} models)? Download a source backup first if needed.</p>
-      <button type="button" onClick={loadPending}>Load selected pack</button>
+      <button type="button" onClick={() => void loadPending()}>Load selected pack</button>
       <button type="button" onClick={() => { setPending(null); setMessage(""); }}>Cancel</button>
     </div>}
 
@@ -279,12 +286,12 @@ export function PackStudioDialog({ source, onClose }: Props) {
               {sourceTexture.width}×{sourceTexture.height} · {resourceKey(asset.resource)}
             </span></div>)}
         </div>
-        <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. Standard editor Save still downloads its current single-model project.</p>
+        <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. The main editor Save now downloads the complete pack source.</p>
       </section>
     </div>
     <div className="pack-studio-foot">
       <span aria-live="polite">{message || (dirty ? "Unsaved Pack Studio changes. Save your .3dmc source pack." : "Pack Studio source is ready.")}</span>
-      {confirmClose && <div className="pack-studio-confirm" role="group" aria-label="Confirm discard unsaved pack">
+      {!external && confirmClose && <div className="pack-studio-confirm" role="group" aria-label="Confirm discard unsaved pack">
         <strong>Unsaved pack changes will be lost.</strong>
         <button type="button" onClick={onClose}>Discard and close</button>
         <button type="button" onClick={() => setConfirmClose(false)}>Keep editing</button>

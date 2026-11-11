@@ -58,6 +58,11 @@ function commitSnapshot(session: PackSession, candidate: PackSnapshot): PackSess
   };
 }
 
+/** Commit source and pack index together in one undo step. */
+export function commitPackSnapshot(session: PackSession, snapshot: PackSnapshot): PackSession {
+  return commitSnapshot(session, snapshot);
+}
+
 export function createPackSession(pack: PackDocument,
                                   sources: readonly EditorDocument[]): PackSession {
   return {

@@ -54,14 +54,12 @@ test("Pack Studio builds, saves, reopens and exports a two-model source pack wit
   await page.getByRole("button", { name: "Pack Studio" }).click();
   const reopenedStudio = page.getByRole("dialog", { name: "Pack Studio" });
   await expect(reopenedStudio.getByRole("listbox", { name: "Pack model assets" }).getByRole("option"))
-    .toHaveCount(1); // No implicit replacement of the live single-model editor.
+    .toHaveCount(2); // The pack session remains active after closing the manager.
   await reopenedStudio.locator('input[type="file"][accept*=".3dmc"]').first().setInputFiles(archivePath);
   await expect(reopenedStudio.getByRole("group", { name: "Confirm source pack replacement" })).toBeVisible();
   await reopenedStudio.getByRole("button", { name: "Load selected pack" }).click();
-  await expect(reopenedStudio.getByRole("listbox", { name: "Pack model assets" }).getByRole("option"))
-    .toHaveCount(2);
-  await reopenedStudio.getByRole("button", { name: "Close" }).click();
   await expect(reopenedStudio).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Active pack model" }).selectOption("model-0");
 
   const [after] = await Promise.all([
     page.waitForEvent("download"),
@@ -83,17 +81,15 @@ test("Pack Studio reports replacement conflicts and guards unsaved pack work", a
   await studio.getByRole("combobox", { name: "Pack replacement target" }).selectOption("diamond_block");
   await expect(studio.getByText(/Duplicate blockstate replacements/)).toBeVisible();
   await expect(studio.getByRole("combobox", { name: "Pack replacement target" })).toHaveValue("iron_block");
-  await studio.getByRole("button", { name: "Close" }).click();
-  await expect(studio.getByRole("group", { name: "Confirm discard unsaved pack" })).toBeVisible();
-  await studio.getByRole("button", { name: "Keep editing" }).click();
-  await expect(studio).toBeVisible();
   await studio.getByRole("button", { name: "Remove selected model" }).click();
   await expect(models).toHaveCount(1);
   await studio.getByRole("button", { name: "Undo pack operation" }).click();
   await expect(models).toHaveCount(2);
   await studio.getByRole("button", { name: "Close" }).click();
-  await studio.getByRole("button", { name: "Discard and close" }).click();
   await expect(studio).toHaveCount(0);
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  await expect(page.getByRole("dialog", { name: "Pack Studio" })
+    .getByRole("listbox", { name: "Pack model assets" }).getByRole("option")).toHaveCount(2);
 });
 
 test("Pack Studio is not offered for the unsupported Java 26.3 target", async ({ page }) => {
