@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
+  AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
   FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
