@@ -8,6 +8,8 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
+**Pack Studio (experimental):** The workspace includes an isolated pack assembly dialog for combining the current model with another native project, saving/reopening a multi-model `.3dmc` source pack, and exporting two supported Java 1.21.4 block replacement visuals. Secondary models are not yet editable in the main 3D viewport and pack-wide local recovery is not implemented. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
+
 The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.
 
 ## Project status
