@@ -37,3 +37,18 @@
 .pack-studio-details>.pack-studio-field{margin:10px 0}
 .pack-studio-resource-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;margin-top:8px}
 @media(max-width:600px){.pack-studio-resource-fields{grid-template-columns:1fr}}
+
+
+/* Search only filters the asset list; it never changes the active model. */
+.pack-studio-search{display:flex;align-items:center;gap:7px;border:1px solid var(--interactive-border);background:var(--control);border-radius:6px;padding:3px 8px;color:var(--secondary)}
+.pack-studio-search:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+.pack-studio-search input{flex:1;min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--text);padding:6px 0;font-size:12px}
+.pack-studio-search input:focus-visible{outline:0}
+.pack-studio-search button{border:0;background:transparent;color:var(--secondary);display:grid;place-items:center;padding:3px;border-radius:4px}
+.pack-studio-search button:hover{color:var(--text);background:var(--raised)}
+.pack-studio-result-count{color:var(--secondary);font-size:11px;margin:6px 0 10px}
+.pack-studio-empty{color:var(--secondary);font-size:12px;line-height:1.5;margin:4px 2px;padding:12px;border:1px dashed var(--divider);border-radius:6px}
+.pack-studio-edit-model{width:100%;padding:9px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--selected);color:var(--accent);font-size:12px;font-weight:600;margin:0 0 12px}
+.pack-studio-edit-model:hover{background:var(--raised)}
+.pack-studio-usage{color:var(--accent)!important;font-size:11px}
+.pack-studio-usage-list{list-style:disc;margin:0 0 0 14px;padding:0;color:var(--secondary);font-size:11px;line-height:1.5}
