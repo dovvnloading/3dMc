@@ -100,18 +100,35 @@ describe("Java Edition 1.21.4 experimental pack", () => {
     const pixels = [...initial.textures[0]!.pixels];
     pixels[3] = 100;
     const transparent = setTexturePixels(initial, pixels);
-    expect(inspectJava1214(transparent).some((i) => i.code === "TEXTURE_ALPHA")).toBe(true);
+    expect(inspectJava1214(transparent).find(i => i.code === "TEXTURE_ALPHA"))
+      .toMatchObject({ textureId: initial.textures[0]!.id });
     const empty = { ...initial, cuboids: [] };
     expect(inspectJava1214(empty).some((i) => i.code === "EMPTY_MODEL")).toBe(true);
     const tinted = { ...initial, cuboids: initial.cuboids.map((node, i) =>
       i === 0 ? { ...node, color: "#dddddd" } : node) };
     expect(inspectJava1214(tinted).some((i) => i.code === "UNSUPPORTED_TINT")).toBe(true);
   });
+  it("locates each texture issue by stable texture ID, not by sheet name or active selection", () => {
+    const initial = createSampleDocument();
+    const alphaPixels = [...initial.textures[0]!.pixels];
+    alphaPixels[3] = 100;
+    const secondary = { ...initial.textures[0]!, id: "accent", name: "Main accent", pixels: alphaPixels };
+    const document = {
+      ...initial,
+      textures: [...initial.textures, secondary],
+      activeTextureId: initial.textures[0]!.id
+    };
+    const issue = inspectJava1214(document).find(item => item.code === "TEXTURE_ALPHA");
+    expect(issue).toMatchObject({ severity: "error", textureId: "accent" });
+    expect(issue?.nodeId).toBeUndefined();
+    expect(() => makeJava1214Pack(document)).toThrow(JavaExportBlocked);
+  });
   it("blocks small source sheets that would lower the game's block-atlas mip level", () => {
     const initial = createSampleDocument();
     const small = { ...initial, textures: [{ ...initial.textures[0]!, width: 8, height: 8,
       pixels: Array.from({ length: 8 * 8 }, () => [12, 34, 56, 255]).flat() }] };
-    expect(inspectJava1214(small).some(issue => issue.code === "TEXTURE_TOO_SMALL")).toBe(true);
+    expect(inspectJava1214(small).find(issue => issue.code === "TEXTURE_TOO_SMALL"))
+      .toMatchObject({ textureId: initial.textures[0]!.id });
     expect(() => makeJava1214Pack(small)).toThrow(JavaExportBlocked);
   });
   it("keeps project names out of exported paths", () => {

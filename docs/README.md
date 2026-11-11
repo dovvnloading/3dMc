@@ -1,6 +1,6 @@
 # 3dMc planning guide
 
-**Status:** proposed foundation, prepared 2026-11-08. The editor is implemented on main with per-face UV authoring and a staged recovery/gesture hardening update; no Minecraft compatibility, device performance, or usability gates have been established. See [First implementation](delivery/FIRST_IMPLEMENTATION.md).
+**Status:** working documentation index, updated 2026-11-11. The implemented editor includes cuboid authoring, UV/texture painting, local recovery, native source archives, and an experimental Java 1.21.4 exporter with recorded game checks. This does not imply broad Minecraft version compatibility or universal device certification. See [First implementation](delivery/FIRST_IMPLEMENTATION.md) and the [full-scale expansion milestone](delivery/FULL_SCALE_EXPANSION_PLAN.md).
 
 ## The central decision
 
@@ -10,7 +10,7 @@ Build a professional Minecraft authoring workspace around one reliable loop: **c
 
 ## Reading paths
 
-**Current expansion milestone:** [Full-scale expansion plan](delivery/FULL_SCALE_EXPANSION_PLAN.md). This is the working reference for next-cycle priorities and completion criteria, reviewed against `main` at `552b14466f258a308b575a9bcd3717527aab18a1`. It keeps the older roadmap and backlog available for reconciliation in the first cycle.
+**Current expansion milestone:** [Full-scale expansion plan](delivery/FULL_SCALE_EXPANSION_PLAN.md). This is the working reference for next-cycle priorities and completion criteria, reviewed against `main` at `552b14466f258a308b575a9bcd3717527aab18a1`. The 2026-11-08 roadmap and backlog are historical proposals, not an accurate inventory of unimplemented work; reconcile individual tasks against the source and tests before scheduling.
 
 For a product review, read the [product brief](product/PRODUCT_BRIEF.md), [workspace specification](design/WORKSPACE_SPEC.md), and [roadmap](delivery/ROADMAP.md).
 

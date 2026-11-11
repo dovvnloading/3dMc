@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
+  ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
   FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
@@ -17,6 +17,7 @@ import type { History } from "./editor/history";
 import { commitSelectionGesture, deleteSelection, duplicateSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
+import { ExportIssueList } from "./components/ExportIssueList";
 import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
@@ -45,6 +46,7 @@ import { makeSixFaceDiagnosticDocument } from "./compatibility/diagnostic";
 import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
 import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS, makeJava1214Pack } from "./export/javaBlock";
+import type { ExportIssue } from "./export/javaBlock";
 
 type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed" | "blocked";
 type WriterStatus = "checking" | "owned" | "blocked" | "failed";
@@ -201,6 +203,29 @@ export function App() {
     setSelection(current => id === null ? selectOnly(null) :
       selectAt(current, id, historyRef.current.present.cuboids.map(node => node.id), modifiers));
   }, [clearStroke]);
+  const locateExportIssue = (issue: ExportIssue) => {
+    const source = historyRef.current.present;
+    if (issue.nodeId) {
+      if (!source.cuboids.some(node => node.id === issue.nodeId)) return;
+      clearStroke();
+      setSelectedId(issue.nodeId);
+      setSearch(""); // Make a filtered-out element visible in the hierarchy.
+      setMode("model"); setTool("select");
+    } else if (issue.textureId) {
+      const textureId = issue.textureId;
+      if (!textureById(source, textureId)) return;
+      clearStroke();
+      // Match asset-list selection: navigating is not a document edit or undo step.
+      publishHistory(current => {
+        const next = selectTexture(current.present, textureId);
+        return next === current.present ? current : { ...current, present: next };
+      });
+      setMode("paint"); setTool("pencil");
+    } else return;
+
+    setSceneOpen(true); setInspectorOpen(true);
+    setExportOpen(false);
+  };
   const applyBatch = useCallback((operation: CommitFn): boolean => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return false;
     const source = historyRef.current.present;
@@ -726,7 +751,7 @@ export function App() {
         <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option><option value="26.3">Java Edition 26.3 · Unsupported</option></select></label>
       <div className="export-file-list" aria-label="Files in the export"><strong>Output files</strong><code>{JAVA_PACK_PATHS.metadata}</code><code>{JAVA_PACK_PATHS.blockstate}</code><code>{JAVA_PACK_PATHS.model}</code><code>{JAVA_PACK_PATHS.mainTexture}</code><span>Plus {doc.cuboids.filter(node => node.material === "solid").length} generated solid-color texture files.</span></div>
       <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture"><div><strong>Six-face orientation test</strong><p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces, upward arrows and asymmetric corner markers. It does not use or change your current project.</p></div><button className="text-button quiet" onClick={downloadDiagnosticPack}><Download size={15}/>Download six-face diagnostic ZIP</button></section>
-      <div className="export-issues"><strong>Preflight · {exportIssues.filter(issue => issue.severity === "error").length} blockers</strong>{exportIssues.map(issue => <div key={issue.code + (issue.nodeId ?? "")} className={"export-issue issue-" + issue.severity}>{issue.severity === "error" ? <AlertCircle size={15}/> : <Info size={15}/>}<span><b>{issue.severity === "error" ? "Fix required" : "Notice"}</b>{issue.message}</span>{issue.nodeId && <button onClick={() => { setSelectedId(issue.nodeId!); setMode("model"); switchTool("select"); setExportOpen(false); }}>Locate</button>}</div>)}</div>
+      <ExportIssueList issues={exportIssues} onLocate={locateExportIssue}/>
       {lastExport && <p className="export-last">Last download started for revision {lastExport.revision} ({Math.round(lastExport.bytes / 1024)} KiB).{lastExport.revision !== history.revision ? " New changes have not been exported." : ""}</p>}
       <div className="modal-actions"><button className="text-button quiet" data-dialog-initial-focus onClick={() => setExportOpen(false)}>Close</button><button className="text-button primary" onClick={downloadJavaPack} disabled={exportStatus === "building" || exportIssues.some(issue => issue.severity === "error")}><Download size={15}/>{exportStatus === "building" ? "Building…" : "Download experimental ZIP"}</button></div>
     </ModalDialog>}
