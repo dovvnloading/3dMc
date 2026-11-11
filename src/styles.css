@@ -53,7 +53,7 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 }
 .brand-divider { width:1px; height:22px; background:var(--divider); margin:0 5px; }
 .brand-subtitle { color:var(--secondary); font-size:13px; letter-spacing:0; font-weight:450; }
-.project-header { display:flex; min-width:0; gap:15px; align-items:center; flex:1; padding-left:12px; }
+.project-header { display:flex; min-width:0; gap:15px; align-items:center; flex:1 1 0; padding-left:12px; overflow:hidden; }
 .project-title {
   width:min(190px,25vw); min-width:90px; border:1px solid transparent;
   color:var(--text); background:transparent; padding:7px 8px;
@@ -301,6 +301,20 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:24px; }
 .boot-loader { position:fixed; z-index:60; right:18px; bottom:45px; background:var(--raised); color:var(--secondary); border:1px solid var(--divider); padding:10px 13px; border-radius:6px; font-size:11px; }
 
+
+/* Pack Studio adds another toolbar action. Keep the profile from extending
+   over Undo at desktop widths and preserve a usable version selector. */
+@media (min-width: 1251px) and (max-width: 1600px) {
+  .app-bar { gap:10px; padding-inline:10px; }
+  .brand-subtitle, .brand-divider { display:none; }
+  .project-header { gap:7px; padding-left:2px; }
+  .project-title { width:clamp(90px,11vw,158px); min-width:90px; }
+  .profile-label { font-size:10px; letter-spacing:0; flex-shrink:0; }
+  .target-select { max-width:120px; margin-left:5px; font-size:10px; padding:5px 4px; }
+  .app-actions { gap:5px; flex-shrink:0; }
+  .app-actions .text-button { padding-inline:8px; gap:5px; font-size:11px; }
+}
+.app-actions { position:relative; z-index:1; }
 @media (max-width: 1250px) {
   .editor-grid { grid-template-columns:218px minmax(0,1fr) 280px; }
   .app-shell.scene-collapsed .editor-grid { grid-template-columns:0 minmax(0,1fr) 280px; }
