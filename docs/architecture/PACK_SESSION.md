@@ -30,9 +30,17 @@ The Scene panel model selector switches the authoritative active source document
 
 Standard **Save project** downloads container v3 for pack mode; **Open** recognizes v3 and requires confirmation before replacing the complete workspace. The existing v1/v2 project path is retained for single-model projects. Pack sessions recover through generation-fenced, hashed IndexedDB checkpoints that include every source and the active model. Opening or recovering a different pack rotates the writer generation to prevent stale writes.
 
+## Asset discovery and texture dependencies
+
+Pack Studio now offers case-insensitive, multi-term filtering by model name, model/source IDs, replacement block, output resource paths and texture names/paths. Filtering changes only the visible list, **never** the selected source model, geometry, texture bytes, recovery snapshot or undo history. Empty-result views keep the active model safely selected. The **Edit selected model in 3D** action closes the manager and returns to the same live workspace.
+
+Each source texture displays how many painted faces refer to it and which cuboids use those faces. Hidden cuboids count as dependencies because their source assignments still matter; cuboids with solid materials are excluded from painted-face counts. Resource names and dependency summaries are derived from the authoritative pack session rather than cached display state.
+
+The current Java 1.21.4 export profile still permits at most two configured block replacements. Search is not a claim of broader Minecraft target support.
+
 ## Remaining work
 
-- Target-aware model path editing, richer asset metadata and search/filter in the pack browser
+- Larger pack asset browsing, target-aware model grouping and richer dependency diagnostics
 - Tested performance/quotas on larger multi-model projects and cross-device usability
 - More precise in-game verification for multiple block replacements and unsupported feature diagnostics
 - Deferred migration of unsupported Java 26.3 sources; never advertise unsupported versions as exportable

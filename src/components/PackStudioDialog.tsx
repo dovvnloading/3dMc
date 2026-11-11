@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, FolderOpen, Layers3, Plus, Save, Trash2 } from "lucide-react";
+import { Download, FolderOpen, Layers3, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { renameProject } from "../editor/domain";
@@ -8,6 +8,7 @@ import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../edit
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
 import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
+import { describeTextureDependencies, searchPackModels } from "../pack/assetBrowser";
 import {
   activePackDocument, activePackModel, addPackModel, createPackSession,
   editActivePackDocument, editPackIndex, redoPackSession, removePackModel,
@@ -64,6 +65,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const [saving, setSaving] = useState(false);
   const [opening, setOpening] = useState(false);
   const [message, setMessage] = useState("");
+  const [modelQuery, setModelQuery] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const [pending, setPending] = useState<PackSession | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -75,6 +77,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const active = activePackModel(session);
   const activeDoc = activePackDocument(session);
   const dirty = session.revision !== lastSavedRevision;
+  const visibleModels = searchPackModels(pack, session.present.sources, modelQuery);
 
   const change = (operation: (current: PackSession) => PackSession) => {
     try {
@@ -271,8 +274,19 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     <div className="pack-studio-layout">
       <section className="pack-studio-models" aria-label="Pack models">
         <h3>Models <span>{pack.models.length}/2 supported replacements</span></h3>
+        <div className="pack-studio-search">
+          <Search size={15} aria-hidden="true"/>
+          <input type="search" aria-label="Search pack models" placeholder="Model, path, texture…"
+            maxLength={120} value={modelQuery} onChange={event => setModelQuery(event.target.value)}/>
+          {modelQuery && <button type="button" aria-label="Clear pack search"
+            onClick={() => setModelQuery("")}><X size={15}/></button>}
+        </div>
+        <p className="pack-studio-result-count" role="status">
+          {modelQuery ? visibleModels.length + " of " + pack.models.length + " models match" :
+            pack.models.length + " model" + (pack.models.length === 1 ? "" : "s") + " in this pack"}
+        </p>
         <div role="listbox" aria-label="Pack model assets">
-          {pack.models.map(model => {
+          {visibleModels.map(model => {
             const item = session.present.sources.find(doc => doc.id === model.sourceDocumentId)!;
             return <button type="button" role="option" aria-selected={model.id === pack.activeModelId}
               className={model.id === pack.activeModelId ? "active" : ""} key={model.id}
@@ -281,6 +295,9 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
               <small>{resourceKey(model.replaces)} · {item.cuboids.length} elements</small>
             </button>;
           })}
+          {visibleModels.length === 0 && <p className="pack-studio-empty">
+            No models match your search. The active model and source data are unchanged.
+          </p>}
         </div>
         <input ref={addFileRef} type="file" hidden accept=".3dmc,application/zip"
           onChange={event => void addFromFile(event)}/>
@@ -296,6 +313,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
 
       <section className="pack-studio-details" aria-label="Selected pack model">
         <h3>{activeDoc.name}</h3>
+        {external && <button className="pack-studio-edit-model" type="button" onClick={onClose}>
+          Edit selected model in 3D
+        </button>}
+        {modelQuery && !visibleModels.some(model => model.id === active.id) &&
+          <p className="pack-studio-help">The selected model is hidden by the search filter. Clear the search to see it in the list.</p>}
         <PackField label="Model name" maxLength={100} value={activeDoc.name}
           onCommit={name => change(current => editActivePackDocument(
             current, source => renameProject(source, name)))}/>
@@ -324,26 +346,40 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         <p className="pack-studio-help">The two supported replacement paths must be unique. This resource pack changes visuals, not gameplay or collision.</p>
         <h4>Texture dependencies</h4>
         <div className="pack-studio-textures">
-          {textureList.map(({ asset, sourceTexture }) =>
-            <div key={asset.id}><strong>{sourceTexture.name}</strong><span>
+          {textureList.map(({ asset, sourceTexture }) => {
+            const usage = describeTextureDependencies(activeDoc, sourceTexture.id);
+            return <div key={asset.id}><strong>{sourceTexture.name}</strong><span>
               {sourceTexture.width}×{sourceTexture.height} · {resourceKey(asset.resource)}
             </span>
-            <div className="pack-studio-resource-fields">
-              <PackField label={"Texture namespace " + sourceTexture.name}
-                maxLength={64} value={asset.resource.namespace}
-                onCommit={namespace => change(current => setTextureResource(
-                  current, asset.id, { ...asset.resource, namespace }))}/>
-              <PackField label={"Texture path " + sourceTexture.name}
-                value={asset.resource.path}
-                onCommit={path => change(current => setTextureResource(
-                  current, asset.id, { ...asset.resource, path }))}/>
-            </div></div>)}
+              <span className="pack-studio-usage" aria-label={"Texture dependencies " + sourceTexture.name}>
+                {usage.faceCount === 0 ? "Not assigned to painted faces" :
+                  usage.faceCount + " painted " + (usage.faceCount === 1 ? "face" : "faces") +
+                  " across " + usage.cuboidCount + " " +
+                  (usage.cuboidCount === 1 ? "element" : "elements")}
+              </span>
+              {usage.uses.length > 0 && <ul className="pack-studio-usage-list">
+                {usage.uses.slice(0, 3).map(item =>
+                  <li key={item.cuboidId}>{item.cuboidName}: {item.faces.join(", ")}</li>)}
+                {usage.uses.length > 3 && <li>+{usage.uses.length - 3} more elements</li>}
+              </ul>}
+              <div className="pack-studio-resource-fields">
+                <PackField label={"Texture namespace " + sourceTexture.name}
+                  maxLength={64} value={asset.resource.namespace}
+                  onCommit={namespace => change(current => setTextureResource(
+                    current, asset.id, { ...asset.resource, namespace }))}/>
+                <PackField label={"Texture path " + sourceTexture.name}
+                  value={asset.resource.path}
+                  onCommit={path => change(current => setTextureResource(
+                    current, asset.id, { ...asset.resource, path }))}/>
+              </div>
+            </div>;
+          })}
         </div>
         <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. The main editor Save now downloads the complete pack source.</p>
       </section>
     </div>
     <div className="pack-studio-foot">
-      <span aria-live="polite">{message || (dirty ? "Unsaved Pack Studio changes. Save your .3dmc source pack." : "Pack Studio source is ready.")}</span>
+      <span aria-live="polite">{message || (external ? "All models share live editing, Undo, and local recovery. Download a .3dmc source backup to keep a portable copy." : dirty ? "Unsaved Pack Studio changes. Save your .3dmc source pack." : "Pack Studio source is ready.")}</span>
       {!external && confirmClose && <div className="pack-studio-confirm" role="group" aria-label="Confirm discard unsaved pack">
         <strong>Unsaved pack changes will be lost.</strong>
         <button type="button" onClick={onClose}>Discard and close</button>
