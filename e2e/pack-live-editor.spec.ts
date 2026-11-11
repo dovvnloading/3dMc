@@ -128,3 +128,40 @@ test("pack export preflight Locates geometry errors in another source model", as
   await expect(x).toHaveValue("30");
   await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
 });
+
+
+test("indexed export preflight blocks generated texture collisions before download", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+
+  const modelPath = await studio.getByRole("textbox", { name: "Model resource path" }).inputValue();
+  const texturePath = studio.getByRole("textbox", { name: "Texture path lantern.png" });
+  await texturePath.fill(modelPath + "/solid_1");
+  await texturePath.press("Enter");
+  await studio.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const exportDialog = page.getByRole("dialog", { name: "Experimental resource pack" });
+  const collision = exportDialog.locator(".export-issue.issue-error")
+    .filter({ hasText: "Generated file path collision" });
+  await expect(collision).toBeVisible();
+  await expect(collision).toContainText("Model: Copper Lantern copy");
+  await expect(collision).toContainText(modelPath + "/solid_1.png");
+  await expect(exportDialog.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
+  await expect(exportDialog.getByText(/minecraft:diamond_block, minecraft:iron_block/)).toBeVisible();
+  await exportDialog.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const details = page.getByRole("dialog", { name: "Pack Studio" });
+  const pathField = details.getByRole("textbox", { name: "Texture path lantern.png" });
+  await pathField.fill("block/safe_second_texture");
+  await pathField.press("Enter");
+  await details.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const finalExport = page.getByRole("dialog", { name: "Experimental resource pack" });
+  await expect(finalExport.locator(".export-issue.issue-error")).toHaveCount(0);
+  await expect(finalExport.getByRole("button", { name: "Download experimental ZIP" })).toBeEnabled();
+});
