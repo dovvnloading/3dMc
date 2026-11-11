@@ -1,6 +1,6 @@
 # Pack document and native migration contract (design slice)
 
-**Status:** schema and graph validation implemented; packing, native persistence, asset browser, and UI wiring **not yet implemented**. Use the [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md) for the milestone order.
+**Status:** pack schema and graph validation implemented, with an experimental deterministic indexed Java pack writer. Native persistence, asset browser and UI wiring **not yet implemented**. Use the [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md) for the milestone order.
 
 ## Why a separate pack index
 
@@ -25,6 +25,12 @@ No mutable Three.js meshes, renderer state, pixel buffers, undo stacks, or open-
 
 \`indexLegacyProject\` demonstrates migration from one validated v3 editor project to one pack index. It retains the existing fixture's \`minecraft:diamond_block\` replacement and \`3dmc:block/lantern\`, \`3dmc:block/main\`, \`3dmc:block/tex_N\` resource identities. No on-disk migration has been triggered.
 
+## Indexed Java 1.21.4 export slice
+
+\`src/pack/javaPackBuilder.ts\` now exports \`makeIndexedJava1214Pack(index, sourceDocuments)\`. It consumes the validated resource identities without modifying the source models. It can package at most eight models into a deterministic ZIP, with an explicit 12 MB cap. Blockstates are limited to property-free \`minecraft:diamond_block\` and \`minecraft:iron_block\` replacements; the latter and any combined pack still require separate in-game verification. This is an internal API, not yet an editor UI export choice.
+
+The writer reuses the existing geometry and UV encoding, and keeps the one-model diamond-block \`makeJava1214Pack\` ZIP **byte-identical** in tests. A collision between generated solid-material textures and declared resources blocks export. The old strict Java pack importer still only understands the legacy 3dMc diamond-block structure; it must reject alternate paths rather than pretending to preserve unsupported data.
+
 ## Persistence and format migration (next implementation boundary)
 
 1. Define a new **native container version** before embedding the pack index into saved archives. Do not add unrecognized fields to existing v2 archives or change their existing files in place.
@@ -48,5 +54,5 @@ A resource pack changes visuals. It does not register new blocks, crafting recip
 - [x] Unit tests for valid legacy conversion and malformed, duplicate, or dangling input.
 - [ ] Persisted pack-aware \`.3dmc\` source container with tested migrations.
 - [ ] Reference-safe multi-asset operations, asset browser, and active editor switching.
-- [ ] Configurable model/replacement export with a strict compatibility registry.
+- [x] Internal configurable model/replacement writer with a strict small target allowlist (not wired to UI or native persistence).
 - [ ] Deterministic multi-asset ZIP and compatible import.
