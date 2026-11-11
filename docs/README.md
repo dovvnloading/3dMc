@@ -14,9 +14,9 @@ Build a professional Minecraft authoring workspace around one reliable loop: **c
 
 For a product review, read the [product brief](product/PRODUCT_BRIEF.md), [workspace specification](design/WORKSPACE_SPEC.md), and [roadmap](delivery/ROADMAP.md).
 
-For the next pack-architecture milestone, read the [pack document and native migration contract](architecture/PACK_DOCUMENT.md); its graph validator is implemented but the native/project export integration remains pending.
+For the implemented multi-model workflow, read the [pack document contract](architecture/PACK_DOCUMENT.md), [native pack v3 format](architecture/NATIVE_PACK_V3.md) and [pack session](architecture/PACK_SESSION.md). The [expansion checkpoint](delivery/EXPANSION_PROGRESS.md) records completed PRs and remaining validation work.
 
-For pack-source persistence, review the [native pack archive v3 contract](architecture/NATIVE_PACK_V3.md), including tested migrations and the limits of the current single-model interface.
+For pack-source persistence, review the [native pack archive v3 contract](architecture/NATIVE_PACK_V3.md), including tested migrations, complete pack recovery and the remaining supported-version limits.
 
 For implementation, start with the [decision register](decisions/DECISIONS.md), [technical design](architecture/TECHNICAL_DESIGN.md), [compatibility strategy](architecture/COMPATIBILITY.md), and [backlog](delivery/BACKLOG.md). The [quality gates](delivery/QUALITY_GATES.md) define completion.
 
