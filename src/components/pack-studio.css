@@ -26,3 +26,14 @@
 .pack-studio-confirm{padding:11px;margin:10px 0;border:1px solid var(--divider);border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}
 .pack-studio-confirm p{margin:0;flex:1;min-width:180px}
 @media(max-width:650px){.pack-studio-layout{grid-template-columns:1fr}}
+
+
+.pack-studio-naming{display:grid;gap:7px;margin:12px 0;padding:10px 12px;border:1px solid var(--divider);border-radius:7px;background:var(--panel)}
+.pack-studio-naming>span{font-size:11px;line-height:1.45;color:var(--secondary)}
+.pack-studio-field{display:grid;gap:6px;min-width:0;color:var(--secondary);font-size:11px}
+.pack-studio-field>span{font-weight:550}
+.pack-studio-field input{box-sizing:border-box;width:100%;min-width:0;padding:8px 9px;background:var(--control);color:var(--text);border:1px solid var(--interactive-border);border-radius:6px;font-size:12px}
+.pack-studio-field input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pack-studio-details>.pack-studio-field{margin:10px 0}
+.pack-studio-resource-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;margin-top:8px}
+@media(max-width:600px){.pack-studio-resource-fields{grid-template-columns:1fr}}

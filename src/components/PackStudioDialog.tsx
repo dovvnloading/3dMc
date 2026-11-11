@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, FolderOpen, Layers3, Plus, Save, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
+import { renameProject } from "../editor/domain";
 import { decodeNativeProject, nativeFilename } from "../editor/nativeArchive";
 import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
 import { startBrowserDownload } from "../editor/exportJobs";
@@ -9,8 +10,8 @@ import { indexLegacyProject, resourceKey } from "../pack/packDocument";
 import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
 import {
   activePackDocument, activePackModel, addPackModel, createPackSession,
-  redoPackSession, removePackModel, selectPackModel, setModelResource,
-  undoPackSession
+  editActivePackDocument, editPackIndex, redoPackSession, removePackModel,
+  selectPackModel, setModelResource, setTextureResource, undoPackSession
 } from "../pack/packSession";
 import type { PackSession } from "../pack/packSession";
 import { ModalDialog } from "./ModalDialog";
@@ -24,12 +25,34 @@ interface Props {
   onOpenPack?: (session: PackSession) => Promise<boolean>;
 }
 
+
 const makeId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 
+/** One blur/Enter = one validated undoable metadata edit. Escape cancels. */
+function PackField({ label, value, onCommit, maxLength = 128 }: {
+  label: string; value: string; onCommit: (next: string) => void; maxLength?: number;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return <label className="pack-studio-field"><span>{label}</span>
+    <input type="text" aria-label={label} value={draft} maxLength={maxLength}
+      spellCheck={false}
+      onChange={event => setDraft(event.target.value)}
+      onBlur={() => {
+        const next = draft.trim();
+        if (next !== value) { onCommit(next); setDraft(value); }
+      }}
+      onKeyDown={event => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") { event.stopPropagation(); setDraft(value); }
+      }}/>
+  </label>;
+}
+
 /**
- * An isolated pack assembly workspace. The current editor remains unchanged.
- * Opening and saving a pack is all-or-nothing; it never flattens or silently
- * imports v3 into the single-model editor or its local recovery checkpoints.
+ * The asset manager of the same pack session used by the live editor.
+ * Pack names, models and resource paths commit through validated pack history.
+ * Opening a new pack replaces the entire workspace, never a single asset.
  */
 export function PackStudioDialog({ source, onClose, session: external, onChange, onOpenPack }: Props) {
   const [local, setLocal] = useState<PackSession>(
@@ -216,6 +239,13 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button className="text-button quiet" type="button" onClick={close}>Close</button>
     </div>
 
+    <div className="pack-studio-naming">
+      <PackField label="Pack name" maxLength={100} value={pack.name}
+        onCommit={name => change(current => editPackIndex(current, index => ({
+          ...index, name
+        })))} />
+      <span>Saved as one portable .3dmc pack source; source model names are independent.</span>
+    </div>
     <div className="pack-studio-tools">
       <input ref={fileRef} type="file" hidden accept=".3dmc,application/zip"
         onChange={event => void choosePack(event)}/>
@@ -255,7 +285,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         <input ref={addFileRef} type="file" hidden accept=".3dmc,application/zip"
           onChange={event => void addFromFile(event)}/>
         <button type="button" disabled={opening || !nextReplacement()}
-          onClick={() => addSource(activeDoc)}><Plus size={14}/>Duplicate model</button>
+          onClick={() => addSource({ ...activeDoc, name: activeDoc.name.slice(0, 95) + " copy" })}><Plus size={14}/>Duplicate model</button>
         <button type="button" disabled={opening || !nextReplacement()}
           onClick={() => addFileRef.current?.click()}><Plus size={14}/>Add model from .3dmc</button>
         <button type="button" disabled={pack.models.length === 1}
@@ -266,8 +296,21 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
 
       <section className="pack-studio-details" aria-label="Selected pack model">
         <h3>{activeDoc.name}</h3>
+        <PackField label="Model name" maxLength={100} value={activeDoc.name}
+          onCommit={name => change(current => editActivePackDocument(
+            current, source => renameProject(source, name)))}/>
         <p>Source model ID: <code>{activeDoc.id}</code></p>
         <p>Resource: <code>{resourceKey(active.resource)}</code></p>
+        <div className="pack-studio-resource-fields">
+          <PackField label="Model resource namespace" maxLength={64}
+            value={active.resource.namespace}
+            onCommit={namespace => change(current => setModelResource(current, active.id,
+              { ...active.resource, namespace }, active.replaces))}/>
+          <PackField label="Model resource path" maxLength={128}
+            value={active.resource.path}
+            onCommit={path => change(current => setModelResource(current, active.id,
+              { ...active.resource, path }, active.replaces))}/>
+        </div>
         <p>Replaces: <code>{resourceKey(active.replaces)}</code></p>
         <label>Replacement target
           <select aria-label="Pack replacement target" value={active.replaces.path}
@@ -284,7 +327,17 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
           {textureList.map(({ asset, sourceTexture }) =>
             <div key={asset.id}><strong>{sourceTexture.name}</strong><span>
               {sourceTexture.width}×{sourceTexture.height} · {resourceKey(asset.resource)}
-            </span></div>)}
+            </span>
+            <div className="pack-studio-resource-fields">
+              <PackField label={"Texture namespace " + sourceTexture.name}
+                maxLength={64} value={asset.resource.namespace}
+                onCommit={namespace => change(current => setTextureResource(
+                  current, asset.id, { ...asset.resource, namespace }))}/>
+              <PackField label={"Texture path " + sourceTexture.name}
+                value={asset.resource.path}
+                onCommit={path => change(current => setTextureResource(
+                  current, asset.id, { ...asset.resource, path }))}/>
+            </div></div>)}
         </div>
         <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. The main editor Save now downloads the complete pack source.</p>
       </section>
