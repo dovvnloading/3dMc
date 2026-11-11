@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createSampleDocument } from "../editor/domain";
-import { JavaExportBlocked } from "../export/javaBlock";
 import { indexLegacyProject } from "./packDocument";
 import { makeIndexedJava1214Pack } from "./javaPackBuilder";
 import { inspectIndexedJava1214Pack } from "./exportPreflight";

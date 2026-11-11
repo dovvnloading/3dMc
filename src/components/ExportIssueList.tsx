@@ -15,7 +15,7 @@ export function ExportIssueList({ issues, onLocate }: Props) {
       key={issue.code + ":" + (issue.nodeId ?? issue.textureId ?? "general") + ":" + index}
       className={"export-issue issue-" + issue.severity}>
       {issue.severity === "error" ? <AlertCircle size={15}/> : <Info size={15}/>}
-      <span><b>{issue.severity === "error" ? "Fix required" : "Notice"}</b>{issue.message}</span>
+      <span><b>{issue.severity === "error" ? "Fix required" : "Notice"}</b>{issue.sourceName && <small className="export-issue-source">Model: {issue.sourceName}</small>}{issue.message}</span>
       {(issue.nodeId || issue.textureId) && <button type="button"
         title={issue.nodeId ? "Locate affected element" : "Locate affected texture"}
         onClick={() => onLocate(issue)}>Locate</button>}
