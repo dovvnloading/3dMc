@@ -104,3 +104,27 @@ test("imported texture remains bound in both the native pack and the multi-model
   expect(files["assets/minecraft/blockstates/diamond_block.json"]).toBeDefined();
   expect(files["assets/minecraft/blockstates/iron_block.json"]).toBeDefined();
 });
+
+test("pack export preflight Locates geometry errors in another source model", async ({ page }) => {
+  await page.goto("/");
+  const selector = await twoModels(page);
+  const second = await selector.inputValue();
+  const x = page.getByRole("textbox", { name: "X position" });
+  await x.fill("30");
+  await x.press("Enter");
+  await expect(x).toHaveValue("30");
+  await selector.selectOption("model-0");
+  await expect(x).toHaveValue("3");
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const dialog = page.getByRole("dialog", { name: "Experimental resource pack" });
+  const blocker = dialog.locator(".export-issue.issue-error")
+    .filter({ hasText: "outside Java model element bounds" });
+  await expect(blocker).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
+  await blocker.getByRole("button", { name: "Locate" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(selector).toHaveValue(second);
+  await expect(x).toHaveValue("30");
+  await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+});
