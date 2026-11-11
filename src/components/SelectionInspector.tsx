@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Axis, EditorDocument } from "../editor/domain";
-import { selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
+import { alignSelection, distributeSelection, selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
 
 interface Props {
   document: EditorDocument;
@@ -93,6 +93,29 @@ export function SelectionInspector(props: Props) {
             value={same ? values[0]! : null}
             onCommit={value => props.apply(doc => setEachSize(doc, props.ids, axis, value))}/>;
         })}</div>
+      </div>
+      <div className="inspector-group">
+        <h3>Align and distribute</h3>
+        <p className="batch-help">Align minimum edges, centers, or maximum edges without resizing. Distribution keeps the outer centers fixed and spaces the other centers evenly; parts may overlap.</p>
+        <div className="batch-align-grid" role="group" aria-label="Align selected parts">
+          {axes.map(axis => <div key={axis} className="batch-align-axis">
+            <span>{label(axis)} axis</span>
+            {(["minimum", "center", "maximum"] as const).map(edge =>
+              <button type="button" key={edge} disabled={disabled}
+                aria-label={"Align " + label(axis) + " " + edge}
+                onClick={() => props.apply(doc => alignSelection(doc, props.ids, axis, edge))}>
+                {edge === "minimum" ? "Min" : edge === "maximum" ? "Max" : "Center"}
+              </button>)}
+          </div>)}
+        </div>
+        <div className="batch-distribute" role="group" aria-label="Distribute selected parts">
+          {axes.map(axis => <button type="button" key={axis} disabled={disabled || nodes.length < 3}
+            aria-label={"Distribute " + label(axis) + " centers"}
+            onClick={() => props.apply(doc => distributeSelection(doc, props.ids, axis))}>
+            Spread {label(axis)}
+          </button>)}
+        </div>
+        {nodes.length < 3 && <p className="batch-help">Select three or more editable parts to distribute centers.</p>}
       </div>
       <div className="inspector-group">
         <h3>Selection actions</h3>

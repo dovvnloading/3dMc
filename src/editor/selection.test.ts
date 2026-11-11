@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createSampleDocument, parseDocument } from "./domain";
 import { commit, createHistory, redo, undo } from "./history";
 import {
+  alignSelection, distributeSelection,
   beginSelectionGesture, cancelSelectionGesture, commitSelectionGesture,
   deleteSelection, duplicateSelection, emptySelection, reconcileSelection,
   selectAt, selectOnly, selectionBounds, setEachSize, setSelectionBounds, transformSelection
@@ -115,6 +116,58 @@ describe("all-or-nothing batch edits", () => {
     const source = createSampleDocument();
     source.cuboids = Array.from({ length: 2000 }, (_, index) => ({ ...source.cuboids[0]!, id: `part-${index}` }));
     expect(() => duplicateSelection(source, ["part-0"], ["extra"])).toThrow(/2,000/);
+  });
+});
+
+
+describe("multi-selection alignment and distribution", () => {
+  it("aligns faces and centers without resizing, changing UVs, or touching other parts", () => {
+    const source = createSampleDocument();
+    const aligned = alignSelection(source, ["body", "base"], 1, "maximum");
+    expect(aligned.cuboids[0]).toBe(source.cuboids[0]);
+    expect(aligned.cuboids[1]!.from).toEqual([2, 10, 2]);
+    expect(aligned.cuboids[1]!.to).toEqual([14, 12, 14]);
+    expect(aligned.cuboids[2]).toBe(source.cuboids[2]);
+    expect(aligned.textures).toBe(source.textures);
+    expect(aligned.cuboids[1]!.faces).toBe(source.cuboids[1]!.faces);
+    expect(parseDocument(aligned)).toEqual(aligned);
+    const left = alignSelection(source, ["body", "base"], 0, "minimum");
+    expect(left.cuboids[0]!.from[0]).toBe(2);
+    expect(left.cuboids[0]!.to[0]).toBe(12);
+    const center = alignSelection(source, ["body", "base"], 0, "center");
+    expect(center).toBe(source);
+    const action = commit(createHistory(source), aligned);
+    expect(undo(action).present).toBe(source);
+    expect(redo(undo(action)).present).toBe(aligned);
+  });
+
+  it("evenly distributes centers while preserving endpoint positions and lengths", () => {
+    const source = createSampleDocument();
+    const arranged = distributeSelection(source, ["base", "roof", "crown"], 1);
+    const byId = (id: string) => arranged.cuboids.find(node => node.id === id)!;
+    expect(byId("base")).toBe(source.cuboids[1]);
+    expect(byId("crown")).toBe(source.cuboids[3]);
+    expect(byId("roof").from[1]).toBe(7.25);
+    expect(byId("roof").to[1]).toBe(9.25);
+    expect(arranged.cuboids[0]).toBe(source.cuboids[0]);
+    expect(arranged.textures).toBe(source.textures);
+    expect(parseDocument(arranged)).toEqual(arranged);
+    expect(undo(commit(createHistory(source), arranged)).present).toBe(source);
+    expect(distributeSelection(source, ["body", "base"], 1)).toBe(source);
+    expect(distributeSelection(source, ["body", "base", "roof"], 0)).toBe(source);
+  });
+
+  it("rejects hidden, locked or out-of-range geometry atomically", () => {
+    const source = createSampleDocument();
+    const before = JSON.stringify(source);
+    const locked = { ...source, cuboids: source.cuboids.map(node =>
+      node.id === "base" ? { ...node, locked: true } : node) };
+    expect(() => alignSelection(locked, ["body", "base"], 1, "maximum")).toThrow(/locked/);
+    expect(() => distributeSelection(locked, ["body", "base", "roof"], 1)).toThrow(/locked/);
+    const hidden = { ...source, cuboids: source.cuboids.map(node =>
+      node.id === "base" ? { ...node, visible: false } : node) };
+    expect(() => alignSelection(hidden, ["body", "base"], 1, "maximum")).toThrow(/hidden/);
+    expect(JSON.stringify(source)).toBe(before);
   });
 });
 

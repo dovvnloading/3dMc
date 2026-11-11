@@ -76,6 +76,44 @@ test("multi-select, exact batch move, undo/redo, rejected edit and native reopen
   await page.screenshot({ path: "test-results/selection-native-reopen.png", fullPage: true });
 });
 
+
+test("align and distribute selected cuboids are undoable and preserve native source", async ({ page }) => {
+  const original = await source(page);
+  await selectPair(page);
+  await page.getByRole("button", { name: "Align Y maximum" }).click();
+  const aligned = await source(page);
+  expect(aligned.cuboids[0]!.from).toEqual([3, 3, 3]);
+  expect(aligned.cuboids[1]!.from).toEqual([2, 10, 2]);
+  expect(aligned.cuboids[1]!.to).toEqual([14, 12, 14]);
+  expect(aligned.textures).toEqual(original.textures);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(original);
+
+  await row(page, "Foundation").click();
+  await row(page, "Canopy").click({ modifiers: ["Control"] });
+  await row(page, "Top plate").click({ modifiers: ["Control"] });
+  await expect(page.getByRole("heading", { name: "3 parts selected" })).toBeVisible();
+  await page.getByRole("button", { name: "Distribute Y centers" }).click();
+  const spread = await source(page);
+  expect(spread.cuboids[2]!.from[1]).toBe(7.25);
+  expect(spread.cuboids[2]!.to[1]).toBe(9.25);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(original);
+  await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
+  expect(await source(page)).toEqual(spread);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error("Native pack save missing");
+  await page.locator('input[type="file"][accept*=".3dmc"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  expect(await source(page)).toEqual(spread);
+});
+
 test("mixed per-part dimensions, duplicate and delete are single reversible commands", async ({ page }) => {
   await selectPair(page);
   const size = page.getByRole("textbox", { name: "Each part X size", exact: true });
