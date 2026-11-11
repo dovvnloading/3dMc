@@ -26,6 +26,7 @@ import { decodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/
 import { decodeNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
 import type { NativePackProject } from "./editor/nativePackArchive";
 import { makeIndexedJava1214Pack } from "./pack/javaPackBuilder";
+import { inspectIndexedJava1214Pack } from "./pack/exportPreflight";
 import { activePackDocument, createPackSession, redoPackSession, selectPackModel, undoPackSession } from "./pack/packSession";
 import type { PackSession } from "./pack/packSession";
 import { advancePackFromEditor, packHistoryView, upgradeEditorHistory } from "./pack/editorBridge";
@@ -135,9 +136,8 @@ export function App() {
   const historyRef = useRef(history); historyRef.current = history;
   const doc = history.present, texture = activeTexture(doc);
   const exportIssues = useMemo(() => packSession
-    ? packSession.present.sources.flatMap(source => inspectJava1214(source).map(issue => ({
-      ...issue, sourceDocumentId: source.id
-    }))) : inspectJava1214(doc), [doc, packSession]);
+    ? inspectIndexedJava1214Pack(packSession.present.pack, packSession.present.sources)
+    : inspectJava1214(doc), [doc, packSession]);
   const [selection, setSelection] = useState<Selection>(() => selectOnly("body"));
   const selectedId = selection.primary, selectedIds = selection.ids;
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -901,7 +901,7 @@ export function App() {
       <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>) that {packSession ? <>
         contains <strong>{packSession.present.pack.models.length} model assets</strong> and replaces {packSession.present.pack.models.map(model => model.replaces.namespace + ":" + model.replaces.path).join(", ")}
       </> : <>replaces the visual model of <strong>minecraft:diamond_block</strong></>}. Gameplay, lighting, and collision do not change.</p>
-      <label className="export-target-control" htmlFor="export-target"><span>Target profile</span><select id="export-target" className="select-control" value={doc.target.candidateRelease} onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
+      <label className="export-target-control" htmlFor="export-target"><span>Target profile</span><select id="export-target" className="select-control" value={doc.target.candidateRelease} disabled={!!packSession} onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
         <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option><option value="26.3">Java Edition 26.3 · Unsupported</option></select></label>
       <div className="export-file-list" aria-label="Files in the export"><strong>Output files</strong><code>{JAVA_PACK_PATHS.metadata}</code><code>{JAVA_PACK_PATHS.blockstate}</code><code>{JAVA_PACK_PATHS.model}</code><code>{JAVA_PACK_PATHS.mainTexture}</code><span>Plus {doc.cuboids.filter(node => node.material === "solid").length} generated solid-color texture files.</span></div>
       <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture"><div><strong>Six-face orientation test</strong><p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces, upward arrows and asymmetric corner markers. It does not use or change your current project.</p></div><button className="text-button quiet" onClick={downloadDiagnosticPack}><Download size={15}/>Download six-face diagnostic ZIP</button></section>
