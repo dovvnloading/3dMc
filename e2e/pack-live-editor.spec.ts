@@ -61,3 +61,37 @@ test("pack-wide local recovery restores both models and selected source after re
   await selector.selectOption("model-0");
   await expect(field).toHaveValue("3");
 });
+
+test("imported texture remains bound in both the native pack and the multi-model ZIP", async ({ page }) => {
+  await page.goto("/");
+  const selector = await twoModels(page);
+  await selector.selectOption("model-0");
+  const pixelBytes = await page.evaluate(async () => {
+    const { encodeRgbaPng } = await import("/src/export/png.ts");
+    return Array.from(encodeRgbaPng(16, 16, new Array(16 * 16 * 4).fill(255)));
+  });
+  await page.getByRole("button", { name: /Add texture from PNG/ }).click();
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name: "extra-sheet.png", mimeType: "image/png", buffer: Buffer.from(pixelBytes)
+  });
+  await page.getByRole("dialog", { name: "Add a texture asset?" })
+    .getByRole("button", { name: "Add texture asset" }).click();
+  const [source] = await Promise.all([
+    page.waitForEvent("download"), page.getByRole("button", { name: "Save project" }).click()
+  ]);
+  const sourcePath = await source.path(); if (!sourcePath) throw new Error("Source pack download missing");
+  const sourceFiles = unzipSync(new Uint8Array(await readFile(sourcePath)));
+  const pack = JSON.parse(strFromU8(sourceFiles["pack.json"]!));
+  expect(pack.textures).toHaveLength(3);
+  expect(pack.models[0].textures).toHaveLength(2);
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("dialog", { name: "Experimental resource pack" })
+      .getByRole("button", { name: "Download experimental ZIP" }).click()
+  ]);
+  const path = await download.path(); if (!path) throw new Error("Pack ZIP download missing");
+  const files = unzipSync(new Uint8Array(await readFile(path)));
+  expect(files["assets/minecraft/blockstates/diamond_block.json"]).toBeDefined();
+  expect(files["assets/minecraft/blockstates/iron_block.json"]).toBeDefined();
+});
