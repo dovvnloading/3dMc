@@ -150,7 +150,8 @@ test("indexed export preflight blocks generated texture collisions before downlo
   await expect(collision).toContainText("Model: Copper Lantern copy");
   await expect(collision).toContainText(modelPath + "/solid_1.png");
   await expect(exportDialog.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
-  await expect(exportDialog.getByText(/minecraft:diamond_block, minecraft:iron_block/)).toBeVisible();
+  await expect(exportDialog.locator(".export-issue.issue-warning").filter({ hasText: "This pack replaces visuals" }))
+    .toContainText("minecraft:diamond_block, minecraft:iron_block");
   await exportDialog.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("button", { name: "Pack Studio" }).click();
