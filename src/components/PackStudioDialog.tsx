@@ -1,15 +1,15 @@
 import { useRef, useState } from "react";
-import { Download, FolderOpen, Layers3, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Download, FolderOpen, Layers3, Plus, Save, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { decodeNativeProject, nativeFilename } from "../editor/nativeArchive";
-import { decodeNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
+import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
 import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
 import {
-  activePackDocument, activePackModel, addPackModel, createPackSession, editPackIndex,
-  redoPackSession, removePackModel, selectPackModel, setModelResource, setTextureResource,
+  activePackDocument, activePackModel, addPackModel, createPackSession,
+  redoPackSession, removePackModel, selectPackModel, setModelResource,
   undoPackSession
 } from "../pack/packSession";
 import type { PackSession } from "../pack/packSession";
@@ -78,7 +78,7 @@ export function PackStudioDialog({ source, onClose }: Props) {
     }
     setOpening(true);
     try {
-      const opened = await decodeNativePack(new Uint8Array(await file.arrayBuffer()));
+      const opened = await openNativePack(new Uint8Array(await file.arrayBuffer()));
       setPending(createPackSession(opened.pack, opened.sources));
       setMessage("Review the pack before replacing the current Pack Studio session.");
     } catch (error) {
