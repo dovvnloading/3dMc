@@ -230,6 +230,21 @@ export function App() {
       selectAt(current, id, historyRef.current.present.cuboids.map(node => node.id), modifiers));
   }, [clearStroke]);
   const locateExportIssue = (issue: ExportIssue) => {
+    // Pack preflight checks every source model. An error on another model must
+    // switch the live editor before attempting to locate its cuboid or sheet.
+    if (issue.sourceDocumentId && historyRef.current.present.id !== issue.sourceDocumentId) {
+      const target = packRef.current?.present.pack.models.find(model =>
+        model.sourceDocumentId === issue.sourceDocumentId);
+      if (!target) {
+        setNotice("The source model for this export issue is no longer in the pack.");
+        return;
+      }
+      switchPackModel(target.id);
+      if (historyRef.current.present.id !== issue.sourceDocumentId) {
+        setNotice("Select an editable source model before locating this export issue.");
+        return;
+      }
+    }
     const source = historyRef.current.present;
     if (issue.nodeId) {
       if (!source.cuboids.some(node => node.id === issue.nodeId)) return;
