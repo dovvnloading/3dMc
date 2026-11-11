@@ -16,6 +16,8 @@ For a product review, read the [product brief](product/PRODUCT_BRIEF.md), [works
 
 For the next pack-architecture milestone, read the [pack document and native migration contract](architecture/PACK_DOCUMENT.md); its graph validator is implemented but the native/project export integration remains pending.
 
+For pack-source persistence, review the [native pack archive v3 contract](architecture/NATIVE_PACK_V3.md), including tested migrations and the limits of the current single-model interface.
+
 For implementation, start with the [decision register](decisions/DECISIONS.md), [technical design](architecture/TECHNICAL_DESIGN.md), [compatibility strategy](architecture/COMPATIBILITY.md), and [backlog](delivery/BACKLOG.md). The [quality gates](delivery/QUALITY_GATES.md) define completion.
 
 For design, pair the workspace specification with the [design system](design/DESIGN_SYSTEM.md). Evaluate complete task flows, including empty, interrupted, unsupported, and recovery states.
