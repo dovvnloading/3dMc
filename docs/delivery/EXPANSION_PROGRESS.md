@@ -19,7 +19,7 @@ Local recovery stores the complete pack as a generation-fenced, hashed checkpoin
 | [#42](https://github.com/dovvnloading/3dMc/pull/42) | Editable pack/model names and resource paths | Merged; CI passed |
 | [#43](https://github.com/dovvnloading/3dMc/pull/43) | Locate preflight errors across source models | Merged; CI passed |
 
-An independent sandbox was used as a fallback when Actions was delayed. It found and fixed a native ZIP validation error before merging #40 and verified the live pack workflows. The complete Chromium suite for the live editor passed **58/58** tests in an independent run. The test command and constraints are documented in [independent validation](INDEPENDENT_VALIDATION.md); GitHub CI and deployment results are tracked separately.
+An independent sandbox was used as a fallback when Actions was delayed. It exposed and helped fix a native ZIP validation error during the earlier archive PR #35, and independently verified the later live pack workflows. The complete Chromium suite for the live editor passed **58/58** tests in an independent run. The test command and constraints are documented in [independent validation](INDEPENDENT_VALIDATION.md); GitHub CI and deployment results are tracked separately.
 
 ## Boundaries — do not overclaim
 

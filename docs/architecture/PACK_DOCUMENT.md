@@ -4,13 +4,13 @@
 
 ## Why a separate pack index
 
-A native v3 `EditorDocument` currently represents one editable model, its cuboids, named texture sheets, and editing target. The editor history, recovery writer, and renderer all work from that single authoritative document. The Java 1.21.4 exporter hard-codes a diamond-block replacement.
+A canonical `EditorDocument` (schema v3) represents one editable model, its cuboids, named texture sheets and editing target. A `PackSession` groups these documents behind one pack-wide history, while the active model drives the 3D viewport. The original `makeJava1214Pack` exporter retains its diamond-block regression fixture; the indexed writer uses validated resource paths for supported pack assets.
 
 The pack index in `src/pack/packDocument.ts` is a separate *pack-wide* description from an individual model document. It is now persisted in native container v3 `.3dmc` source archives alongside every referenced model and texture. It records stable model and texture asset IDs, resource paths, the selected Java target, original source document IDs, explicit texture bindings, replacement relationships, provenance, and the active model's ID.
 
 ### Current data contract
 
-- `schemaVersion: 1` – version of the **pack index** (independent of native editor document schema v3, native ZIP container v2 and Minecraft pack format 46).
+- `schemaVersion: 1` – version of the **pack index** (independent of native editor document schema v3, native ZIP container v3 (legacy v2 remains importable) and Minecraft pack format 46).
 - `id`, `name`, `targetProfile: "java-1.21.4-static-block"`, `activeModelId`.
 - `models[]` – stable ID; source project ID; model resource location (`namespace:path`); vanilla block being visually replaced; explicit mapping from each source texture ID to a pack texture asset ID; provenance (`editor` or `java-1214-import`).
 - `textures[]` – stable ID; source document ID and source texture ID; export resource location.
