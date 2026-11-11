@@ -148,7 +148,8 @@ export function readExactStoredZip(bytes: Uint8Array,
     seen.add(name);
     pos = next;
   }
-  if (pos !== end || !seen.has("manifest.json") || !seen.has("document.json"))
+  if (pos !== end || !seen.has("manifest.json") ||
+      (limits === LEGACY_ZIP_LIMITS && !seen.has("document.json")))
     reject("Native archive directory is incomplete.");
 
   const spans: { from: number; to: number }[] = [];
