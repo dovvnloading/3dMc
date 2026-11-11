@@ -29,7 +29,7 @@ export interface IndexedJavaPackResult {
 
 const jsonBytes = (value: unknown) => strToU8(JSON.stringify(value, null, 2) + "\n");
 
-function generatedSolidResource(pack: PackDocument, model: PackModelAsset,
+export function generatedSolidResource(pack: PackDocument, model: PackModelAsset,
                                 nodeIndex: number): ResourceLocation {
   // The legacy single-block path is retained for byte-identical exports.
   const legacy = pack.models.length === 1 && model.id === "model-0" &&
