@@ -1,6 +1,6 @@
 # Implementation backlog
 
-**Status:** proposed work queue; no items are implemented. **Prepared:** 2026-11-08.
+**Status:** historical proposed work queue (prepared 2026-11-08); the statement that no items are implemented is outdated. Several early editor and export features now exist. Use the [full-scale expansion plan](FULL_SCALE_EXPANSION_PLAN.md) as the current milestone reference, and check each older item against code and tests before treating it as unfinished.
 
 This backlog converts the product direction into reviewable work packages. It is intentionally ordered by dependencies and product outcomes. The [roadmap](ROADMAP.md) owns milestone scope and staffing assumptions; [quality gates](QUALITY_GATES.md) own measurable release criteria.
 

@@ -25,6 +25,7 @@ export interface ExportIssue {
   code: string;
   message: string;
   nodeId?: string;
+  textureId?: string;
 }
 
 export class JavaExportBlocked extends Error {
@@ -47,6 +48,9 @@ export interface JavaPackResult {
 const error = (code: string, message: string, nodeId?: string): ExportIssue =>
   ({ severity: "error", code, message, ...(nodeId ? { nodeId } : {}) });
 
+const textureError = (code: string, message: string, textureId: string): ExportIssue =>
+  ({ ...error(code, message), textureId });
+
 const warning = (code: string, message: string): ExportIssue =>
   ({ severity: "warning", code, message });
 
@@ -68,14 +72,14 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
   const powerOfTwo = (n: number) => Number.isSafeInteger(n) && n > 0 && (n & (n - 1)) === 0;
   for (const t of document.textures) {
     if (!powerOfTwo(t.width) || t.width !== t.height || t.width > 64)
-      issues.push(error("TEXTURE_DIMENSIONS", "Texture " + t.name +
-        " must be square, power-of-two, and at most 64×64 texels."));
+      issues.push(textureError("TEXTURE_DIMENSIONS", "Texture " + t.name +
+        " must be square, power-of-two, and at most 64×64 texels.", t.id));
     else if (t.width < MIN_JAVA_TEXTURE_SIZE)
-      issues.push(error("TEXTURE_TOO_SMALL", "Texture " + t.name +
-        " is smaller than 16×16. Replace it with a 16×16, 32×32, or 64×64 image before export to preserve Minecraft's block-atlas mipmaps."));
+      issues.push(textureError("TEXTURE_TOO_SMALL", "Texture " + t.name +
+        " is smaller than 16×16. Replace it with a 16×16, 32×32, or 64×64 image before export to preserve Minecraft's block-atlas mipmaps.", t.id));
     if (t.pixels.some((part, i) => i % 4 === 3 && part !== 255))
-      issues.push(error("TEXTURE_ALPHA", "Texture " + t.name +
-        " uses alpha. This Java 1.21.4 profile supports opaque pixels only."));
+      issues.push(textureError("TEXTURE_ALPHA", "Texture " + t.name +
+        " uses alpha. This Java 1.21.4 profile supports opaque pixels only.", t.id));
   }
 
   for (const node of document.cuboids) {

@@ -104,11 +104,57 @@ test("experimental Java pack download and actionable geometry blockers", async (
   const x = page.getByRole("textbox", { name: "X position" });
   await x.fill("30");
   await x.press("Enter");
+  await page.getByRole("textbox", { name: "Filter scene elements" }).fill("not a real element");
+  await expect(page.getByText("No matching elements.")).toBeVisible();
   await page.getByRole("button", { name: "Minecraft export" }).click();
   await expect(modal.getByText(/outside Java model element bounds/)).toBeVisible();
   await expect(modal.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
   await modal.getByRole("button", { name: "Locate" }).click();
   await expect(page.getByRole("heading", { name: "Lantern body" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Filter scene elements" })).toHaveValue("");
+  await expect(page.getByRole("option", { name: /Lantern body/ })).toHaveAttribute("aria-selected", "true");
+  expect(errors).toEqual([]);
+});
+
+test("texture export blocker locates the exact sheet and opens Paint without changing the project", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+
+  const png = await page.evaluate(async () => {
+    const { encodeRgbaPng } = await import("/src/export/png.ts");
+    const pixels = new Array(16 * 16 * 4).fill(255);
+    pixels[3] = 100; // One translucent texel is enough to block this export profile.
+    return Array.from(encodeRgbaPng(16, 16, pixels));
+  });
+  await page.getByRole("button", { name: /Add texture from PNG/ }).click();
+  await page.locator('input[accept=".png,image/png"]').setInputFiles({
+    name: "Accent transparent.png", mimeType: "image/png", buffer: Buffer.from(png)
+  });
+  const importDialog = page.getByRole("dialog", { name: "Add a texture asset?" });
+  await importDialog.getByRole("radio", { name: /Use the PNG dimensions/ }).check();
+  await importDialog.getByRole("button", { name: "Add texture asset" }).click();
+
+  const assets = page.getByRole("group", { name: "Texture assets" });
+  await expect(assets.locator(".texture-slot-select").last()).toHaveAttribute("aria-pressed", "true");
+  await assets.locator(".texture-slot-select").first().click();
+  await expect(assets.locator(".texture-slot-select").last()).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  const preflight = page.getByRole("dialog", { name: "Experimental resource pack" });
+  const alphaIssue = preflight.locator(".export-issue.issue-error")
+    .filter({ hasText: "Accent transparent.png" });
+  await expect(alphaIssue).toContainText("uses alpha");
+  await expect(preflight.getByRole("button", { name: "Download experimental ZIP" })).toBeDisabled();
+  await alphaIssue.getByRole("button", { name: "Locate" }).click();
+
+  await expect(preflight).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Paint" })).toHaveAttribute("aria-selected", "true");
+  await expect(assets.locator(".texture-slot-select").last()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".texture-pixel-wrap canvas")).toHaveAttribute("width", "16");
+
+  await page.getByRole("button", { name: "Minecraft export" }).click();
+  await expect(preflight.getByText(/1 blockers?/)).toBeVisible();
   expect(errors).toEqual([]);
 });
 

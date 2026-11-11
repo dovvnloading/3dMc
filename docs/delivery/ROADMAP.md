@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-**Status:** proposed implementation plan. The repository is at the planning foundation stage. No editor, usability result, performance result, or compatibility certification is implied by this document. All durations and numeric thresholds below are planning hypotheses to validate during implementation.
+**Status:** historical stage proposal (2026-11-08), retained for context. An executable editor and an experimental Java 1.21.4 exporter now exist; the claim below that work is still at the planning foundation is outdated. Use the [full-scale expansion plan](FULL_SCALE_EXPANSION_PLAN.md) for current priorities, and verify historical checklist items against code and tests before scheduling them. Durations and numeric thresholds below are hypotheses, not commitments or certifications.
 
 This roadmap turns the product direction into an order of work. The [backlog](BACKLOG.md) holds actionable work; [quality gates](QUALITY_GATES.md) define the evidence required to claim a stage is complete. Target support is governed by the [compatibility contract](../architecture/COMPATIBILITY.md). Reassess the plan after S0 and at every subsequent gate.
 
