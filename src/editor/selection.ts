@@ -119,6 +119,43 @@ export function setSelectionBounds(document: EditorDocument, ids: readonly strin
   return transformSelection(document, ids, delta, scale, bounds.from);
 }
 
+
+/** Align bounding box edges or centers without resizing any part or changing UVs. */
+export function alignSelection(document: EditorDocument, ids: readonly string[],
+  axis: Axis, edge: "minimum" | "center" | "maximum"): EditorDocument {
+  const nodes = editableSelection(document, ids);
+  const bounds = selectionBounds(nodes);
+  if (!bounds || nodes.length < 2) return document;
+  const target = edge === "minimum" ? bounds.from[axis] :
+    edge === "maximum" ? bounds.to[axis] : bounds.center[axis];
+  const edgeOf = (node: Cuboid) => edge === "minimum" ? node.from[axis] :
+    edge === "maximum" ? node.to[axis] : (node.from[axis] + node.to[axis]) / 2;
+  const moved = nodes.map(node => shiftPart(node, axis, target - edgeOf(node)));
+  return publish(document, moved);
+}
+
+/** Keep the outermost centers fixed and space intermediate centers evenly. */
+export function distributeSelection(document: EditorDocument, ids: readonly string[],
+  axis: Axis): EditorDocument {
+  const nodes = editableSelection(document, ids);
+  if (nodes.length < 3) return document;
+  const center = (node: Cuboid) => (node.from[axis] + node.to[axis]) / 2;
+  // ES stable sort retains scene order as the tie breaker.
+  const ordered = [...nodes].sort((a, b) => center(a) - center(b));
+  const first = center(ordered[0]!), last = center(ordered[ordered.length - 1]!);
+  if (first === last) return document;
+  const spaced = ordered.map((node, index) =>
+    shiftPart(node, axis, first + (last - first) * index / (ordered.length - 1) - center(node)));
+  return publish(document, spaced);
+}
+
+function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
+  if (offset === 0) return node;
+  const shift = (values: Vec3): Vec3 => values.map((value, a) =>
+    a === axis ? rounded(value + offset) : value) as unknown as Vec3;
+  return { ...node, from: shift(node.from), to: shift(node.to) };
+}
+
 export function setEachSize(document: EditorDocument, ids: readonly string[], axis: Axis,
   value: number): EditorDocument {
   if (!Number.isFinite(value) || value <= 0 || value > 64)
