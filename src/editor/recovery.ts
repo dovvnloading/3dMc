@@ -1,5 +1,8 @@
 import type { EditorDocument } from "./domain";
 import { decodeProject, encodeProject, MAX_PROJECT_BYTES } from "./project";
+import type { PackDocument } from "../pack/packDocument";
+import { parsePackDocument, verifyPackSources } from "../pack/packDocument";
+import { parseDocument } from "./domain";
 
 interface Checkpoint {
   key: "latest" | "previous";
@@ -14,6 +17,59 @@ export interface RecoveryCandidate {
   revision: number;
   savedAt: string;
   fallback: boolean;
+}
+
+/** The entire pack index and every source model recover as one atomic generation. */
+export interface PackRecoveryCandidate {
+  kind: "pack";
+  pack: PackDocument;
+  sources: EditorDocument[];
+  revision: number;
+  savedAt: string;
+  fallback: boolean;
+}
+
+export type AnyRecoveryCandidate = (RecoveryCandidate & { kind: "document" }) | PackRecoveryCandidate;
+export const MAX_PACK_RECOVERY_BYTES = 12_000_000;
+export const MAX_PACK_RECOVERY_MODELS = 8;
+
+/** Serializable pack checkpoint; never contains renderer objects or browser leases. */
+export function encodePackCheckpoint(packInput: PackDocument, sourceInput: readonly EditorDocument[]): string {
+  const pack = parsePackDocument(packInput);
+  if (pack.models.length > MAX_PACK_RECOVERY_MODELS)
+    throw new Error("Recovery supports at most eight pack models.");
+  const sources = sourceInput.map(parseDocument);
+  verifyPackSources(pack, sources);
+  const ids = new Set(pack.models.map(model => model.sourceDocumentId));
+  if (sources.length !== ids.size || sources.some(source => !ids.has(source.id)))
+    throw new Error("Pack recovery cannot contain missing or unrelated source documents.");
+  const serialized = JSON.stringify({ format: "3dmc-pack-recovery", version: 1, pack, sources });
+  const bytes = new TextEncoder().encode(serialized).length;
+  if (bytes > MAX_PACK_RECOVERY_BYTES)
+    throw new RecoverySnapshotTooLarge(bytes, MAX_PACK_RECOVERY_BYTES);
+  return serialized;
+}
+
+export function decodePackCheckpoint(serialized: string): { pack: PackDocument; sources: EditorDocument[] } {
+  if (new TextEncoder().encode(serialized).length > MAX_PACK_RECOVERY_BYTES)
+    throw new Error("Pack recovery exceeds the 12 MB source limit.");
+  const data = JSON.parse(serialized) as unknown;
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    throw new Error("Not a valid pack recovery checkpoint.");
+  const record = data as Record<string, unknown>;
+  if (Object.keys(record).sort().join(",") !== "format,pack,sources,version" ||
+      record.format !== "3dmc-pack-recovery" || record.version !== 1 ||
+      !Array.isArray(record.sources))
+    throw new Error("Unrecognized pack recovery version or fields.");
+  const pack = parsePackDocument(record.pack);
+  if (pack.models.length > MAX_PACK_RECOVERY_MODELS)
+    throw new Error("Pack recovery has too many models.");
+  const sources = record.sources.map(parseDocument);
+  verifyPackSources(pack, sources);
+  const ids = new Set(pack.models.map(model => model.sourceDocumentId));
+  if (sources.length !== ids.size || sources.some(source => !ids.has(source.id)))
+    throw new Error("Pack recovery contains missing or unrelated source documents.");
+  return { pack, sources };
 }
 
 export interface RecoveryLease {
@@ -35,8 +91,8 @@ export class RecoveryOwnershipLost extends Error {
 
 /** The editor must never acknowledge a checkpoint its own reader would reject. */
 export class RecoverySnapshotTooLarge extends Error {
-  constructor(readonly actualBytes: number) {
-    super(`Local recovery snapshot (${(actualBytes / 1_000_000).toFixed(2)} MB) exceeds the 1.5 MB limit. Download a .3dmc source backup; these changes were not saved locally.`);
+  constructor(readonly actualBytes: number, readonly limitBytes = MAX_PROJECT_BYTES) {
+    super(`Local recovery snapshot (${(actualBytes / 1_000_000).toFixed(2)} MB) exceeds the ${(limitBytes / 1_000_000).toFixed(1)} MB limit. Download a .3dmc source backup; these changes were not saved locally.`);
     this.name = "RecoverySnapshotTooLarge";
   }
 }
@@ -213,7 +269,24 @@ export async function saveRecovery(
   return operation;
 }
 
-export async function readRecovery(): Promise<RecoveryCandidate | null> {
+/** Pack snapshots reuse the same ownership transaction and checkpoint generation. */
+export async function savePackRecovery(
+  pack: PackDocument, sources: readonly EditorDocument[], revision: number, lease: RecoveryLease
+): Promise<void> {
+  if (!Number.isSafeInteger(revision) || revision < 0)
+    throw new Error("Recovery revision must be a nonnegative safe integer.");
+  const contents = encodePackCheckpoint(pack, sources);
+  const operation = queue.catch(() => undefined).then(async () => {
+    await publish({
+      key: "latest", contents, revision,
+      digest: await digest(contents), savedAt: new Date().toISOString()
+    }, lease);
+  });
+  queue = operation;
+  return operation;
+}
+
+async function readCheckpointRecords(): Promise<(Checkpoint | undefined)[]> {
   const db = await openDatabase();
   const records = await new Promise<(Checkpoint | undefined)[]>((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
@@ -230,6 +303,11 @@ export async function readRecovery(): Promise<RecoveryCandidate | null> {
     tx.onabort = () => reject(tx.error ?? new Error("Recovery read transaction aborted."));
   }).finally(() => db.close());
 
+  return records;
+}
+
+export async function readRecovery(): Promise<RecoveryCandidate | null> {
+  const records = await readCheckpointRecords();
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
     if (!record || typeof record.contents !== "string" ||
@@ -243,6 +321,33 @@ export async function readRecovery(): Promise<RecoveryCandidate | null> {
       return { document, revision: record.revision,
         savedAt: record.savedAt, fallback: i > 0 };
     } catch { /* Fall back to the previous independently validated checkpoint. */ }
+  }
+  return null;
+}
+
+/** Read either a legacy source or a complete pack; corrupted latest falls back safely. */
+export async function readAnyRecovery(): Promise<AnyRecoveryCandidate | null> {
+  const records = await readCheckpointRecords();
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    if (!record || typeof record.contents !== "string" ||
+        !Number.isSafeInteger(record.revision) || record.revision < 0 ||
+        typeof record.savedAt !== "string" || !Number.isFinite(Date.parse(record.savedAt)) ||
+        new TextEncoder().encode(record.contents).length > MAX_PACK_RECOVERY_BYTES) continue;
+    try {
+      if (await digest(record.contents) !== record.digest) continue;
+      const data = JSON.parse(record.contents) as unknown;
+      if (data && typeof data === "object" && !Array.isArray(data) &&
+          (data as Record<string, unknown>).format === "3dmc-pack-recovery") {
+        const { pack, sources } = decodePackCheckpoint(record.contents);
+        return { kind: "pack", pack, sources, revision: record.revision,
+          savedAt: record.savedAt, fallback: i > 0 };
+      }
+      if (new TextEncoder().encode(record.contents).length > MAX_PROJECT_BYTES) continue;
+      const document = decodeProject(record.contents);
+      return { kind: "document", document, revision: record.revision,
+        savedAt: record.savedAt, fallback: i > 0 };
+    } catch { /* Never publish partially restored project data. */ }
   }
   return null;
 }

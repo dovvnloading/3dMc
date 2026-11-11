@@ -194,3 +194,41 @@ test("invalid newest checkpoint metadata falls back to the previous verified rev
     name: "Previous verified source", revision: 81, fallback: true
   });
 });
+
+test("pack-wide recovery preserves every editable model and fences displaced writers", async ({ page }) => {
+  await page.goto("/");
+  const report = await page.evaluate(async () => {
+    const recovery = await import("/src/editor/recovery.ts");
+    const { createSampleDocument } = await import("/src/editor/domain.ts");
+    const { indexLegacyProject } = await import("/src/pack/packDocument.ts");
+    const source = createSampleDocument();
+    const second = { ...createSampleDocument(), id: "recovery-model-2", name: "Recovered second" };
+    second.textures[0]!.pixels[3] = 57;
+    const pack = indexLegacyProject(source);
+    pack.models.push({ id: "model-2", sourceDocumentId: second.id,
+      resource: { namespace: "3dmc", path: "block/model_2" },
+      replaces: { namespace: "minecraft", path: "iron_block" },
+      provenance: "editor", textures: [{ sourceTextureId: "main", textureAssetId: "tex-2" }] });
+    pack.textures.push({ id: "tex-2", sourceDocumentId: second.id, sourceTextureId: "main",
+      resource: { namespace: "3dmc", path: "block/tex_2" } });
+    pack.activeModelId = "model-2";
+    const old = await recovery.claimRecoveryWriter("pack-writer-1", true);
+    if (!old.granted) throw new Error("No recovery writer available");
+    await recovery.savePackRecovery(pack, [source, second], 41, old.lease);
+    const restored = await recovery.readAnyRecovery();
+    const displaced = await recovery.claimRecoveryWriter("pack-writer-2", true);
+    if (!displaced.granted) throw new Error("Could not rotate recovery ownership");
+    let staleRejected = false;
+    try { await recovery.savePackRecovery(pack, [source, second], 42, old.lease); }
+    catch (error) { staleRejected = error instanceof recovery.RecoveryOwnershipLost; }
+    const after = await recovery.readAnyRecovery();
+    return { restored: restored?.kind, fallback: restored?.fallback,
+      modelCount: restored?.kind === "pack" ? restored.sources.length : -1,
+      modelName: restored?.kind === "pack" ? restored.sources[1]?.name : "",
+      pixel: restored?.kind === "pack" ? restored.sources[1]?.textures[0]?.pixels[3] : null,
+      active: restored?.kind === "pack" ? restored.pack.activeModelId : "",
+      staleRejected, revision: after?.revision };
+  });
+  expect(report).toEqual({ restored: "pack", fallback: false, modelCount: 2,
+    modelName: "Recovered second", pixel: 57, active: "model-2", staleRejected: true, revision: 41 });
+});
