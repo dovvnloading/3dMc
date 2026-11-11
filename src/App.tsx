@@ -22,15 +22,21 @@ import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
 import { decodeProject, MAX_PROJECT_BYTES } from "./editor/project";
-import { decodeNativeProject, MAX_NATIVE_BYTES } from "./editor/nativeArchive";
+import { decodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
+import { decodeNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
+import type { NativePackProject } from "./editor/nativePackArchive";
+import { makeIndexedJava1214Pack } from "./pack/javaPackBuilder";
+import { activePackDocument, createPackSession, redoPackSession, selectPackModel, undoPackSession } from "./pack/packSession";
+import type { PackSession } from "./pack/packSession";
+import { advancePackFromEditor, packHistoryView, upgradeEditorHistory } from "./pack/editorBridge";
 import { prepareJavaPackDownload, prepareLegacyJsonDownload, prepareNativeProjectDownload,
   prepareSixFaceDiagnosticDownload, prepareTexturePngDownload, startBrowserDownload } from "./editor/exportJobs";
 import { makeNewProject } from "./editor/templates";
 import { PRIMITIVE_PRESETS, addPrimitive, moveCuboid, setCuboidMaterial } from "./editor/primitives";
 import type { PrimitiveId } from "./editor/primitives";
 import type { NewProjectOptions } from "./editor/templates";
-import { claimRecoveryWriter, readRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, RecoveryOwnershipLost, RecoverySnapshotTooLarge } from "./editor/recovery";
-import type { RecoveryCandidate, RecoveryLease } from "./editor/recovery";
+import { claimRecoveryWriter, readAnyRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, savePackRecovery, RecoveryOwnershipLost, RecoverySnapshotTooLarge } from "./editor/recovery";
+import type { AnyRecoveryCandidate, RecoveryLease } from "./editor/recovery";
 import { floodFill, readHex } from "./editor/pixels";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
 import type { PaintGesture } from "./editor/gestures";
@@ -122,11 +128,16 @@ function getFilename(date: Date): string {
 
 export function App() {
   const [history, setHistory] = useState<History>(() => createHistory(createSampleDocument()));
+  const [packSession, setPackSession] = useState<PackSession | null>(null);
+  const packRef = useRef(packSession); packRef.current = packSession;
   const [openSession, setOpenSession] = useState(0);
   const activeSession = useRef(openSession); activeSession.current = openSession;
   const historyRef = useRef(history); historyRef.current = history;
   const doc = history.present, texture = activeTexture(doc);
-  const exportIssues = useMemo(() => inspectJava1214(doc), [doc]);
+  const exportIssues = useMemo(() => packSession
+    ? packSession.present.sources.flatMap(source => inspectJava1214(source).map(issue => ({
+      ...issue, sourceDocumentId: source.id
+    }))) : inspectJava1214(doc), [doc, packSession]);
   const [selection, setSelection] = useState<Selection>(() => selectOnly("body"));
   const selectedId = selection.primary, selectedIds = selection.ids;
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -158,8 +169,9 @@ export function App() {
   const [writerEpoch, setWriterEpoch] = useState(0), [takingOver, setTakingOver] = useState(false);
   const awaitingRecoveryRef = useRef(false);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>("unsaved");
-  const [candidate, setCandidate] = useState<RecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
+  const [candidate, setCandidate] = useState<AnyRecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
+  const [pendingPackOpen, setPendingPackOpen] = useState<NativePackProject | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false), [savingProject, setSavingProject] = useState(false);
   const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
   const [pendingTexture, setPendingTexture] = useState<DecodedTexture | null>(null);
@@ -179,15 +191,27 @@ export function App() {
   const fileIntent = useRef(0), openingProject = useRef(false);
   const textureSource = useRef<{ document: EditorDocument; mode: "replace" | "new" } | null>(null);
 
-  // Synchronously publish the authoritative revision before React batches the render.
-  // Two commands in the same event turn must not silently discard the second edit.
+  // PackSession is authoritative in pack mode. The legacy History is only an
+  // adapter for existing commands; it is never a second durable undo stack.
+  const publishPackSession = useCallback((advance: (current: PackSession) => PackSession): boolean => {
+    const current = packRef.current;
+    if (!current) return false;
+    const next = advance(current);
+    if (next === current) return false;
+    packRef.current = next;
+    const view = packHistoryView(next);
+    historyRef.current = view; activeRevision.current = next.revision;
+    setPackSession(next); setHistory(view);
+    return true;
+  }, []);
   const publishHistory = useCallback((advance: (current: History) => History): boolean => {
     const current = historyRef.current, next = advance(current);
     if (next === current) return false;
+    if (packRef.current) return publishPackSession(pack => advancePackFromEditor(pack, current, next));
     historyRef.current = next; activeRevision.current = next.revision;
     setHistory(next);
     return true;
-  }, []);
+  }, [publishPackSession]);
   const commitDocument = useCallback((operation: CommitFn) => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
     if (drag.current) {
@@ -303,7 +327,7 @@ export function App() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([readRecovery(), claimRecoveryWriter(writerId.current)]).then(([restored, claim]) => {
+    Promise.all([readAnyRecovery(), claimRecoveryWriter(writerId.current)]).then(([restored, claim]) => {
       if (!alive) return;
       setCandidate(restored); awaitingRecoveryRef.current = restored !== null;
       if (claim.granted) { writerRef.current = claim.lease; setWriterStatus("owned"); }
@@ -347,7 +371,10 @@ export function App() {
     const timer = window.setTimeout(() => {
       if (!current()) return;
       setRecoveryStatus("saving");
-      saveRecovery(snapshot, revision, lease).then(() => { if (current()) setRecoveryStatus("saved"); }).catch((error: unknown) => {
+      const pack = packRef.current;
+      const save = pack ? savePackRecovery(pack.present.pack, pack.present.sources, revision, lease)
+        : saveRecovery(snapshot, revision, lease);
+      save.then(() => { if (current()) setRecoveryStatus("saved"); }).catch((error: unknown) => {
         if (!current()) return;
         if (error instanceof RecoveryOwnershipLost) markWriterLost();
         else {
@@ -365,7 +392,7 @@ export function App() {
       const claim = await claimRecoveryWriter(writerId.current, true);
       if (!claim.granted) throw new RecoveryOwnershipLost();
       writerRef.current = claim.lease;
-      const latest = await readRecovery(); awaitingRecoveryRef.current = latest !== null;
+      const latest = await readAnyRecovery(); awaitingRecoveryRef.current = latest !== null;
       setCandidate(latest); setWriterStatus("owned"); setWriterEpoch(epoch => epoch + 1); setRecoveryStatus("unsaved");
       setNotice("This tab now owns local recovery. Choose the saved session or keep this workspace before editing.");
     } catch (error) {
@@ -376,12 +403,16 @@ export function App() {
   const navigate = (kind: ViewKind) => setView(current => ({ kind, count: current.count + 1 }));
   const runUndo = useCallback(() => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
-    clearStroke(); publishHistory(undo);
-  }, [clearStroke, publishHistory]);
+    clearStroke();
+    if (packRef.current) publishPackSession(undoPackSession);
+    else publishHistory(undo);
+  }, [clearStroke, publishHistory, publishPackSession]);
   const runRedo = useCallback(() => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
-    clearStroke(); publishHistory(redo);
-  }, [clearStroke, publishHistory]);
+    clearStroke();
+    if (packRef.current) publishPackSession(redoPackSession);
+    else publishHistory(redo);
+  }, [clearStroke, publishHistory, publishPackSession]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       if (event.key === "Escape" && drag.current) { event.preventDefault(); clearStroke(); return; }
@@ -420,8 +451,16 @@ export function App() {
   const saveProject = async () => {
     if (savingProject) return; setSavingProject(true);
     try {
-      startBrowserDownload(await prepareNativeProjectDownload(doc));
-      setNotice("Native .3dmc project download started. Keep the archive as your portable backup.");
+      const pack = packRef.current;
+      if (pack) {
+        const bytes = await encodeNativePack(pack.present.pack, pack.present.sources);
+        startBrowserDownload({ filename: nativeFilename(pack.present.pack.name),
+          mimeType: "application/zip", content: bytes });
+        setNotice("Complete pack-aware .3dmc backup download started. All models and textures are included.");
+      } else {
+        startBrowserDownload(await prepareNativeProjectDownload(doc));
+        setNotice("Native .3dmc project download started. Keep the archive as your portable backup.");
+      }
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare your native project archive."); }
     finally { setSavingProject(false); }
   };
@@ -430,9 +469,18 @@ export function App() {
     if (exportStatus === "building") return;
     setExportStatus("building"); const capturedRevision = history.revision;
     try {
-      const prepared = prepareJavaPackDownload(doc);
-      startBrowserDownload(prepared.file);
-      setLastExport({ revision: capturedRevision, bytes: prepared.bytes }); setExportStatus("started");
+      const pack = packRef.current;
+      if (pack) {
+        const result = makeIndexedJava1214Pack(pack.present.pack, pack.present.sources);
+        startBrowserDownload({ filename: "3dmc-multi-model-java-1.21.4-experimental.zip",
+          mimeType: "application/zip", content: result.zip });
+        setLastExport({ revision: capturedRevision, bytes: result.zip.length });
+      } else {
+        const prepared = prepareJavaPackDownload(doc);
+        startBrowserDownload(prepared.file);
+        setLastExport({ revision: capturedRevision, bytes: prepared.bytes });
+      }
+      setExportStatus("started");
       setNotice("Experimental Java pack download started. This artifact still requires an in-game check.");
     } catch (error) {
       setExportStatus("idle");
@@ -493,11 +541,23 @@ export function App() {
     setTextureReading(false); setPackInspecting(false);
     try {
       let imported: EditorDocument;
-      if (file.size > MAX_NATIVE_BYTES) throw new Error("File exceeds the 3 MB project import budget.");
+      if (file.size > MAX_NATIVE_PACK_BYTES) throw new Error("File exceeds the 12 MB source pack import budget.");
       const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
       const nativeZip = signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04;
-      if (nativeZip || file.name.toLowerCase().endsWith(".3dmc")) imported = await decodeNativeProject(new Uint8Array(await file.arrayBuffer()));
-      else {
+      if (nativeZip || file.name.toLowerCase().endsWith(".3dmc")) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (file.size > MAX_NATIVE_BYTES) {
+          const opened = await decodeNativePack(bytes);
+          if (current()) setPendingPackOpen(opened);
+          return;
+        }
+        // The v2 reader rejects pack.json before inspecting a v3 manifest.
+        let pack: NativePackProject | null = null;
+        try { pack = await decodeNativePack(bytes); }
+        catch { /* Fall back to the strict legacy source decoder. */ }
+        if (pack) { if (current()) setPendingPackOpen(pack); return; }
+        imported = await decodeNativeProject(bytes);
+      } else {
         if (file.size > MAX_PROJECT_BYTES) throw new Error("Legacy JSON project exceeds the 1.5 MB import limit.");
         imported = decodeProject(await file.text());
       }
@@ -527,16 +587,91 @@ export function App() {
       const rotated = await rotateRecoveryWriter(lease);
       if (writerRef.current?.generation !== lease.generation) return false;
       writerRef.current = rotated; awaitingRecoveryRef.current = false;
+      packRef.current = null; setPackSession(null);
       const nextHistory = createHistory(document), nextSession = activeSession.current + 1;
       historyRef.current = nextHistory; activeRevision.current = nextHistory.revision; activeSession.current = nextSession;
       setWriterEpoch(epoch => epoch + 1); setHistory(nextHistory); setOpenSession(nextSession);
       setSelectedId(document.cuboids[0]?.id ?? null); setSelectedFace("north"); setSearch(""); setShapeMenuOpen(false);
-      setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPack(null); setPendingTexture(null); textureSource.current = null;
+      setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPackOpen(null); setPackStudioOpen(false); setPendingPack(null); setPendingTexture(null); textureSource.current = null;
       setCandidate(null); setRecoveryStatus("unsaved"); setDeletingTextureId(null); setDeleteReplacementId(null);
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup."); return true;
     } catch (error) {
       markWriterLost(); setNotice(error instanceof Error ? error.message : "Could not safely open the project."); return false;
     } finally { openingProject.current = false; }
+  };
+  /** Writer rotation prevents stale checkpoints from overwriting a newly opened pack. */
+  const acceptPackOpen = async (next: PackSession): Promise<boolean> => {
+    const lease = writerRef.current;
+    if (!lease) { setNotice("Take over recovery before opening a source pack."); return false; }
+    if (openingProject.current) return false;
+    openingProject.current = true; fileIntent.current++; clearStroke();
+    try {
+      const rotated = await rotateRecoveryWriter(lease);
+      if (writerRef.current?.generation !== lease.generation) return false;
+      writerRef.current = rotated; awaitingRecoveryRef.current = false;
+      packRef.current = next; setPackSession(next);
+      const view = packHistoryView(next), doc = activePackDocument(next);
+      const stamp = activeSession.current + 1;
+      historyRef.current = view; activeRevision.current = next.revision; activeSession.current = stamp;
+      setHistory(view); setOpenSession(stamp); setWriterEpoch(epoch => epoch + 1);
+      setSelectedId(doc.cuboids[0]?.id ?? null); setSelectedFace("north");
+      setSearch(""); setShapeMenuOpen(false); setMode("model"); setTool("select");
+      setPendingOpen(null); setPendingPackOpen(null); setPendingPack(null);
+      setPendingTexture(null); textureSource.current = null;
+      setDeletingTextureId(null); setDeleteReplacementId(null);
+      setPackStudioOpen(false); setCandidate(null); setRecoveryStatus("unsaved");
+      setNotice("Pack opened with " + next.present.pack.models.length + " editable models. Recovery is updating.");
+      return true;
+    } catch (error) {
+      markWriterLost(); setNotice(error instanceof Error ? error.message : "Could not safely open the pack.");
+      return false;
+    } finally { openingProject.current = false; }
+  };
+  const resetActiveModelView = (doc: EditorDocument) => {
+    clearStroke(); fileIntent.current++;
+    const stamp = activeSession.current + 1;
+    activeSession.current = stamp; setOpenSession(stamp);
+    setSelectedId(doc.cuboids[0]?.id ?? null); setSelectedFace("north");
+    setSearch(""); setMode("model"); setTool("select");
+    setPendingTexture(null); textureSource.current = null;
+    setDeletingTextureId(null); setDeleteReplacementId(null);
+  };
+  const switchPackModel = (id: string) => {
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
+    const before = packRef.current;
+    if (!before || before.present.pack.activeModelId === id) return;
+    try {
+      clearStroke();
+      if (publishPackSession(current => selectPackModel(current, id)))
+        resetActiveModelView(activePackDocument(packRef.current!));
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not switch models."); }
+  };
+  const changePackStudioSession = (next: PackSession) => {
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
+    const before = packRef.current;
+    if (!before) return;
+    try {
+      const switching = before.present.pack.activeModelId !== next.present.pack.activeModelId;
+      if (publishPackSession(() => next) && switching) resetActiveModelView(activePackDocument(next));
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Pack change was rejected."); }
+  };
+  const openPackStudio = () => {
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) {
+      setNotice("Take over recovery before editing a pack."); return;
+    }
+    if (!packRef.current) {
+      try {
+        const next = upgradeEditorHistory(historyRef.current);
+        packRef.current = next; setPackSession(next);
+        const view = packHistoryView(next);
+        historyRef.current = view; activeRevision.current = view.revision;
+        setHistory(view);
+        const stamp = activeSession.current + 1;
+        activeSession.current = stamp; setOpenSession(stamp);
+        setWriterEpoch(epoch => epoch + 1);
+      } catch (error) { setNotice(error instanceof Error ? error.message : "Cannot open pack workspace."); return; }
+    }
+    setPackStudioOpen(true);
   };
   const createNewProject = async (options: NewProjectOptions): Promise<boolean> => {
     const opened = await acceptOpen(makeNewProject(options)); if (opened) setNewProjectOpen(false); return opened;
@@ -563,8 +698,8 @@ export function App() {
         <span>3dMc</span><span className="brand-divider"/><span className="brand-subtitle">Studio</span></div>
       <div className="project-header">
         <CommittedText label="Project name" className="project-title" value={doc.name} onCommit={name => commitDocument(current => renameProject(current, name))}/>
-        <label className="profile-label" title="Target compatibility is experimental">Java · Static block
-          <select className="target-select" aria-label="Minecraft target version" value={doc.target.candidateRelease}
+        <label className="profile-label" title={packSession ? "Pack target is pinned to Java 1.21.4" : "Target compatibility is experimental"}>Java · Static block
+          <select className="target-select" aria-label="Minecraft target version" value={doc.target.candidateRelease} disabled={!!packSession}
             onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
             <option value="1.21.4">1.21.4 · Experimental</option><option value="26.3">26.3 · Not supported</option>
           </select>
@@ -580,8 +715,8 @@ export function App() {
         <input type="file" ref={packFileRef} accept=".zip,application/zip" hidden onChange={choosePack}/>
         <button className="text-button subtle" onClick={() => packFileRef.current?.click()} disabled={packInspecting} title="Import a 3dMc experimental Java 1.21.4 resource pack">
           <PackageOpen size={16}/>{packInspecting ? "Inspecting…" : "Import pack"}</button>
-        <button className="text-button quiet" onClick={() => void saveProject()} disabled={savingProject} title="Download native .3dmc source project"><Save size={16}/>{savingProject ? "Preparing…" : "Save project"}</button>
-        <button className="text-button subtle" onClick={() => setPackStudioOpen(true)} disabled={doc.target.candidateRelease !== "1.21.4"} title={doc.target.candidateRelease === "1.21.4" ? "Assemble and save a multi-model source pack" : "Pack Studio currently requires Java 1.21.4"}><Layers3 size={16}/>Pack Studio</button>
+        <button className="text-button quiet" onClick={() => void saveProject()} disabled={savingProject} title={packSession ? "Download complete pack-aware .3dmc source" : "Download native .3dmc source project"}><Save size={16}/>{savingProject ? "Preparing…" : "Save project"}</button>
+        <button className="text-button subtle" onClick={openPackStudio} disabled={doc.target.candidateRelease !== "1.21.4"} title={doc.target.candidateRelease === "1.21.4" ? "Assemble and save a multi-model source pack" : "Pack Studio currently requires Java 1.21.4"}><Layers3 size={16}/>Pack Studio</button>
         <button className="text-button primary" onClick={() => setExportOpen(true)} title="Experimental pack export; in-game validation is pending"><Download size={16}/>Minecraft export</button>
       </div>
     </header>
@@ -597,6 +732,16 @@ export function App() {
     </nav>
     <div className="editor-grid">
       <aside className="scene-panel" aria-label="Scene hierarchy">
+        {packSession && <div className="pack-editor-selector" role="group" aria-label="Pack asset browser">
+          <label htmlFor="active-pack-model">PACK MODELS <span>{packSession.present.pack.models.length} assets</span></label>
+          <select id="active-pack-model" aria-label="Active pack model" value={packSession.present.pack.activeModelId}
+            onChange={event => switchPackModel(event.target.value)}>
+            {packSession.present.pack.models.map(model => <option key={model.id} value={model.id}>
+              {packSession.present.sources.find(source => source.id === model.sourceDocumentId)?.name ?? model.id} · {model.replaces.path}
+            </option>)}
+          </select>
+          <button type="button" onClick={openPackStudio}>Manage pack assets</button>
+        </div>}
         <SectionHeading title="Scene" trailing={<button type="button" className="shape-trigger" aria-label="Add primitive" aria-expanded={shapeMenuOpen} aria-controls="shape-creation-menu"
           onClick={() => setShapeMenuOpen(value => !value)}><Plus size={15}/><span>Add shape</span><ChevronDown size={13}/></button>}/>
         {shapeMenuOpen && <div id="shape-creation-menu" className="shape-creation-menu" role="menu" aria-label="Choose a primitive"><div className="shape-menu-title">ADD A CUBOID PRIMITIVE</div>
@@ -648,7 +793,7 @@ export function App() {
           <div className="texture-asset-actions"><button type="button" aria-label="Import texture PNG" disabled={textureReading} onClick={() => { setTextureImportMode("replace"); textureFileRef.current?.click(); }}><ImagePlus size={14}/>{textureReading ? "Reading…" : "Import PNG"}</button>
             <button type="button" aria-label="Download texture PNG" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button></div>
           <button type="button" className="legacy-json-link" onClick={saveLegacyJson} title="Additional portable legacy .3dmc.json backup">Download legacy JSON backup</button>
-          <div className="scene-meta"><span>Native source · .3dmc v2</span><span>{doc.textures.length} textures</span></div>
+          <div className="scene-meta"><span>{packSession ? "Pack source · .3dmc v3" : "Native source · .3dmc v2"}</span><span>{doc.textures.length} textures</span></div>
         </div>
       </aside>
       <main className="stage" aria-label="3D editing workspace"><div className="stage-main">
@@ -730,13 +875,17 @@ export function App() {
       <h2 id="writer-title">{writerStatus === "blocked" ? "Another tab controls local recovery" : "Local recovery isn't available"}</h2><p>{writerStatus === "blocked" ? "This editor is read-only here to protect the other tab's saved work. You can download the current project, or explicitly take over editing. A suspended older tab will no longer be able to overwrite this tab's checkpoints." : "You can still download the current project as a portable backup. Retry ownership only when you're ready to edit."}</p>
       <div className="modal-actions"><button className="text-button quiet" onClick={saveProject}><Save size={15}/>Download backup</button><button className="text-button primary" disabled={takingOver} onClick={takeOverWriter}>{takingOver ? "Taking over…" : "Take over editing"}</button></div>
     </ModalDialog>}
-    {candidate && bootChecked && writerStatus === "owned" && <ModalDialog className="recovery-banner" labelledBy="recovery-title"><div><Info size={19}/><p><strong id="recovery-title">Continue a local session?</strong><span>{candidate.document.name} · {getFilename(new Date(candidate.savedAt))}{candidate.fallback ? " · Previous verified checkpoint" : ""}</span></p></div>
-      <button className="text-button quiet" onClick={keepCurrentWorkspace}>Keep current workspace</button><button className="text-button primary" onClick={() => acceptOpen(candidate.document)}>Recover project</button></ModalDialog>}
+    {candidate && bootChecked && writerStatus === "owned" && <ModalDialog className="recovery-banner" labelledBy="recovery-title"><div><Info size={19}/><p><strong id="recovery-title">Continue a local session?</strong><span>{candidate.kind === "pack" ? candidate.pack.name + " · " + candidate.pack.models.length + " models" : candidate.document.name} · {getFilename(new Date(candidate.savedAt))}{candidate.fallback ? " · Previous verified checkpoint" : ""}</span></p></div>
+      <button className="text-button quiet" onClick={keepCurrentWorkspace}>Keep current workspace</button><button className="text-button primary" onClick={() => candidate.kind === "pack" ? void acceptPackOpen(createPackSession(candidate.pack, candidate.sources)) : void acceptOpen(candidate.document)}>Recover project</button></ModalDialog>}
     {notice && <div role="status" className="notice-toast"><Info size={17}/><span>{notice}</span><button onClick={() => setNotice(null)} aria-label="Dismiss notice">×</button></div>}
-    {packStudioOpen && <PackStudioDialog source={doc} onClose={() => setPackStudioOpen(false)}/>}
+    {packStudioOpen && <PackStudioDialog source={doc} session={packSession ?? undefined}
+      onChange={changePackStudioSession} onOpenPack={acceptPackOpen}
+      onClose={() => setPackStudioOpen(false)}/>}
     {exportOpen && <ModalDialog className="modal export-modal" labelledBy="pack-export-title" onCancel={() => setExportOpen(false)}>
       <div className="export-heading"><div className="modal-icon"><Download size={22}/></div><div><span className="export-kicker">JAVA EDITION · RESOURCE PACK</span><h2 id="pack-export-title">Experimental resource pack</h2></div></div>
-      <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>) that replaces the visual model of <strong>minecraft:diamond_block</strong>. Gameplay, lighting, and collision do not change.</p>
+      <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>) that {packSession ? <>
+        contains <strong>{packSession.present.pack.models.length} model assets</strong> and replaces {packSession.present.pack.models.map(model => model.replaces.namespace + ":" + model.replaces.path).join(", ")}
+      </> : <>replaces the visual model of <strong>minecraft:diamond_block</strong></>}. Gameplay, lighting, and collision do not change.</p>
       <label className="export-target-control" htmlFor="export-target"><span>Target profile</span><select id="export-target" className="select-control" value={doc.target.candidateRelease} onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
         <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option><option value="26.3">Java Edition 26.3 · Unsupported</option></select></label>
       <div className="export-file-list" aria-label="Files in the export"><strong>Output files</strong><code>{JAVA_PACK_PATHS.metadata}</code><code>{JAVA_PACK_PATHS.blockstate}</code><code>{JAVA_PACK_PATHS.model}</code><code>{JAVA_PACK_PATHS.mainTexture}</code><span>Plus {doc.cuboids.filter(node => node.material === "solid").length} generated solid-color texture files.</span></div>
@@ -768,6 +917,12 @@ export function App() {
         <p className="import-consequence">Other resource packs may use valid Minecraft features that this editor cannot yet preserve. They are blocked rather than partially converted.</p><div className="modal-actions"><button className="text-button primary" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Keep working</button></div></>}
     </ModalDialog>}
     {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={createNewProject} onBackup={saveProject}/>}
+    {pendingPackOpen && <ModalDialog className="modal" labelledBy="pack-open-title" onCancel={() => setPendingPackOpen(null)}>
+      <div className="modal-icon"><Layers3 size={23}/></div><h2 id="pack-open-title">Open source pack?</h2>
+      <p><strong>{pendingPackOpen.pack.name}</strong> contains {pendingPackOpen.pack.models.length} complete editable model(s). It will replace the current workspace; download a backup first if needed.</p>
+      <div className="modal-actions"><button className="text-button quiet" onClick={() => setPendingPackOpen(null)}>Cancel</button>
+        <button className="text-button primary" onClick={() => void acceptPackOpen(createPackSession(pendingPackOpen.pack, pendingPackOpen.sources))}>Open source pack</button></div>
+    </ModalDialog>}
     {pendingOpen && <ModalDialog className="modal" labelledBy="open-dialog-title" onCancel={() => setPendingOpen(null)}><div className="modal-icon"><AlertCircle size={23}/></div><h2 id="open-dialog-title">Open this project?</h2><p><strong>{pendingOpen.name}</strong> will replace the current workspace. Download your current project first if you want a portable copy.</p><div className="modal-actions"><button className="text-button quiet" onClick={() => setPendingOpen(null)}>Cancel</button><button className="text-button primary" onClick={() => acceptOpen(pendingOpen)}>Open project</button></div></ModalDialog>}
   </div>;
 }

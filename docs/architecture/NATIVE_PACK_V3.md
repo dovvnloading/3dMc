@@ -1,6 +1,6 @@
 # Native multi-model project archives (container v3)
 
-**Status:** native v3 source archives and an isolated, user-visible **Pack Studio** assembly workspace are implemented. Pack Studio can assemble, inspect, save/reopen, and export supported multi-model packs, but **live 3D editing of secondary pack models and pack-wide recovery are not yet implemented**. The main editor's Save/Open and local recovery remain single-model for safety.
+**Status:** native v3 pack archives, live multi-model editing, Pack Studio management, complete source Save/Open, and generation-fenced pack-wide recovery are implemented for Java 1.21.4 pack projects. Native v1/v2 and legacy JSON remain readable. Java ZIP export is still experimental, and the iron-block/combined-pack appearance requires further in-game verification.
 
 ## Format boundaries
 
@@ -48,20 +48,21 @@ The active model is selected by the pack index. Source documents remain canonica
 
 `openNativePack(bytes)` recognizes v1/v2 and migrates them to an in-memory single-asset pack, or decodes v3 intact. Callers must treat the returned pack plus all source documents as one logical project. Do not pass only the active model to the old editor's document-replacement path and claim a successful pack import.
 
-## Isolated Pack Studio assembly workflow
+## Unified live Pack Studio workflow
 
-The main editor toolbar now offers **Pack Studio** for the supported Java 1.21.4 source target. The modal snapshots the current source model without changing the active editor or its recovery checkpoint. A creator can duplicate the model, add another existing single-model `.3dmc` source, choose between the two currently allowlisted property-free block replacements, inspect texture bindings, remove models, and undo/redo pack operations. The pack editor only offers a second replacement when one remains available, so its two-asset cap is intentionally narrower than the underlying eight-model source archive contract.
+The main workspace and Pack Studio manage **one pack session**. Use the model selector in the Scene hierarchy to switch the source being edited in Model/Paint/Preview. Pack Studio can duplicate or import source models, select allowed block replacements, inspect texture bindings, remove models and undo pack operations.
 
-**Save pack .3dmc** produces native container v3 with all source documents and RGBA textures. **Open source pack** supports v3 and migrates supported v1/v2 projects into the staged session. It requires confirmation before discarding the staged pack and warns before closing with unsaved changes. **Export Java ZIP** invokes the validated indexed Java 1.21.4 writer; combined packs and the iron-block target still require independent in-game verification.
+**Save project** downloads a complete native v3 pack archive when pack mode is active. **Open** recognizes v3 source packs, validates the complete archive before making changes, and requires confirmation to replace the workspace. Existing v1/v2 native and legacy JSON source projects retain their standalone workflow; the old single-model decoder still rejects v3 rather than dropping other models. A separate **Save pack .3dmc** action exists in Pack Studio for the same complete pack source.
 
-Pack Studio is explicitly an **isolated assembly workspace**, not a second active 3D editor. Closing it does not change the open model. Its source pack must be downloaded before closing to persist changes; it is not backed by local recovery yet. The main editor's standard Save/Open remains the existing single-model v2 route, which intentionally rejects v3 archives rather than silently stripping other models.
+Pack-wide browser recovery now stores the complete validated index, every source model, full RGBA textures and active asset as one hashed, generation-fenced checkpoint. Stale tabs cannot overwrite a newer owner's checkpoint. Recovery remains **local to this browser** and does not replace a portable .3dmc backup.
 
-## Remaining integration work
+The indexed Java exporter supports two explicit property-free replacements (`minecraft:diamond_block` and `minecraft:iron_block`) as an experimental profile. The combined pack and iron-block target still require separate in-game checks; exporting these visuals does not register new game behavior.
 
-1. Give the editor an authoritative pack session and separate active-model histories without losing changes on asset switching.
-2. Extend Pack Studio's limited model assembly browser with safe user-defined resource paths, asset naming, search, and target-aware dependency inspection.
-3. Make pack-aware v3 Save/Open the main editor workflow **only after** the active-model editing and recovery contract is implemented; continue to support legacy .3dmc and JSON files.
-4. Integrate the strict target-profile validation and indexed Java writer in the export UI, and test combined packs in Minecraft before claiming game compatibility.
-5. Add regression coverage for interruptions, quota failures, and aborted editor switches.
+## Remaining work
+
+1. Improve asset paths, names, search, and dependency inspection in the model browser
+2. Measure pack-wide recovery quotas, larger model/history performance and multi-device interaction
+3. Verify combined-block Java 1.21.4 output in game and add a strict supported-target registry
+4. Expand named-version import/export capabilities incrementally without claiming arbitrary pack support
 
 This work belongs to Workstreams A, D and F in the [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md).

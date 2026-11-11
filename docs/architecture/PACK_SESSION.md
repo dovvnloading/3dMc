@@ -1,6 +1,6 @@
 # Pack-wide editor session and command history
 
-**Status:** pure pack-session commands implemented, with focused tests. **Not yet connected to the current workspace, recovery store, native Save/Open buttons, or multi-asset browser.**
+**Status:** pack session is connected to the live 3D workspace, Pack Studio manager, pack-wide recovery and native v3 Save/Open for supported Java 1.21.4 projects. Existing legacy single-model projects retain their original editing and source-file path until entering pack mode.
 
 ## State and ownership
 
@@ -24,11 +24,17 @@ The session does **not** yet automatically create pack texture asset bindings wh
 
 The session is not yet the live application's recovery document. The current editor still uses its original single-model `History`; replacing that with this session requires a carefully tested UI/recovery migration. Importing a v3 multi-asset source archive into the old single-model state would be lossy, so the interface does not do that.
 
-## Next integration steps
+## Integration checkpoint
 
-1. Introduce a pack-aware recovery payload with versioned migration from existing single-model checkpoints, writer-generation fencing, and explicit interrupted-write behavior.
-2. Render a pack asset browser with task-complete creation, switching, renaming, duplication and deletion using these commands, while keeping one authoritative revision sequence.
-3. Wire native v3 source archive Save/Open and indexed resource pack export to the validated session (with progress/cancellation if required by measured workloads).
-4. Add browser tests for complete multi-asset create → edit → switch → undo → save → reopen → export flows, plus real-game checks for the configured Java block replacements.
+The Scene panel model selector switches the authoritative active source document without duplicating history. Model and Paint tools operate on the selected source, while pack-level additions and replacements share the same undo stream. Source texture additions/removals update pack texture bindings atomically. The current source filename and ID remain stable across model switches; active selection and unfinished paint gestures are reset when switching.
 
-See the [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md) and [pack document contract](PACK_DOCUMENT.md).
+Standard **Save project** downloads container v3 for pack mode; **Open** recognizes v3 and requires confirmation before replacing the complete workspace. The existing v1/v2 project path is retained for single-model projects. Pack sessions recover through generation-fenced, hashed IndexedDB checkpoints that include every source and the active model. Opening or recovering a different pack rotates the writer generation to prevent stale writes.
+
+## Remaining work
+
+- Target-aware model path editing, richer asset metadata and search/filter in the pack browser
+- Tested performance/quotas on larger multi-model projects and cross-device usability
+- More precise in-game verification for multiple block replacements and unsupported feature diagnostics
+- Deferred migration of unsupported Java 26.3 sources; never advertise unsupported versions as exportable
+
+See the [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md).

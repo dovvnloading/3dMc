@@ -8,7 +8,7 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
-**Pack Studio (experimental):** The workspace includes an isolated pack assembly dialog for combining the current model with another native project, saving/reopening a multi-model `.3dmc` source pack, and exporting two supported Java 1.21.4 block replacement visuals. Secondary models are not yet editable in the main 3D viewport and pack-wide local recovery is not implemented. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
+**Pack Studio (experimental):** One shared pack session now powers the live 3D Model/Paint editor and Pack Studio asset manager. Switch between models in the Scene panel, edit each model's geometry and textures, undo across pack operations, recover the whole pack locally, and save/reopen a multi-model `.3dmc` source archive. The initial Java 1.21.4 pack export remains limited to two compatible block replacements, and additional game validation is pending. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
 
 The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.
 
@@ -29,7 +29,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 | [Design system](docs/design/DESIGN_SYSTEM.md) | The visual language, component contracts, accessibility, and design review standards |
 | [Technical design](docs/architecture/TECHNICAL_DESIGN.md) | Document state, rendering, commands, painting, persistence, workers, and module boundaries |
 | [Pack document contract](docs/architecture/PACK_DOCUMENT.md) | Pack-wide asset IDs, resource path validation, and planned native migration |
-| [Native pack source archive v3](docs/architecture/NATIVE_PACK_V3.md) | Strict multi-model source ZIP, checksums, legacy migration, and pending UI integration |
+| [Native pack source archive v3](docs/architecture/NATIVE_PACK_V3.md) | Multi-model ZIP, legacy migration, live Save/Open and recovery limitations |
 | [Compatibility strategy](docs/architecture/COMPATIBILITY.md) | Asset families, format profiles, import/export fidelity, and version evidence |
 | [Full-scale expansion plan](docs/delivery/FULL_SCALE_EXPANSION_PLAN.md) | Current expansion milestone: priority workstreams, implementation cycles, coordination, and definition of done |
 | [Delivery roadmap](docs/delivery/ROADMAP.md) | Stages, dependencies, staffing assumptions, and the first two sprints |
