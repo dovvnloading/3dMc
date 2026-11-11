@@ -20,8 +20,10 @@ import { SelectionInspector } from "./components/SelectionInspector";
 import { ExportIssueList } from "./components/ExportIssueList";
 import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
-import { decodeProject, encodeProject, MAX_PROJECT_BYTES, safeFilename } from "./editor/project";
-import { decodeNativeProject, encodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
+import { decodeProject, MAX_PROJECT_BYTES } from "./editor/project";
+import { decodeNativeProject, MAX_NATIVE_BYTES } from "./editor/nativeArchive";
+import { prepareJavaPackDownload, prepareLegacyJsonDownload, prepareNativeProjectDownload,
+  prepareSixFaceDiagnosticDownload, prepareTexturePngDownload, startBrowserDownload } from "./editor/exportJobs";
 import { makeNewProject } from "./editor/templates";
 import { PRIMITIVE_PRESETS, addPrimitive, moveCuboid, setCuboidMaterial } from "./editor/primitives";
 import type { PrimitiveId } from "./editor/primitives";
@@ -38,14 +40,12 @@ import { TextureSurface } from "./components/TextureSurface";
 import { TextureImportDialog } from "./components/TextureImportDialog";
 import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./editor/textureImport";
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
-import { encodeRgbaPng } from "./export/png";
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
-import { makeSixFaceDiagnosticDocument } from "./compatibility/diagnostic";
 import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
-import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS, makeJava1214Pack } from "./export/javaBlock";
+import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/javaBlock";
 import type { ExportIssue } from "./export/javaBlock";
 
 type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed" | "blocked";
@@ -411,19 +411,14 @@ export function App() {
 
   const saveLegacyJson = () => {
     try {
-      const url = URL.createObjectURL(new Blob([encodeProject(doc)], { type: "application/json" }));
-      const link = globalThis.document.createElement("a"); link.href = url; link.download = safeFilename(doc.name);
-      globalThis.document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      startBrowserDownload(prepareLegacyJsonDownload(doc));
       setNotice("Legacy JSON backup download started. Keep this as an additional portable copy.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare the JSON backup."); }
   };
   const saveProject = async () => {
     if (savingProject) return; setSavingProject(true);
     try {
-      const archive = await encodeNativeProject(doc);
-      const url = URL.createObjectURL(new Blob([new Uint8Array(archive)], { type: "application/zip" }));
-      const link = globalThis.document.createElement("a"); link.href = url; link.download = nativeFilename(doc.name);
-      globalThis.document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      startBrowserDownload(await prepareNativeProjectDownload(doc));
       setNotice("Native .3dmc project download started. Keep the archive as your portable backup.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare your native project archive."); }
     finally { setSavingProject(false); }
@@ -433,11 +428,9 @@ export function App() {
     if (exportStatus === "building") return;
     setExportStatus("building"); const capturedRevision = history.revision;
     try {
-      const pack = makeJava1214Pack(doc);
-      const url = URL.createObjectURL(new Blob([new Uint8Array(pack.zip)], { type: "application/zip" }));
-      const link = globalThis.document.createElement("a"); link.href = url; link.download = "3dmc-diamond-block-java-1.21.4-experimental.zip";
-      globalThis.document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      setLastExport({ revision: capturedRevision, bytes: pack.zip.length }); setExportStatus("started");
+      const prepared = prepareJavaPackDownload(doc);
+      startBrowserDownload(prepared.file);
+      setLastExport({ revision: capturedRevision, bytes: prepared.bytes }); setExportStatus("started");
       setNotice("Experimental Java pack download started. This artifact still requires an in-game check.");
     } catch (error) {
       setExportStatus("idle");
@@ -447,10 +440,7 @@ export function App() {
   };
   const downloadDiagnosticPack = () => {
     try {
-      const pack = makeJava1214Pack(makeSixFaceDiagnosticDocument());
-      const url = URL.createObjectURL(new Blob([new Uint8Array(pack.zip)], { type: "application/zip" }));
-      const link = globalThis.document.createElement("a"); link.href = url; link.download = "3dmc-java-1.21.4-six-face-orientation-test.zip";
-      globalThis.document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      startBrowserDownload(prepareSixFaceDiagnosticDownload());
       setNotice("Six-face diagnostic download started. Install the unmodified ZIP in Java 1.21.4 and record screenshots/logs; game verification remains pending.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare the diagnostic pack."); }
   };
@@ -490,11 +480,7 @@ export function App() {
   };
   const downloadTexturePng = () => {
     try {
-      const png = encodeRgbaPng(texture.width, texture.height, texture.pixels);
-      const url = URL.createObjectURL(new Blob([new Uint8Array(png)], { type: "image/png" }));
-      const link = globalThis.document.createElement("a"); link.href = url;
-      link.download = texture.name.replace(/[^a-zA-Z0-9_.-]+/g, "-").slice(0, 80).replace(/\.png$/i, "") + ".png";
-      globalThis.document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      startBrowserDownload(prepareTexturePngDownload(doc));
       setNotice("PNG texture download started. Native .3dmc source preserves your complete editable project.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export PNG."); }
   };
