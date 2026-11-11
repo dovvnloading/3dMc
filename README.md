@@ -32,6 +32,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 | [Native pack source archive v3](docs/architecture/NATIVE_PACK_V3.md) | Multi-model ZIP, legacy migration, live Save/Open and recovery limitations |
 | [Compatibility strategy](docs/architecture/COMPATIBILITY.md) | Asset families, format profiles, import/export fidelity, and version evidence |
 | [Full-scale expansion plan](docs/delivery/FULL_SCALE_EXPANSION_PLAN.md) | Current expansion milestone: priority workstreams, implementation cycles, coordination, and definition of done |
+| [Expansion implementation checkpoint](docs/delivery/EXPANSION_PROGRESS.md) | Integrated pack workflow, test evidence, current limitations and next development slices |
 | [Delivery roadmap](docs/delivery/ROADMAP.md) | Stages, dependencies, staffing assumptions, and the first two sprints |
 | [Quality gates](docs/delivery/QUALITY_GATES.md) | Testing goals and engineering guidance |
 | [Implementation backlog](docs/delivery/BACKLOG.md) | Ordered work packages with acceptance criteria and dependencies |
