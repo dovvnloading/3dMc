@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
-  FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
@@ -18,6 +18,7 @@ import { commitSelectionGesture, deleteSelection, duplicateSelection, reconcileS
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
 import { ExportIssueList } from "./components/ExportIssueList";
+import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
 import { decodeProject, MAX_PROJECT_BYTES } from "./editor/project";
@@ -167,6 +168,7 @@ export function App() {
   const [deleteReplacementId, setDeleteReplacementId] = useState<string | null>(null);
   const [textureReading, setTextureReading] = useState(false), [packInspecting, setPackInspecting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [packStudioOpen, setPackStudioOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
   const [lastExport, setLastExport] = useState<{ revision: number; bytes: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -579,6 +581,7 @@ export function App() {
         <button className="text-button subtle" onClick={() => packFileRef.current?.click()} disabled={packInspecting} title="Import a 3dMc experimental Java 1.21.4 resource pack">
           <PackageOpen size={16}/>{packInspecting ? "Inspecting…" : "Import pack"}</button>
         <button className="text-button quiet" onClick={() => void saveProject()} disabled={savingProject} title="Download native .3dmc source project"><Save size={16}/>{savingProject ? "Preparing…" : "Save project"}</button>
+        <button className="text-button subtle" onClick={() => setPackStudioOpen(true)} title="Assemble and save a multi-model source pack"><Layers3 size={16}/>Pack Studio</button>
         <button className="text-button primary" onClick={() => setExportOpen(true)} title="Experimental pack export; in-game validation is pending"><Download size={16}/>Minecraft export</button>
       </div>
     </header>
@@ -730,6 +733,7 @@ export function App() {
     {candidate && bootChecked && writerStatus === "owned" && <ModalDialog className="recovery-banner" labelledBy="recovery-title"><div><Info size={19}/><p><strong id="recovery-title">Continue a local session?</strong><span>{candidate.document.name} · {getFilename(new Date(candidate.savedAt))}{candidate.fallback ? " · Previous verified checkpoint" : ""}</span></p></div>
       <button className="text-button quiet" onClick={keepCurrentWorkspace}>Keep current workspace</button><button className="text-button primary" onClick={() => acceptOpen(candidate.document)}>Recover project</button></ModalDialog>}
     {notice && <div role="status" className="notice-toast"><Info size={17}/><span>{notice}</span><button onClick={() => setNotice(null)} aria-label="Dismiss notice">×</button></div>}
+    {packStudioOpen && <PackStudioDialog source={doc} onClose={() => setPackStudioOpen(false)}/>}
     {exportOpen && <ModalDialog className="modal export-modal" labelledBy="pack-export-title" onCancel={() => setExportOpen(false)}>
       <div className="export-heading"><div className="modal-icon"><Download size={22}/></div><div><span className="export-kicker">JAVA EDITION · RESOURCE PACK</span><h2 id="pack-export-title">Experimental resource pack</h2></div></div>
       <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>) that replaces the visual model of <strong>minecraft:diamond_block</strong>. Gameplay, lighting, and collision do not change.</p>
