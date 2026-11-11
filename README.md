@@ -26,6 +26,7 @@ Read the [planning guide](docs/README.md) for the recommended reading order and 
 | [Workspace specification](docs/design/WORKSPACE_SPEC.md) | The layout, modes, interactions, onboarding, shortcuts, and recovery experience |
 | [Design system](docs/design/DESIGN_SYSTEM.md) | The visual language, component contracts, accessibility, and design review standards |
 | [Technical design](docs/architecture/TECHNICAL_DESIGN.md) | Document state, rendering, commands, painting, persistence, workers, and module boundaries |
+| [Pack document contract](docs/architecture/PACK_DOCUMENT.md) | Pack-wide asset IDs, resource path validation, and planned native migration |
 | [Compatibility strategy](docs/architecture/COMPATIBILITY.md) | Asset families, format profiles, import/export fidelity, and version evidence |
 | [Full-scale expansion plan](docs/delivery/FULL_SCALE_EXPANSION_PLAN.md) | Current expansion milestone: priority workstreams, implementation cycles, coordination, and definition of done |
 | [Delivery roadmap](docs/delivery/ROADMAP.md) | Stages, dependencies, staffing assumptions, and the first two sprints |

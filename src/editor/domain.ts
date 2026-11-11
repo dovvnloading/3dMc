@@ -1,7 +1,7 @@
 /**
- * Canonical, renderer-independent S0 document. This is a deliberately narrow
- * native schema and NOT a complete Java/Bedrock model representation.
- * Its JSON export uses .3dmc.json until the versioned ZIP codec is implemented.
+ * Canonical, renderer-independent v3 editor source document. Native .3dmc
+ * archives are versioned separately, as is the pack-wide asset index.
+ * This is intentionally not a complete Java or Bedrock model representation.
  */
 export type Vec3 = readonly [number, number, number];
 export type Axis = 0 | 1 | 2;
