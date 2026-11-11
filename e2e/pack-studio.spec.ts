@@ -166,3 +166,49 @@ test("pack and model resource names are editable, validated and retained through
   expect(game["assets/my_assets/textures/block/painted_lantern.png"]).toBeDefined();
   expect(game["assets/minecraft/blockstates/diamond_block.json"]).toBeDefined();
 });
+
+
+test("asset search filters by model, replacement, and texture path without changing the pack", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  const items = studio.getByRole("listbox", { name: "Pack model assets" }).getByRole("option");
+  const search = studio.getByRole("searchbox", { name: "Search pack models" });
+
+  await expect(studio.getByLabel("Texture dependencies lantern.png"))
+    .toContainText("6 painted faces across 1 element");
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+  await expect(items).toHaveCount(2);
+
+  const name = studio.getByRole("textbox", { name: "Model name" });
+  await name.fill("Frost Window");
+  await name.press("Enter");
+  await search.fill("frost");
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText("Frost Window");
+  await expect(studio.getByRole("status")).toContainText("1 of 2 models match");
+
+  await search.fill("minecraft:diamond_block");
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText("Copper Lantern");
+  await search.fill("IRON_BLOCK frost");
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText("Frost Window");
+
+  await search.fill("no-such-model");
+  await expect(items).toHaveCount(0);
+  await expect(studio.getByText(/No models match your search/)).toBeVisible();
+  await expect(name).toHaveValue("Frost Window"); // Filtering never changes the active source.
+  await studio.getByRole("button", { name: "Clear pack search" }).click();
+  await expect(items).toHaveCount(2);
+
+  await studio.getByRole("textbox", { name: "Texture path lantern.png" }).fill("block/frost_paint");
+  await studio.getByRole("textbox", { name: "Texture path lantern.png" }).press("Enter");
+  await search.fill("frost_paint");
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText("Frost Window");
+  await studio.getByRole("button", { name: "Edit selected model in 3D" }).click();
+  await expect(studio).toHaveCount(0);
+  const modelSelector = page.getByRole("combobox", { name: "Active pack model" });
+  await expect(modelSelector).toContainText("Frost Window");
+});
