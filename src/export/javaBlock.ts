@@ -26,6 +26,8 @@ export interface ExportIssue {
   message: string;
   nodeId?: string;
   textureId?: string;
+  /** Pack-level diagnostics identify the source model that owns an issue. */
+  sourceDocumentId?: string;
 }
 
 export class JavaExportBlocked extends Error {
