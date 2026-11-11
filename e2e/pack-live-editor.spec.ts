@@ -21,7 +21,16 @@ test("edits either live model, undoes changes and reopens a complete pack", asyn
   await selector.selectOption(second);
   await expect(field).toHaveValue("3");
   await field.fill("7"); await field.press("Enter");
-  await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
+  const undoButton = page.getByRole("button", { name: /Undo \\(Ctrl/ });
+  // A disabled version selector previously overlapped the Undo hit target
+  // in pack mode at the standard 1440px desktop viewport.
+  await expect(undoButton).toBeEnabled();
+  expect(await undoButton.evaluate(button => {
+    const rect = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return hit === button || button.contains(hit);
+  })).toBe(true);
+  await undoButton.click();
   await expect(field).toHaveValue("3");
   await selector.selectOption("model-0");
   await expect(field).toHaveValue("5");
