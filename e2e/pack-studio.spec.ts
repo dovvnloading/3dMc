@@ -95,3 +95,11 @@ test("Pack Studio reports replacement conflicts and guards unsaved pack work", a
   await studio.getByRole("button", { name: "Discard and close" }).click();
   await expect(studio).toHaveCount(0);
 });
+
+test("Pack Studio is not offered for the unsupported Java 26.3 target", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "Minecraft target version" }).selectOption("26.3");
+  await expect(page.getByRole("button", { name: "Pack Studio" })).toBeDisabled();
+  await page.getByRole("combobox", { name: "Minecraft target version" }).selectOption("1.21.4");
+  await expect(page.getByRole("button", { name: "Pack Studio" })).toBeEnabled();
+});
