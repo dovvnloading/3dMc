@@ -581,7 +581,7 @@ export function App() {
         <button className="text-button subtle" onClick={() => packFileRef.current?.click()} disabled={packInspecting} title="Import a 3dMc experimental Java 1.21.4 resource pack">
           <PackageOpen size={16}/>{packInspecting ? "Inspecting…" : "Import pack"}</button>
         <button className="text-button quiet" onClick={() => void saveProject()} disabled={savingProject} title="Download native .3dmc source project"><Save size={16}/>{savingProject ? "Preparing…" : "Save project"}</button>
-        <button className="text-button subtle" onClick={() => setPackStudioOpen(true)} title="Assemble and save a multi-model source pack"><Layers3 size={16}/>Pack Studio</button>
+        <button className="text-button subtle" onClick={() => setPackStudioOpen(true)} disabled={doc.target.candidateRelease !== "1.21.4"} title={doc.target.candidateRelease === "1.21.4" ? "Assemble and save a multi-model source pack" : "Pack Studio currently requires Java 1.21.4"}><Layers3 size={16}/>Pack Studio</button>
         <button className="text-button primary" onClick={() => setExportOpen(true)} title="Experimental pack export; in-game validation is pending"><Download size={16}/>Minecraft export</button>
       </div>
     </header>
