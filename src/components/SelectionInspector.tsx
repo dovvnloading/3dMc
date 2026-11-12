@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Axis, EditorDocument } from "../editor/domain";
+import type { Axis, EditorDocument, Vec3 } from "../editor/domain";
+import { SelectionArrayTools } from "./SelectionArrayTools";
 import { alignSelection, distributeSelection, mirrorSelection, selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   setSnap: (value: number) => void;
   apply: (operation: (document: EditorDocument) => EditorDocument) => boolean;
   duplicate: () => void;
+  repeat: (copies: number, step: Vec3) => void;
   remove: () => void;
   clear: () => void;
 }
@@ -125,6 +127,11 @@ export function SelectionInspector(props: Props) {
             Mirror {label(axis)}
           </button>)}
         </div>
+      </div>
+      <div className="inspector-group">
+        <h3>Duplicate array</h3>
+        <SelectionArrayTools selectedCount={nodes.length}
+          totalCount={props.document.cuboids.length} disabled={disabled} onCreate={props.repeat}/>
       </div>
       <div className="inspector-group">
         <h3>Selection actions</h3>
