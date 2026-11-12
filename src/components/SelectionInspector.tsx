@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Axis, EditorDocument, Vec3 } from "../editor/domain";
 import { SelectionArrayTools } from "./SelectionArrayTools";
+import { MoveSnapControl } from "./MoveSnapControl";
 import { alignSelection, distributeSelection, mirrorSelection, selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
 
 interface Props {
@@ -71,11 +72,7 @@ export function SelectionInspector(props: Props) {
             value={property === "position" ? bounds.from[axis] : bounds.size[axis]}
             onCommit={value => props.apply(doc => setSelectionBounds(doc, props.ids, property, axis, value))}/>)}</div>
         </div>)}
-        <label className="form-caption" htmlFor="batch-snap">Move snap</label>
-        <select id="batch-snap" className="select-control" aria-label="Move snap increment" value={props.snap}
-          onChange={event => props.setSnap(Number(event.target.value))}>
-          {[0.25, 0.5, 1, 2].map(n => <option key={n} value={n}>{n} unit{n > 1 ? "s" : ""}</option>)}
-        </select>
+        <MoveSnapControl value={props.snap} onChange={props.setSnap}/>
         <div className="batch-nudges" role="group" aria-label="Move selection by snap increment">
           {axes.flatMap(axis => ([-1, 1] as const).map(sign => <button type="button" key={axis + ":" + sign}
             disabled={disabled} aria-label={`Move selection ${sign > 0 ? "+" : "−"}${label(axis)}`}
