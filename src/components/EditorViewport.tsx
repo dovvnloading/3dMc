@@ -36,7 +36,7 @@ interface ViewportProps {
   onFinishPaint: () => void;
   onCancelPaint: () => void;
   onSample: (texel: Texel, textureId: string) => void;
-  onFill: (texel: Texel, textureId: string) => void;
+  onFill: (texel: Texel, textureId: string, faceKey?: string) => void;
   onTransform: (id: string, position: Vec3, scale: Vec3) => void;
   onBatchTransform?: (gesture: SelectionGesture, translation: Vec3, scale: Vec3) => void;
 }
@@ -212,7 +212,7 @@ function AssetMesh(props: MeshProps) {
     const direction = faceFromTriangle(event.faceIndex ?? -1); if (direction) props.onSelectFace(direction);
     if (tool === "eyedropper") { props.onSample(hit.texel, hit.textureId); return; }
     if (node.locked) return;
-    if (tool === "fill") { props.onFill(hit.texel, hit.textureId); return; }
+    if (tool === "fill") { props.onFill(hit.texel, hit.textureId, hit.face); return; }
     if (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle") return;
     const capture = event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null;
     capture?.setPointerCapture?.(event.pointerId); props.onBeginPaint(hit.texel, hit.face, hit.textureId);
