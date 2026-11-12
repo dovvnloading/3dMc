@@ -315,3 +315,66 @@ test("item targets and display settings are undoable without mutating source cub
   await expect(studio.getByRole("group", { name: "Item assets for selected model" })
     .getByRole("button")).toHaveCount(2);
 });
+
+
+test("Java item settings import restores authored display values without replacing source geometry", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  await studio.getByRole("button", { name: "Add Java item" }).click();
+
+  const guiAngle = studio.getByRole("spinbutton", { name: "Inventory / GUI rotation X" });
+  await guiAngle.fill("67");
+  await guiAngle.press("Enter");
+  const [firstDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const exported = await firstDownload.path();
+  if (!exported) throw new Error("Item resource pack missing.");
+
+  await guiAngle.fill("22");
+  await guiAngle.press("Enter");
+  await expect(guiAngle).toHaveValue("22");
+  const before = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download legacy JSON backup" }).click()
+  ]);
+  const beforePath = await before[0].path();
+  if (!beforePath) throw new Error("Editable source backup missing.");
+  const sourceBytes = await readFile(beforePath, "utf8");
+
+  await studio.locator('input[type="file"][accept=".zip,application/zip"]')
+    .setInputFiles(exported);
+  await expect(studio.getByRole("group", { name: "Review imported item settings" })).toBeVisible();
+  await expect(guiAngle).toHaveValue("22");
+  await studio.getByRole("button", { name: "Apply imported item settings" }).click();
+  await expect(guiAngle).toHaveValue("67");
+  const after = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download legacy JSON backup" }).click()
+  ]);
+  const afterPath = await after[0].path();
+  if (!afterPath) throw new Error("Editable source backup missing after import.");
+  expect(await readFile(afterPath, "utf8")).toBe(sourceBytes);
+
+  const [recreated] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const recreatedPath = await recreated.path();
+  if (!recreatedPath) throw new Error("Re-export after item import failed.");
+  expect(await readFile(recreatedPath)).toEqual(await readFile(exported));
+
+  await studio.getByRole("button", { name: "Undo pack operation" }).click();
+  await expect(guiAngle).toHaveValue("22");
+  await studio.getByRole("button", { name: "Redo pack operation" }).click();
+  await expect(guiAngle).toHaveValue("67");
+
+  await studio.locator('input[type="file"][accept=".zip,application/zip"]')
+    .setInputFiles({ name: "unsupported.zip", mimeType: "application/zip",
+      buffer: Buffer.from("not a zip") });
+  await expect(studio.getByRole("group", { name: "Review imported item settings" }))
+    .toHaveCount(0);
+  await expect(guiAngle).toHaveValue("67");
+});
