@@ -1,3 +1,5 @@
+import { validRasterLayers } from "./layers";
+
 /**
  * Canonical, renderer-independent v3 editor source document. Native .3dmc
  * archives are versioned separately, as is the pack-wide asset index.
@@ -66,13 +68,24 @@ export interface Cuboid {
   locked: boolean;
 }
 
+export interface RasterLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  pixels: number[];
+}
+
 export interface PixelTexture {
   id: string;
   name: string;
   width: number;
   height: number;
-  /** Straight RGBA, top-left origin. Not serialized as a GPU object. */
+  /** Straight RGBA, top-left origin. Flattened cache for renderer and Java export. */
   pixels: number[];
+  /** Optional editable source layers, bottom to top. */
+  layers?: RasterLayer[];
+  activeLayerId?: string;
 }
 
 /** Flat, editor-only organizational groups. No transforms or Minecraft export semantics. */
@@ -183,7 +196,9 @@ export function parseDocument(input: unknown): EditorDocument {
       t.width > 0 && t.height > 0 && t.width <= 64 && t.height <= 64 &&
       Array.isArray(t.pixels) && t.pixels.length === t.width * t.height * 4 &&
       t.pixels.every(n => int(n) && n >= 0 && n <= 255) &&
-      Object.keys(candidate).every(key => ["id", "name", "width", "height", "pixels"].includes(key));
+      Object.keys(candidate).every(key => [
+        "id", "name", "width", "height", "pixels", "layers", "activeLayerId"
+      ].includes(key)) && validRasterLayers(t as PixelTexture);
   }
   if (!textures.every(validTexture) ||
       new Set(textures.map(t => t.id)).size !== textures.length)
@@ -267,7 +282,11 @@ export function parseDocument(input: unknown): EditorDocument {
     })),
     textures: textures.map(t => ({
       id: t.id, name: t.name, width: t.width, height: t.height,
-      pixels: [...t.pixels]
+      pixels: [...t.pixels],
+      ...(t.layers ? {
+        layers: t.layers.map(layer => ({ ...layer, pixels: [...layer.pixels] })),
+        activeLayerId: t.activeLayerId
+      } : {})
     })),
     activeTextureId: activeId,
     ...(groups ? { groups } : {}),
@@ -406,6 +425,9 @@ export function setTexturePixels(
   if (!t || pixels.length !== t.pixels.length ||
       !pixels.every(n => int(n) && n >= 0 && n <= 255)) return doc;
   if (pixels.every((value, i) => value === t.pixels[i])) return doc;
+  if (t.layers) throw new Error(
+    "This texture has editable layers. Flatten them explicitly before replacing the entire RGBA sheet."
+  );
   return { ...doc, textures: doc.textures.map(item =>
     item.id === textureId ? { ...item, pixels: [...pixels] } : item) };
 }
