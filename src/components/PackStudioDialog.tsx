@@ -87,8 +87,10 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       setSession(next);
       setMessage("");
       setConfirmClose(false);
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Pack operation was rejected. No assets changed.");
+      return false;
     }
   };
 
