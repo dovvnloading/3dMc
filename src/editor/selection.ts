@@ -215,6 +215,48 @@ export function duplicateSelection(document: EditorDocument, ids: readonly strin
   return { ...document, cuboids: [...document.cuboids, ...copies] };
 }
 
+/**
+ * Repeat a selection at a fixed model-space offset per copy. The caller reserves
+ * all stable IDs before dispatch; failures never create a partially edited source.
+ * Copies retain independent face metadata and shared source texture references.
+ */
+export function repeatSelection(document: EditorDocument, ids: readonly string[],
+  newIds: readonly string[], count: number, step: Vec3): EditorDocument {
+  if (!Number.isSafeInteger(count) || count < 1 || count > 64 ||
+      !finite(step) || step.every(value => value === 0))
+    throw new SelectionEditError(
+      "Choose 1–64 copies and a finite, nonzero X/Y/Z step. No parts were added."
+    );
+  const nodes = editableSelection(document, ids);
+  if (!nodes.length) return document;
+  const total = nodes.length * count;
+  if (document.cuboids.length + total > 2000)
+    throw new SelectionEditError("The array exceeds the 2,000-part source limit. No parts were added.");
+  const existing = new Set(document.cuboids.map(node => node.id));
+  if (newIds.length !== total || new Set(newIds).size !== total ||
+      newIds.some(id => !id || id.length > 100 || existing.has(id)))
+    throw new SelectionEditError("Array copy identifiers are invalid or already exist. No parts were added.");
+
+  const copies = Array.from({ length: count }, (_, copyIndex) =>
+    nodes.map((node, nodeIndex): Cuboid => ({
+      ...node,
+      id: newIds[copyIndex * nodes.length + nodeIndex]!,
+      name: node.name.slice(0, 92) + " copy " + (copyIndex + 1),
+      faces: copyFaces(node.faces),
+      from: node.from.map((value, axis) =>
+        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3,
+      to: node.to.map((value, axis) =>
+        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3
+    }))
+  ).flat();
+
+  if (copies.some(node => !isValidCuboid(node)))
+    throw new SelectionEditError(
+      "An array copy would exceed the supported geometry bounds. No parts were added."
+    );
+  return { ...document, cuboids: [...document.cuboids, ...copies] };
+}
+
 export interface SelectionGesture {
   readonly source: EditorDocument;
   readonly ids: readonly string[];
