@@ -1,5 +1,15 @@
 /** Source pixels use a top-left origin; WebGL UVs have a bottom-left origin. */
 export type Texel = readonly [number, number];
+/** Pixel-space boundaries; right and bottom exclude the texel center. */
+export interface PixelMask {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+export const insideMask = (mask: PixelMask | undefined, x: number, y: number) =>
+  !mask || (x + 0.5 >= mask.left && x + 0.5 < mask.right &&
+            y + 0.5 >= mask.top && y + 0.5 < mask.bottom);
 
 export function uvToTexel(u: number, v: number, width: number, height: number): Texel {
   return [
@@ -17,7 +27,7 @@ export function hexToRGB(hex: string): [number, number, number] {
 export function drawStroke(
   pixels: number[], width: number, height: number,
   start: Texel, end: Texel, color: string, size: 1 | 2 | 4,
-  alpha: 0 | 255 = 255
+  alpha: 0 | 255 = 255, mask?: PixelMask
 ): number[] {
   const result = [...pixels];
   const [r, g, b] = alpha === 0 ? [0, 0, 0] : hexToRGB(color);
@@ -31,7 +41,7 @@ export function drawStroke(
       for (let ox = 0; ox < size; ox++) {
         const px = x + ox - Math.floor((size - 1) / 2);
         const py = y + oy - Math.floor((size - 1) / 2);
-        if (px < 0 || py < 0 || px >= width || py >= height) continue;
+        if (px < 0 || py < 0 || px >= width || py >= height || !insideMask(mask, px, py)) continue;
         const i = (py * width + px) * 4;
         result[i] = r; result[i + 1] = g; result[i + 2] = b; result[i + 3] = alpha;
       }
@@ -48,14 +58,14 @@ export function drawStroke(
 export function drawRectangle(
   pixels: number[], width: number, height: number,
   start: Texel, end: Texel, color: string, size: 1 | 2 | 4,
-  alpha: 0 | 255 = 255
+  alpha: 0 | 255 = 255, mask?: PixelMask
 ): number[] {
   const left = Math.min(start[0], end[0]), right = Math.max(start[0], end[0]);
   const top = Math.min(start[1], end[1]), bottom = Math.max(start[1], end[1]);
-  let result = drawStroke(pixels, width, height, [left, top], [right, top], color, size, alpha);
-  result = drawStroke(result, width, height, [right, top], [right, bottom], color, size, alpha);
-  result = drawStroke(result, width, height, [right, bottom], [left, bottom], color, size, alpha);
-  return drawStroke(result, width, height, [left, bottom], [left, top], color, size, alpha);
+  let result = drawStroke(pixels, width, height, [left, top], [right, top], color, size, alpha, mask);
+  result = drawStroke(result, width, height, [right, top], [right, bottom], color, size, alpha, mask);
+  result = drawStroke(result, width, height, [right, bottom], [left, bottom], color, size, alpha, mask);
+  return drawStroke(result, width, height, [left, bottom], [left, top], color, size, alpha, mask);
 }
 
 export function readHex(pixels: number[], width: number, [x, y]: Texel): string {
@@ -72,13 +82,14 @@ export function readHex(pixels: number[], width: number, [x, y]: Texel): string 
  */
 export function floodFill(
   pixels: number[], width: number, height: number,
-  [x, y]: Texel, color: string
+  [x, y]: Texel, color: string, mask?: PixelMask
 ): number[] {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
       width < 1 || height < 1 || width > 64 || height > 64 ||
       pixels.length !== width * height * 4 ||
       !Number.isSafeInteger(x) || !Number.isSafeInteger(y) ||
-      x < 0 || y < 0 || x >= width || y >= height) return pixels;
+      x < 0 || y < 0 || x >= width || y >= height ||
+      !insideMask(mask, x, y)) return pixels;
   const origin = (y * width + x) * 4;
   const previous = pixels.slice(origin, origin + 4);
   const next = [...hexToRGB(color), 255];
@@ -104,7 +115,8 @@ export function floodFill(
       cy + 1 < height ? cell + width : -1
     ];
     for (const neighbor of neighbors) {
-      if (neighbor >= 0 && !queued[neighbor]) {
+      if (neighbor >= 0 && !queued[neighbor] &&
+          insideMask(mask, neighbor % width, Math.floor(neighbor / width))) {
         queued[neighbor] = 1;
         // Do not enqueue through a different RGBA region.
         if (previous.every((n, channel) => output[neighbor * 4 + channel] === n))
