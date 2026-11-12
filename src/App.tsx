@@ -18,6 +18,7 @@ import { commitSelectionGesture, deleteSelection, duplicateSelection, repeatSele
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
 import { SelectionArrayTools } from "./components/SelectionArrayTools";
+import { MoveSnapControl } from "./components/MoveSnapControl";
 import { groupSelection, renameGroup, ungroup } from "./editor/groups";
 import { ExportIssueList } from "./components/ExportIssueList";
 import { PackStudioDialog } from "./components/PackStudioDialog";
@@ -914,8 +915,7 @@ export function App() {
             }} commitDocument={commitDocument} textures={doc.textures} textureWidth={faceAsset?.width ?? texture.width} textureHeight={faceAsset?.height ?? texture.height}/>}
             <div className="inspector-group"><SectionHeading title="Transform" trailing={<SlidersHorizontal size={15} className="section-muted-icon"/>}/>
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/><AxisRow title="Size" selected={selected} property="size" commitDocument={commitDocument}/>
-              <div className="form-group"><div className="form-caption">Move snap</div><select aria-label="Move snap increment" className="select-control" value={snap} onChange={event => setSnap(Number(event.target.value))}>
-                <option value={0.25}>0.25 unit</option><option value={0.5}>0.5 unit</option><option value={1}>1 unit</option><option value={2}>2 units</option></select></div>
+              <div className="form-group"><MoveSnapControl value={snap} onChange={setSnap}/></div>
               {selected.locked && <div className="inline-note"><Lock size={14}/>Unlock this element to edit geometry.</div>}
               <div className="inline-note"><Info size={14}/>Rotation requires a verified Java target capability profile.</div>
             </div>
