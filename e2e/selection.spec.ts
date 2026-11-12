@@ -326,3 +326,24 @@ test("named Scene groups collapse, rename, select and survive native save/reopen
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
   expect(await source(page)).toEqual(grouped);
 });
+
+test("custom move snap drives numeric batch nudges and preserves one undo step", async ({ page }) => {
+  const original = await source(page);
+  await selectPair(page);
+  const snap = page.getByRole("spinbutton", { name: "Custom move snap" });
+  await snap.fill("0.125");
+  await snap.press("Enter");
+  await expect(page.getByRole("combobox", { name: "Move snap increment" })).toHaveValue("custom");
+  await page.getByRole("button", { name: "Move selection +X" }).click();
+  const moved = await source(page);
+  expect(moved.cuboids[0]!.from).toEqual([3.125, 3, 3]);
+  expect(moved.cuboids[1]!.from).toEqual([2.125, 1, 2]);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(original);
+
+  await row(page, "Lantern body").click();
+  await expect(page.getByRole("spinbutton", { name: "Custom move snap" })).toHaveValue("0.125");
+  await page.getByRole("spinbutton", { name: "Custom move snap" }).fill("0");
+  await page.getByRole("spinbutton", { name: "Custom move snap" }).press("Enter");
+  await expect(page.getByRole("spinbutton", { name: "Custom move snap" })).toHaveValue("0.125");
+});
