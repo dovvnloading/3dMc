@@ -233,3 +233,54 @@ test("two duplicate commands in one browser turn both commit without losing the 
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
   expect(await source(page)).toEqual(initial);
 });
+
+test("array duplicates a multi-selection with exact offsets and one undoable source change", async ({ page }) => {
+  const original = await source(page);
+  await selectPair(page);
+  await page.getByRole("spinbutton", { name: "Array copies" }).fill("3");
+  await page.getByRole("spinbutton", { name: "Array step X" }).fill("0");
+  await page.getByRole("spinbutton", { name: "Array step Y" }).fill("4");
+  await page.getByRole("spinbutton", { name: "Array step Z" }).fill("-2");
+  await page.getByRole("button", { name: "Create array copies" }).click();
+
+  await expect(rows(page)).toHaveCount(13);
+  await expect(page.getByRole("heading", { name: "2 parts selected" })).toBeVisible();
+  const array = await source(page);
+  expect(array.cuboids[7]!.from).toEqual([3, 7, 1]);
+  expect(array.cuboids[9]!.from).toEqual([3, 11, -1]);
+  expect(array.cuboids[11]!.from).toEqual([3, 15, -3]);
+  expect(array.cuboids[7]!.faces).toEqual(original.cuboids[0]!.faces);
+  expect(array.textures).toEqual(original.textures);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(original);
+  await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
+  expect(await source(page)).toEqual(array);
+
+  const [archive] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await archive.path();
+  if (!path) throw new Error("Native project archive missing");
+  await page.locator('input[type="file"][accept*=".3dmc"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  expect(await source(page)).toEqual(array);
+});
+
+test("single-element array rejects empty spacing before creating copies", async ({ page }) => {
+  await row(page, "Lantern body").click();
+  const original = await source(page);
+  const action = page.getByRole("button", { name: "Create array copies" });
+  await expect(action).toBeEnabled();
+  await page.getByRole("spinbutton", { name: "Array step X" }).fill("0");
+  await expect(action).toBeDisabled();
+  await page.getByRole("spinbutton", { name: "Array step X" }).fill("1");
+  await action.click();
+  await expect(rows(page)).toHaveCount(9);
+  const result = await source(page);
+  expect(result.cuboids[7]!.from).toEqual([4, 3, 3]);
+  expect(result.cuboids[8]!.from).toEqual([5, 3, 3]);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(original);
+});
