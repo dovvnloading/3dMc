@@ -10,12 +10,13 @@ interface Props {
   currentWidth: number;
   currentHeight: number;
   paintedFaces: number;
+  hasLayers?: boolean;
   onClose: () => void;
   onConfirm: (policy: TextureImportPolicy) => void;
 }
 
 export function TextureImportDialog({
-  image, isAdding = false, currentWidth, currentHeight, paintedFaces, onClose, onConfirm
+  image, isAdding = false, currentWidth, currentHeight, paintedFaces, hasLayers = false, onClose, onConfirm
 }: Props) {
   const [policy, setPolicy] = useState<TextureImportPolicy>("keep-size");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -86,6 +87,11 @@ export function TextureImportDialog({
               {isAdding ? "" : " Current painted element count: " + paintedFaces + "."}
               It is <strong>one undoable edit</strong>; existing source textures remain in Undo history.
             </span></p>
+            {!isAdding && hasLayers && <p role="status"><AlertTriangle size={15}/><span>
+              Replacing this PNG also removes all editable raster layers on the selected texture.
+              The entire layered source is retained in Undo until you close the project.
+              Save a portable .3dmc backup before replacing the sheet if you need to keep layers.
+            </span></p>}
             {resamples && <p><AlertTriangle size={15}/><span>
               Nearest-neighbor resampling changes pixel dimensions without smoothing. A non-square PNG is stretched
               to the current canvas aspect ratio.
