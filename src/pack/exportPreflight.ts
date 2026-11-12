@@ -92,18 +92,29 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
       })));
   }
 
+  for (const item of pack.items ?? []) {
+    const owner = pack.models.find(model => model.id === item.sourceModelId)!;
+    const source = sourcesById.get(owner.sourceDocumentId)!;
+    reserve(gameFilePath("models", item.resource), "item model " + item.id, owner, source.name);
+    reserve(gameFilePath("items", item.replaces), "item definition " + item.id, owner, source.name);
+  }
+
   const replacements = pack.models.map(model => resourceKey(model.replaces));
+  const itemReplacements = (pack.items ?? []).map(item => resourceKey(item.replaces));
   issues.push({
     severity: "warning", code: "PACK_VISUAL_REPLACEMENTS_ONLY",
     message: "This pack replaces visuals for " + replacements.join(", ") +
+      (itemReplacements.length ? "; items " + itemReplacements.join(", ") : "") +
       ", not collision, lighting, crafting, or gameplay."
   });
   issues.push({
     severity: "warning", code: "PACK_GAME_CHECK_REQUIRED",
     message: "Check this experimental pack in Minecraft Java 1.21.4. " +
-      (pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block") ?
-        "Combined packs and iron-block replacements still need their own in-game verification." :
-        "The browser preview is only an approximation of Minecraft rendering.")
+      (itemReplacements.length ?
+        "Item models and their inventory/hand display transforms still need in-game verification." :
+        pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block") ?
+          "Combined packs and iron-block replacements still need their own in-game verification." :
+          "The browser preview is only an approximation of Minecraft rendering.")
   });
   return issues;
 }
