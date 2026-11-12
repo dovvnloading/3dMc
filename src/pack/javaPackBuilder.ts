@@ -16,7 +16,10 @@ import { javaItemDisplay } from "./itemProfile";
  * variant. The existing diamond-block fixture is the only in-game check here;
  * iron-block output still needs its own real-game verification.
  */
-export const JAVA_1214_REPLACEMENTS = ["diamond_block", "iron_block"] as const;
+export const JAVA_1214_REPLACEMENTS = [
+  "diamond_block", "iron_block", "gold_block", "emerald_block",
+  "lapis_block", "redstone_block", "netherite_block", "obsidian"
+] as const;
 export const MAX_INDEXED_EXPORT_MODELS = 8 as const;
 export const MAX_INDEXED_EXPORT_BYTES = 12_000_000 as const;
 
@@ -85,7 +88,8 @@ export function makeIndexedJava1214Pack(index: PackDocument,
     if (!JAVA_1214_REPLACEMENTS.includes(asset.replaces.path as typeof JAVA_1214_REPLACEMENTS[number]))
       throw new PackIndexError(
         "Unsupported Java 1.21.4 replacement " + resourceKey(asset.replaces) +
-        ". Choose diamond_block or iron_block; blocks with state properties need a separate profile."
+        ". Choose a property-free replacement: " + JAVA_1214_REPLACEMENTS.join(", ") +
+        ". Stateful blocks need a separate profile."
       );
 
     // verifyPackSources already established the exact source identity and target.

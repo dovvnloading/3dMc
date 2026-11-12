@@ -60,7 +60,8 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
       issues.push({
         severity: "error", code: "UNSUPPORTED_BLOCK_REPLACEMENT",
         message: resourceKey(model.replaces) +
-          " is not an allowed Java 1.21.4 block replacement. Choose diamond_block or iron_block in Pack Studio.",
+          " is not an allowed Java 1.21.4 block replacement. Choose " +
+          JAVA_1214_REPLACEMENTS.join(", ") + " in Pack Studio.",
         sourceDocumentId: model.sourceDocumentId, sourceName: source.name
       });
     }

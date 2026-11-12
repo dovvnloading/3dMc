@@ -7,7 +7,7 @@ import { decodeNativeProject, nativeFilename } from "../editor/nativeArchive";
 import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
-import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
+import { JAVA_1214_REPLACEMENTS, makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
 import { describeTextureDependencies, searchPackModels } from "../pack/assetBrowser";
 import {
   activePackDocument, activePackModel, addPackModel, createPackSession,
@@ -136,13 +136,13 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
 
   const nextReplacement = () => {
     const names = new Set(pack.models.map(model => model.replaces.path));
-    return ["diamond_block", "iron_block"].find(name => !names.has(name)) ?? null;
+    return JAVA_1214_REPLACEMENTS.find(name => !names.has(name)) ?? null;
   };
 
   const addSource = (document: EditorDocument) => {
     const replacement = nextReplacement();
     if (!replacement) {
-      setMessage("This Java 1.21.4 experiment supports two non-conflicting block replacements per pack.");
+      setMessage("This Java 1.21.4 experiment supports up to eight distinct block replacements per pack.");
       return;
     }
     if (document.target.candidateRelease !== "1.21.4") {
@@ -276,7 +276,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
 
     <div className="pack-studio-layout">
       <section className="pack-studio-models" aria-label="Pack models">
-        <h3>Models <span>{pack.models.length}/2 supported replacements</span></h3>
+        <h3>Models <span>{pack.models.length}/{JAVA_1214_REPLACEMENTS.length} supported replacements</span></h3>
         <div className="pack-studio-search">
           <Search size={15} aria-hidden="true"/>
           <input type="search" aria-label="Search pack models" placeholder="Model, path, texture…"
@@ -342,11 +342,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
             onChange={event => change(current => setModelResource(
               current, active.id, active.resource,
               { namespace: "minecraft", path: event.target.value }))}>
-            <option value="diamond_block">minecraft:diamond_block</option>
-            <option value="iron_block">minecraft:iron_block</option>
+            {JAVA_1214_REPLACEMENTS.map(target =>
+              <option key={target} value={target}>minecraft:{target}</option>)}
           </select>
         </label>
-        <p className="pack-studio-help">The two supported replacement paths must be unique. This resource pack changes visuals, not gameplay or collision.</p>
+        <p className="pack-studio-help">Each replacement target must be unique. This resource pack changes visuals, not gameplay or collision.</p>
         <h4>Texture dependencies</h4>
         <div className="pack-studio-textures">
           {textureList.map(({ asset, sourceTexture }) => {
