@@ -899,7 +899,7 @@ export function App() {
           <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
           <IconButton active={tool === "line"} label="Line tool (L)" onClick={() => switchTool("line")}><Minus size={18}/></IconButton>
           <IconButton active={tool === "rectangle"} label="Rectangle outline (U)" onClick={() => switchTool("rectangle")}><Square size={18}/></IconButton>
-          <IconButton active={tool === "eraser" label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
+          <IconButton active={tool === "eraser"} label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
           <IconButton active={tool === "fill"} label="Fill connected area (G)" onClick={() => switchTool("fill")}><PaintBucket size={18}/></IconButton>
           <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
         </>}</div>}
