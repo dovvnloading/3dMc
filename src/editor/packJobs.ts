@@ -10,7 +10,7 @@ export type PackJobKind = "native" | "java";
 export interface PackJobRequest {
   kind: PackJobKind;
   pack: PackDocument;
-  sources: Record<string, EditorDocument>;
+  sources: EditorDocument[];
 }
 
 export type PackJobReply =
@@ -18,7 +18,7 @@ export type PackJobReply =
   | { success: false; error: string };
 
 export function buildPackZipInWorker(kind: PackJobKind, pack: PackDocument,
-  sources: Record<string, EditorDocument>, signal?: AbortSignal): Promise<Uint8Array> {
+  sources: EditorDocument[], signal?: AbortSignal): Promise<Uint8Array> {
   if (signal?.aborted) {
     return Promise.reject(new DOMException("Pack preparation canceled.", "AbortError"));
   }
