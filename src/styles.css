@@ -983,3 +983,30 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .palette-actions button{min-height:25px;padding:4px 8px;color:var(--text);background:var(--control);border:1px solid var(--interactive-border);border-radius:5px;font-size:11px;cursor:pointer}
 .palette-actions button:disabled{opacity:.4;cursor:not-allowed}
 .palette-actions button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* Paint layer stack: rows are shown top-to-bottom; document order is bottom-up. */
+.raster-layers-panel{border-bottom:1px solid var(--divider);padding:12px 0;margin:0 0 13px}
+.raster-layers-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.raster-layers-heading h3{font-size:12px;margin:0;color:var(--text)}
+.raster-layers-heading span{color:var(--secondary);font-size:10px}
+.raster-layer-help{font-size:10px;color:var(--secondary);line-height:1.55;margin:10px 0}
+.raster-layer-create,.raster-layer-actions button{padding:7px 10px;border:1px solid var(--interactive-border);background:var(--control);color:var(--text);border-radius:5px;font-size:11px;cursor:pointer}
+.raster-layer-create:disabled,.raster-layer-actions button:disabled{opacity:.4;cursor:not-allowed}
+.raster-layer-list{display:grid;gap:4px;max-height:250px;overflow:auto;margin:10px 0}
+.raster-layer-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto auto 21px 21px;gap:4px;align-items:center;min-width:0;padding:5px;background:var(--control);border-radius:5px;border:1px solid var(--divider)}
+.raster-layer-row.current{border-color:var(--accent);background:var(--selected)}
+.raster-layer-row button{min-width:0;background:transparent;border:0;color:var(--secondary);font-size:10px;padding:4px 2px;cursor:pointer;border-radius:3px}
+.raster-layer-row button:hover{color:var(--accent);background:var(--raised)}
+.raster-layer-row button:disabled{opacity:.3;cursor:not-allowed}
+.raster-layer-row .raster-layer-select{font-size:15px;color:var(--accent)}
+.raster-layer-row .raster-layer-toggle{font-size:9px}
+.raster-layer-row .raster-layer-percent{font-size:9px;color:var(--secondary)}
+.raster-layer-name{width:100%;min-width:0;border:1px solid transparent;padding:5px 3px;background:transparent;color:var(--text);font-size:11px;border-radius:3px;box-sizing:border-box}
+.raster-layer-name:focus{border-color:var(--interactive-border);outline:2px solid var(--focus)}
+.raster-layer-detail{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0}
+.raster-layer-detail>span{color:var(--secondary);font-size:10px}
+.raster-opacity{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--secondary)}
+.raster-opacity input{width:60px;max-width:100%;border:1px solid var(--interactive-border);border-radius:4px;padding:6px;background:var(--control);color:var(--text);font-size:11px}
+.raster-opacity input[aria-invalid=true]{border-color:#e0988c}
+.raster-opacity small{color:#e0988c}
+.raster-layer-actions{display:flex;gap:6px;flex-wrap:wrap}
