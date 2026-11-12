@@ -217,7 +217,8 @@ export function parsePackDocument(input: unknown): PackDocument {
       if (replaces.namespace !== "minecraft" ||
           !JAVA_1214_ITEM_TARGETS.includes(
             replaces.path as typeof JAVA_1214_ITEM_TARGETS[number]))
-        fail("Unsupported Java 1.21.4 item replacement. Choose stick, paper, apple, or diamond_sword.");
+        fail("Unsupported Java 1.21.4 item replacement. Choose " +
+          JAVA_1214_ITEM_TARGETS.join(", ") + ".");
       const handAnimationOnSwap = item.handAnimationOnSwap;
       if (typeof handAnimationOnSwap !== "boolean")
         fail("Item hand animation setting must be true or false.");

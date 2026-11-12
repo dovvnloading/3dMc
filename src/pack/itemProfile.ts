@@ -4,7 +4,8 @@
  * This is visual replacement only, not item components or game behavior.
  */
 export const JAVA_1214_ITEM_TARGETS = [
-  "stick", "paper", "apple", "diamond_sword"
+  "stick", "paper", "apple", "diamond_sword",
+  "iron_ingot", "gold_ingot", "diamond", "emerald"
 ] as const;
 
 export const ITEM_DISPLAY_CONTEXTS = [

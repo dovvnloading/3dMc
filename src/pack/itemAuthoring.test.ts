@@ -23,7 +23,10 @@ const fixture = (id = "item-one", replaces = "stick"): PackItemAsset => ({
 
 describe("Java 1.21.4 item authoring profile", () => {
   it("bounds and round-trips exact display contexts without shared mutable defaults", () => {
-    expect(JAVA_1214_ITEM_TARGETS).toEqual(["stick", "paper", "apple", "diamond_sword"]);
+    expect(JAVA_1214_ITEM_TARGETS).toEqual([
+      "stick", "paper", "apple", "diamond_sword",
+      "iron_ingot", "gold_ingot", "diamond", "emerald"
+    ]);
     const initial = defaultItemDisplay();
     expect(parseItemDisplay(initial)).toEqual(initial);
     const changed = updateItemDisplay(initial, "gui", "rotation", 1, -95.5);
@@ -190,6 +193,30 @@ describe("Java 1.21.4 item authoring profile", () => {
     expect(restored.pack.exportBlockVisuals).toBe(false);
     expect(makeIndexedJava1214Pack(restored.pack, restored.sources).zip).toEqual(out.zip);
     expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it("generates one Java item definition per supported target without duplicating texture files", () => {
+    const source = createSampleDocument();
+    const index = indexLegacyProject(source);
+    const items = JAVA_1214_ITEM_TARGETS.map((target, index) => ({
+      ...fixture("item-" + index, target),
+      resource: { namespace: "studio", path: "item/model_" + index }
+    }));
+    const pack = parsePackDocument({ ...index, items, exportBlockVisuals: false });
+    const exported = makeIndexedJava1214Pack(pack, [source]);
+    expect(exported.replaces).toEqual([]);
+    expect(exported.itemReplacements).toEqual(JAVA_1214_ITEM_TARGETS.map(
+      target => "minecraft:" + target));
+    const files = unzipSync(exported.zip);
+    expect(Object.keys(files).filter(path => path.includes("/items/"))).toHaveLength(8);
+    expect(Object.keys(files).filter(path => path.includes("/blockstates/"))).toHaveLength(0);
+    expect(Object.keys(files).filter(path => path === "assets/3dmc/textures/block/main.png"))
+      .toHaveLength(1);
+    for (const [i, target] of JAVA_1214_ITEM_TARGETS.entries()) {
+      expect(files["assets/minecraft/items/" + target + ".json"]).toBeDefined();
+      const itemModel = JSON.parse(strFromU8(files["assets/minecraft/items/" + target + ".json"]!));
+      expect(itemModel.model.model).toBe("studio:item/model_" + i);
+    }
   });
 
   it("rejects item model collisions and source-format blockers before writing a ZIP", () => {

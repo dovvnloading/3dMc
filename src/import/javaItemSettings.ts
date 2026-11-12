@@ -92,7 +92,8 @@ export function inspectGeneratedItemSettings(bytes: Uint8Array, packInput: PackD
 
     const itemPaths = [...files.keys()].filter(path => path.startsWith("assets/minecraft/items/"));
     if (!itemPaths.length || itemPaths.length > JAVA_1214_ITEM_TARGETS.length)
-      fail("This ZIP needs 1–4 supported item definitions from 3dMc.");
+      fail("This ZIP needs 1–" + JAVA_1214_ITEM_TARGETS.length +
+        " supported item definitions from 3dMc.");
 
     const imported: PackItemAsset[] = [];
     for (const itemPath of itemPaths) {
