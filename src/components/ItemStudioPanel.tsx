@@ -21,7 +21,9 @@ function ItemTextField({ label, value, onCommit }: {
       onBlur={event => {
         const next = event.currentTarget.value.trim();
         if (next && next !== value) onCommit(next);
-        else setDraft(value);
+        // Revert an invalid attempted edit; a successful change updates value
+        // through the canonical pack session and refreshes this controlled field.
+        setDraft(value);
       }}
       onKeyDown={event => {
         if (event.key === "Enter") event.currentTarget.blur();
