@@ -16,8 +16,13 @@ export function boxUVLayout(node: Cuboid): Record<FaceDirection, FaceUVRect> {
   const scale = Math.min(16 / sheetWidth, 16 / sheetHeight);
   const ox = (16 - sheetWidth * scale) / 2;
   const oy = (16 - sheetHeight * scale) / 2;
-  const rect = (x1: number, y1: number, x2: number, y2: number): FaceUVRect =>
-    [ox + x1 * scale, oy + y1 * scale, ox + x2 * scale, oy + y2 * scale];
+  const rect = (x1: number, y1: number, x2: number, y2: number): FaceUVRect => {
+    const exact: FaceUVRect = [ox + x1 * scale, oy + y1 * scale,
+      ox + x2 * scale, oy + y2 * scale];
+    const rounded = exact.map(value => Math.round(value * 1_000_000) / 1_000_000) as unknown as FaceUVRect;
+    // Very thin but valid parts should not become zero-area UV faces after rounding.
+    return rounded[0] < rounded[2] && rounded[1] < rounded[3] ? rounded : exact;
+  };
   const result: Record<FaceDirection, FaceUVRect> = {
     up: rect(d, 0, d + w, d),
     down: rect(d, d + h, d + w, 2 * d + h),
