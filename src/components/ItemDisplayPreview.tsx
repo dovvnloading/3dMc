@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import type { Cuboid, EditorDocument, PixelTexture } from "../editor/domain";
+import type { Cuboid, EditorDocument } from "../editor/domain";
 import type { ItemDisplayTransform } from "../pack/itemProfile";
 import { applyFaceUvs, BOX_FACE_ORDER } from "../editor/uv";
 
