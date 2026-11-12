@@ -303,7 +303,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button type="button" disabled={saving || exporting} onClick={() => void exportPack()}>
         <Download size={15}/>{exporting ? "Building ZIP…" : "Export Java ZIP"}
       </button>
-      {(saving || exporting) && <button type="button" onClick={cancelPackJob}>Cancel preparation</button>
+      {(saving || exporting) && <button type="button" onClick={cancelPackJob}>Cancel preparation</button>}
       <button type="button" disabled={!session.past.length}
         onClick={() => change(undoPackSession)} aria-label="Undo pack operation">Undo</button>
       <button type="button" disabled={!session.future.length}
