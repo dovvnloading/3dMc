@@ -212,3 +212,106 @@ test("asset search filters by model, replacement, and texture path without chang
   const modelSelector = page.getByRole("combobox", { name: "Active pack model" });
   await expect(modelSelector).toContainText("Frost Window");
 });
+
+
+test("Java item authoring exports a 1.21.4 item definition and persists display edits", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  await studio.getByRole("button", { name: "Add Java item" }).click();
+
+  const target = studio.getByRole("combobox", { name: "Item replacement target" });
+  await expect(target).toHaveValue("stick");
+  await expect(studio.getByRole("group", { name: "Item display preview" })).toBeVisible();
+  const modelPath = studio.getByRole("textbox", { name: "Item model path" });
+  await modelPath.fill("item/custom_lantern");
+  await modelPath.press("Enter");
+  await expect(modelPath).toHaveValue("item/custom_lantern");
+
+  const context = studio.getByRole("combobox", { name: "Item display context" });
+  await expect(context).toHaveValue("gui");
+  const guiAngle = studio.getByRole("spinbutton", { name: "Inventory / GUI rotation X" });
+  await guiAngle.fill("60");
+  await guiAngle.press("Enter");
+  await expect(guiAngle).toHaveValue("60");
+  await context.selectOption("firstperson_righthand");
+  const handScale = studio.getByRole("spinbutton", { name: "First-person hand scale X" });
+  await handScale.fill("0.85");
+  await handScale.press("Enter");
+  await expect(handScale).toHaveValue("0.85");
+  await studio.getByRole("checkbox", { name: "Animate hand on item swap" }).uncheck();
+
+  const [javaZip] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const javaPath = await javaZip.path();
+  if (!javaPath) throw new Error("Java item ZIP was not downloaded");
+  const javaFiles = unzipSync(new Uint8Array(await readFile(javaPath)));
+  const definition = JSON.parse(strFromU8(javaFiles["assets/minecraft/items/stick.json"]!));
+  expect(definition).toEqual({
+    model: { type: "minecraft:model", model: "3dmc:item/custom_lantern" },
+    hand_animation_on_swap: false
+  });
+  const model = JSON.parse(strFromU8(javaFiles["assets/3dmc/models/item/custom_lantern.json"]!));
+  expect(model.display.gui.rotation[0]).toBe(60);
+  expect(model.display.firstperson_righthand.scale[0]).toBe(0.85);
+  expect(model.textures.painted).toBe("3dmc:block/main");
+  expect(javaFiles["assets/minecraft/blockstates/diamond_block.json"]).toBeDefined();
+  expect(javaFiles["assets/3dmc/textures/block/main.png"]).toBeDefined();
+
+  const [native] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Save pack .3dmc" }).click()
+  ]);
+  const nativePath = await native.path();
+  if (!nativePath) throw new Error("Portable item source was not downloaded");
+  const nativeFiles = unzipSync(new Uint8Array(await readFile(nativePath)));
+  const sourcePack = JSON.parse(strFromU8(nativeFiles["pack.json"]!));
+  expect(sourcePack.items).toHaveLength(1);
+  expect(sourcePack.items[0].display.gui.rotation[0]).toBe(60);
+  expect(sourcePack.items[0].handAnimationOnSwap).toBe(false);
+
+  await studio.locator('input[type="file"][accept*=".3dmc"]').first().setInputFiles(nativePath);
+  await expect(studio.getByRole("group", { name: "Confirm source pack replacement" })).toBeVisible();
+  await studio.getByRole("button", { name: "Load selected pack" }).click();
+  await expect(studio).toHaveCount(0);
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const reopened = page.getByRole("dialog", { name: "Pack Studio" });
+  await expect(reopened.getByRole("combobox", { name: "Item replacement target" })).toHaveValue("stick");
+  await expect(reopened.getByRole("textbox", { name: "Item model path" }))
+    .toHaveValue("item/custom_lantern");
+  await expect(reopened.getByRole("checkbox", { name: "Animate hand on item swap" })).not.toBeChecked();
+  await expect(reopened.getByRole("spinbutton", { name: "Inventory / GUI rotation X" })).toHaveValue("60");
+});
+
+test("item targets and display settings are undoable without mutating source cuboids", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  await studio.getByRole("button", { name: "Add Java item" }).click();
+  const path = studio.getByRole("combobox", { name: "Item replacement target" });
+  await path.selectOption("paper");
+  await expect(path).toHaveValue("paper");
+  await studio.getByRole("button", { name: "Undo pack operation" }).click();
+  await expect(path).toHaveValue("stick");
+  await studio.getByRole("button", { name: "Redo pack operation" }).click();
+  await expect(path).toHaveValue("paper");
+  await studio.getByRole("button", { name: "Add Java item" }).click();
+  await expect(studio.getByRole("group", { name: "Item assets for selected model" })
+    .getByRole("button")).toHaveCount(2);
+
+  // Generated item raw models may not overwrite an existing block model.
+  const itemModelPath = studio.getByRole("textbox", { name: "Item model path" });
+  await itemModelPath.fill("block/lantern");
+  await itemModelPath.press("Enter");
+  await expect(studio.getByText(/Duplicate model paths/)).toBeVisible();
+  await expect(itemModelPath).not.toHaveValue("block/lantern");
+
+  await studio.getByRole("button", { name: "Remove Java item" }).click();
+  await expect(studio.getByRole("group", { name: "Item assets for selected model" })
+    .getByRole("button")).toHaveCount(1);
+  await studio.getByRole("button", { name: "Undo pack operation" }).click();
+  await expect(studio.getByRole("group", { name: "Item assets for selected model" })
+    .getByRole("button")).toHaveCount(2);
+});
