@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { EditorDocument } from "../editor/domain";
 import { addPackItem, editPackIndex, removePackItem, setItemHandAnimation,
   setPackItemDisplay, setPackItemResource } from "../pack/packSession";
 import type { PackSession } from "../pack/packSession";
 import { MAX_PACK_ITEMS, resourceKey } from "../pack/packDocument";
+import type { PackDocument } from "../pack/packDocument";
+import { inspectGeneratedItemSettings } from "../import/javaItemSettings";
+import { MAX_INDEXED_EXPORT_BYTES } from "../pack/javaPackBuilder";
 import { defaultItemDisplay, ITEM_DISPLAY_CONTEXTS, itemContextName,
   JAVA_1214_ITEM_TARGETS } from "../pack/itemProfile";
 import type { ItemAxis, ItemDisplayContext, ItemDisplayTransform } from "../pack/itemProfile";
@@ -71,7 +75,7 @@ function ItemNumberField({ label, value, minimum, maximum, onCommit }: {
 interface Props {
   session: PackSession;
   source: EditorDocument;
-  onEdit: (operation: (current: PackSession) => PackSession) => void;
+  onEdit: (operation: (current: PackSession) => PackSession) => boolean;
 }
 
 /**
@@ -84,6 +88,12 @@ export function ItemStudioPanel({ session, source, onEdit }: Props) {
   const items = (pack.items ?? []).filter(item => item.sourceModelId === activeModelId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [context, setContext] = useState<ItemDisplayContext>("gui");
+  const [reading, setReading] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+  const [pendingImport, setPendingImport] = useState<{
+    pack: PackDocument; revision: number; count: number;
+  } | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
   const selected = items.find(item => item.id === selectedId) ?? items[0] ?? null;
   const unavailable = new Set((pack.items ?? []).map(item => item.replaces.path));
   const nextTarget = JAVA_1214_ITEM_TARGETS.find(target => !unavailable.has(target));
@@ -91,13 +101,12 @@ export function ItemStudioPanel({ session, source, onEdit }: Props) {
     if (!nextTarget || (pack.items?.length ?? 0) >= MAX_PACK_ITEMS) return;
     const key = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
     const id = "item_" + key;
-    onEdit(current => addPackItem(current, {
+    if (onEdit(current => addPackItem(current, {
       id, sourceModelId: activeModelId,
       resource: { namespace: "3dmc", path: "item/" + nextTarget + "_" + key },
       replaces: { namespace: "minecraft", path: nextTarget },
       display: defaultItemDisplay(), handAnimationOnSwap: true
-    }));
-    setSelectedId(id);
+    }))) setSelectedId(id);
   };
   const update = (operation: (itemId: string) => (current: PackSession) => PackSession) => {
     if (selected) onEdit(operation(selected.id));
@@ -105,15 +114,74 @@ export function ItemStudioPanel({ session, source, onEdit }: Props) {
   const editValue = (field: keyof ItemDisplayTransform, axis: ItemAxis, value: number) =>
     update(id => current => setPackItemDisplay(current, id, context, field, axis, value));
 
+  const chooseItemSettings = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_INDEXED_EXPORT_BYTES) {
+      setImportMessage("Java ZIP exceeds the 12 MB bounded import limit.");
+      return;
+    }
+    const revision = session.revision;
+    setReading(true);
+    setPendingImport(null); setImportMessage("");
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = inspectGeneratedItemSettings(bytes, pack, session.present.sources);
+      if (result.status === "blocked") {
+        setImportMessage(result.problems.join(" "));
+      } else {
+        setPendingImport({ pack: result.pack, revision, count: result.items.length });
+        setImportMessage("Review the detected item targets before replacing your item configurations.");
+      }
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : "Item settings ZIP could not be read.");
+    } finally {
+      setReading(false);
+    }
+  };
+  const applyImportedSettings = () => {
+    if (!pendingImport) return;
+    const candidate = pendingImport;
+    if (onEdit(current => {
+      if (current.revision !== candidate.revision)
+        throw new Error("The pack changed during item import. Reopen the ZIP; no item settings were replaced.");
+      return editPackIndex(current, () => candidate.pack);
+    })) {
+      setPendingImport(null);
+      setSelectedId(null);
+      setImportMessage("Imported item settings into this editable pack. Save a .3dmc source backup.");
+    }
+  };
+
   return <section className="pack-item-studio" aria-label="Java item assets">
     <div className="pack-item-studio-header">
       <div><h3>Java item authoring <span>{(pack.items ?? []).length}/{MAX_PACK_ITEMS}</span></h3>
         <p>Use the active editable model for an item visual. Its geometry and textures stay linked to the source.</p>
       </div>
-      <button type="button" onClick={add} disabled={!nextTarget ||
-        (pack.items?.length ?? 0) >= MAX_PACK_ITEMS}
-        aria-label="Add Java item"><Plus size={15}/>Add item</button>
+      <div className="pack-item-header-actions">
+        <button type="button" onClick={add} disabled={!nextTarget ||
+          (pack.items?.length ?? 0) >= MAX_PACK_ITEMS}
+          aria-label="Add Java item"><Plus size={15}/>Add item</button>
+        <input ref={importRef} type="file" hidden accept=".zip,application/zip"
+          onChange={event => void chooseItemSettings(event)}/>
+        <button type="button" disabled={reading}
+          aria-label="Import item settings from Java ZIP"
+          onClick={() => importRef.current?.click()}>
+          {reading ? "Reading ZIP…" : "Import item settings ZIP"}
+        </button>
+      </div>
     </div>
+    {pendingImport && <div className="pack-item-import-review" role="group"
+      aria-label="Review imported item settings">
+      <p>Replace this pack's item settings with {pendingImport.count} recognized item
+        {pendingImport.count === 1 ? "" : "s"}? Geometry, texture pixels and block replacements will remain unchanged.</p>
+      <button type="button" onClick={applyImportedSettings}>Apply imported item settings</button>
+      <button type="button" onClick={() => { setPendingImport(null); setImportMessage(""); }}>
+        Cancel item settings import
+      </button>
+    </div>}
+    {importMessage && <p className="pack-item-import-message" role="status">{importMessage}</p>}
     {items.length > 0 && <div className="pack-item-tabs" role="group" aria-label="Item assets for selected model">
       {items.map(item => <button type="button" key={item.id}
         aria-pressed={item.id === selected?.id}
