@@ -230,13 +230,14 @@ export function parseDocument(input: unknown): EditorDocument {
         throw new Error("Source group IDs must be valid and unique.");
       if (typeof item.name !== "string" || !item.name.trim() || item.name.length > 100)
         throw new Error("Source group names must have 1–100 characters.");
-      if (!Array.isArray(item.memberIds) || item.memberIds.length < 1 ||
-          item.memberIds.some(id => typeof id !== "string" || !cuboidIds.has(id) ||
-            usedMembers.has(id) || item.memberIds.filter(candidate => candidate === id).length !== 1))
+      const memberIds = item.memberIds;
+      if (!Array.isArray(memberIds) || memberIds.length < 1 ||
+          memberIds.some(id => typeof id !== "string" || !cuboidIds.has(id) ||
+            usedMembers.has(id)) || new Set(memberIds).size !== memberIds.length)
         throw new Error("Source groups contain duplicated or missing cuboid references.");
       usedGroupIds.add(item.id);
-      item.memberIds.forEach(id => usedMembers.add(id));
-      return { id: item.id, name: item.name, memberIds: [...item.memberIds] };
+      memberIds.forEach(id => usedMembers.add(id));
+      return { id: item.id, name: item.name, memberIds: [...memberIds] };
     });
   }
 
