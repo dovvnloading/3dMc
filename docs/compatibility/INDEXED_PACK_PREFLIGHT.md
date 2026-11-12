@@ -22,3 +22,23 @@ Focused unit tests cover a valid legacy pack, a two-model pack, unsupported stat
 The browser test builds a two-model pack, intentionally collides a declared texture path with a generated solid texture, confirms Download is disabled and the source is identified, corrects the path, and confirms the blocker is cleared. New ZIP combinations still require real-game checks.
 
 See the [pack contract](../architecture/PACK_DOCUMENT.md), [full-scale expansion plan](../delivery/FULL_SCALE_EXPANSION_PLAN.md), and [Java compatibility evidence](../evidence/java-1.21.4-2026-11-09/REPORT.md).
+
+## Exact generated-file preview
+
+Pack Studio now offers **Preview Java ZIP files** before download. The list includes
+`pack.mcmeta`, every generated blockstate/model JSON, each bound source texture
+and each generated solid-material PNG, together with the owning source model.
+It shows the exact vanilla block replacements affected by the current pack.
+The download button is disabled if the preflight has errors, and the opened
+preview explains the blockers and the source to correct.
+
+The preview and editor's existing export gate use the same non-mutating
+`planIndexedJava1214Pack` result. A focused unit test asserts that the planned
+paths (including order) match the actual writer's ZIP entry paths for a
+two-model diamond/iron pack; a browser test compares the visible list with
+downloaded ZIP entries and verifies collision correction. The writer still
+revalidates immediately before packaging.
+
+This is a source/path verification aid, **not** a Minecraft renderer or
+in-game compatibility check. The combined diamond/iron fixture still needs
+game screenshots, exact ZIP hash and a recorded Java 1.21.4 client run.
