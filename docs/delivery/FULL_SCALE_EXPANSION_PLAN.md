@@ -15,6 +15,12 @@ The goal is an approachable workflow that produces dependable game-ready assets,
 
 Keep the core editor usable without accounts or a backend. Add optional online services only when they solve a demonstrated problem.
 
+## Initial push: development milestones only
+
+The current push is for **building the editor**. Milestones must deliver implemented code and usable creator features, not planning, documentation sweeps, test campaigns, in-game certification, performance reports, creator studies, or release sign-off. Work directly from the unimplemented features below. Keep existing safety and source-data protections while coding.
+
+Routine developer checks can accompany a change, but testing and compatibility evidence are **not separate stages or blockers for progressing through this initial implementation push**. In-game, hardware, cross-browser, and release validation can happen later. Until verified, Minecraft compatibility claims remain explicitly experimental.
+
 ## Current foundation
 
 Reviewed baseline: main at `552b14466f258a308b575a9bcd3717527aab18a1`.
@@ -30,22 +36,25 @@ Already present:
 - Up to 16 named texture sheets and pixel-painting tools.
 - Native `.3dmc` archives, migration, recovery, and local project snapshots.
 - Bounded external Java model import with dependency preflight.
-- Experimental Java 1.21.4 resource-pack export.
+- Experimental Java 1.21.4 resource-pack export and pack-wide preflight.
+- Unified Pack Studio multi-model editing, native pack v3 Save/Open, and pack-wide recovery.
+- Configurable block/model/texture resource paths with diamond/iron visual replacements.
+- Align/distribute modeling tools, searchable pack assets, and texture dependency inspection.
 - Unit, browser, cross-browser, and compiled-site testing infrastructure.
 
 Current constraints:
 
-- Export currently replaces `minecraft:diamond_block` using fixed paths.
+- Indexed Java export currently supports only `minecraft:diamond_block` and `minecraft:iron_block` visual replacements, not arbitrary block targets.
 - It does not create block behavior, crafting recipes, collision, or new game registrations.
 - Java export is restricted to the documented 1.21.4 static-block subset.
 - The 26.3 option is marked unsupported; it is not a second working target.
 - Native textures are limited to 64×64, and export has additional opacity and dimension restrictions.
 - The document supports more cuboids than the current exporter can output.
-- Geometry does not yet have element rotation or a group hierarchy.
+- Geometry has align/distribute but not named groups, geometry mirroring, or element rotation.
 - `App.tsx` owns substantial interaction and project orchestration.
 - External import is intentionally narrower than arbitrary Minecraft pack support.
 
-Some older roadmap language describes an earlier foundation stage and conflicts with the current implementation and practical testing direction. Reconcile it before planning new work.
+Older foundation-stage and quality-gate roadmaps are historical references, not required steps before further development.
 
 ## Define the first full release
 
@@ -73,16 +82,11 @@ A useful v1 should let a creator:
 
 ## Workstream A: strengthen the foundation
 
-### 1. Align the documentation with reality
+### Keep documentation aligned as needed (not a milestone)
 
-- Update the README, roadmap, backlog, and decision records to match the code.
-- Clearly separate implemented, experimental, planned, and unsupported capabilities.
-- Preserve useful game and device test observations without describing them as universal certification.
-- Keep testing practical and proportional rather than introducing heavy release gates for every change.
+Update capability descriptions alongside the corresponding implementation changes. Do not schedule stand-alone documentation, research, or test-evidence stages during the initial push.
 
-**Done when:** A new contributor can understand what works today, what is next, and what is explicitly unsupported.
-
-### 2. Split responsibilities out of `App.tsx`
+### Split responsibilities out of `App.tsx`
 
 Extract in small, behavior-preserving steps:
 
@@ -94,9 +98,9 @@ Extract in small, behavior-preserving steps:
 
 Preserve one canonical document, one revision sequence, and one authoritative history/transaction path. Renderer objects should remain derived from the document.
 
-**Done when:** Existing editing, cancellation, save/reopen, painting, and recovery tests pass after each extraction. Avoid a wholesale rewrite.
+**Implementation target:** Behavior-preserving extracted modules that keep editing, cancellation, save/reopen, painting, and recovery working. Avoid a wholesale rewrite.
 
-### 3. Improve diagnostics
+### Improve diagnostics
 
 - Let an issue select the affected model, element, face, or texture.
 - Explain the problem and offer a concrete corrective action.
@@ -150,7 +154,7 @@ Implement in roughly this order:
 - Preserve editable layers in native projects.
 - Flatten deterministically for game output.
 - Integrate strokes and layer operations with shared undo.
-- Add complex blending only after preview/export agreement is tested.
+- Add complex blending only after basic layer editing and deterministic flattening work.
 
 **Done when:** 2D and 3D painting share the same pixel operations; rotated and mirrored UV fixtures affect the intended texels; exported output matches the supported preview; and layered projects reopen without data loss.
 
@@ -193,7 +197,7 @@ Keep the active model editor separate from the pack-wide asset index.
 - Define a version-specific item profile.
 - Add item display contexts and corresponding previews.
 - Generate the item definitions and model relationships required by that version.
-- Test representative inventory, handheld, and display cases.
+- Build representative inventory, handheld, and display previews; defer formal in-game testing.
 - Do not assume block export proves item compatibility.
 
 **Done when:** A creator can make several assets, reopen the source project, and export one working pack without manually repairing generated JSON.
@@ -211,17 +215,17 @@ Each profile should declare:
 - Import behavior and export mappings.
 - Known preview limitations.
 
-Keep source-project schema versions separate from Minecraft format versions. A dropdown option must never imply support before its implementation and tests exist.
+Keep source-project schema versions separate from Minecraft format versions. A dropdown option must never imply support before its implementation exists; newly implemented formats remain experimental until verified later.
 
 Start with the existing Java 1.21.4 profile. Choose the next target based on creator demand and the relevant current format documentation.
 
-Expand imports field by field with real fixtures. Preserve original files where needed, retain existing archive and resource limits, and avoid silently discarding unsupported semantics.
+Expand imports field by field with representative source examples. Preserve original files where needed, retain existing archive and resource limits, and avoid silently discarding unsupported semantics.
 
 ## Workstream F: performance and data safety
 
-Before increasing limits:
+As larger-project capabilities are implemented:
 
-- Measure memory, paint latency, history size, and export time.
+- Instrument memory, paint latency, history size, and export time where needed to guide code optimizations; formal benchmarking comes later.
 - Replace expensive pixel snapshots with region or tile deltas where measurements justify it.
 - Keep periodic recovery checkpoints.
 - Move expensive decoding, encoding, and packaging into workers.
@@ -229,13 +233,13 @@ Before increasing limits:
 - Reject stale worker results using document and revision identity.
 - Dispose GPU resources on replacement and shutdown.
 
-Raise texture limits in measured steps, such as 128 and then 256 pixels, rather than promising unlimited projects.
+Raise texture limits in bounded increments, such as 128 and then 256 pixels, rather than promising unlimited projects.
 
 ### Persistence
 
 - Multiple named projects and a useful recent-project view.
 - Clear backup/export reminders when browser storage is at risk.
-- Safe, tested schema migrations.
+- Safe, backward-compatible schema migrations.
 - Recovery from quota errors and interrupted writes.
 - No silent eviction of user-saved snapshots.
 - Direct file saving where supported, with a download fallback.
@@ -251,53 +255,47 @@ Raise texture limits in measured steps, such as 128 and then 256 pixels, rather 
 - Clear empty, loading, unsupported, and recovery states.
 - Desktop-first editing and usable narrow-screen inspection.
 - Accessible labels, contrast, and non-color-only status indicators.
-- Release notes, known limitations, and downloadable sample packs.
-- A bug-report template requesting version, target profile, and reproduction steps.
-- An optional sanitized diagnostic bundle, with no automatic project uploads.
-- Third-party asset/license inventory and clear Minecraft affiliation wording.
+- Downloadable example projects and sample packs.
 
-Consider offline installation or a desktop wrapper after user demand is established. If adding a service worker, test updates, stale caches, and recovery before claiming reliable offline use.
+Defer release notes, bug-report processes, license inventories, product studies and launch preparation until the development push is complete. Consider offline installation or a desktop wrapper after user demand is established.
 
-## Suggested implementation sequence
+## Initial implementation sequence — development only
 
-### First cycle: prepare the foundation
+The foundational pack workflow is already implemented: live multi-model editing, native pack Save/Open and recovery, asset browser search and rename, indexed Java export, and align/distribute tools. **Do not repeat completed foundation work or add verification-only milestones.** Continue with these existing, unimplemented workstream features:
 
-- Reconcile stale documentation.
-- Extract one clear orchestration boundary from `App.tsx`.
-- Add issue-to-element navigation.
-- Design the pack document and migration contract.
-- Implement configurable resource identity while preserving the current exporter fixture.
+### Milestone 1: modeling and organization
 
-### Second cycle: complete the pack workflow
+- Implement named groups with a navigable hierarchy and reference-safe group operations.
+- Add geometry mirroring and duplicate-with-offset/repeat/array tools; align/distribute already exist.
+- Improve numeric transforms and configurable snapping without changing unsupported game geometry silently.
 
-- Add a multi-asset browser and reference-safe operations.
-- Export a small pack with several supported assets.
-- Add groups and align/mirror tools.
-- Improve interactive UV selection.
+### Milestone 2: interactive UV and painting
 
-### Third cycle: expand creation capability
+- Implement interactive UV selection and dragging with linked 3D face highlighting.
+- Add pixel snapping, face UV copy/paste and predictable mirrored mappings.
+- Build line and rectangle paint tools, followed by palette and brush improvements.
 
-- Add a complete Java item profile.
-- Expand supported imports using real examples and fixtures.
-- Add high-value paint tools and palette management.
-- Measure larger texture/history workloads and fix demonstrated bottlenecks.
+### Milestone 3: item and format authoring
 
-### Following cycles
+- Implement a version-scoped Java item authoring profile and necessary model/definition relationships.
+- Add item editing and inventory/handheld/display previews.
+- Extend bounded import handling for the supported fields and supported Java export targets.
 
-- Layers and higher texture budgets.
-- Product polish informed by repeat users.
-- A second explicitly supported Minecraft profile.
-- Then decide whether Bedrock, animation, or integrations offer the most value.
+### Milestone 4: richer editable projects
 
-These are ordering blocks, not calendar promises. Re-estimate after each usable slice.
+- Add editable raster layers, visibility, opacity and reordering, plus deterministic export flattening.
+- Improve larger-project history, worker-based import/export, progress/cancel handling and source recovery.
+- Add useful project organization, onboarding, keyboard accessibility and workspace polish.
+
+Each milestone is complete for this push when its **code and UI actually work** with undo, save and reopen where applicable. These are feature-development increments, not calendar deadlines or release-certification gates. Later game/device/browser evidence does not block moving to the next implementation milestone.
 
 ## Divide work among code agents
 
 - **Core:** document schema, commands, history, migrations, and persistence.
 - **Modeling:** hierarchy, transforms, selection, and geometry tools.
 - **Texture:** UV workflows, painting, layers, and pixel tests.
-- **Compatibility:** profiles, imports, exports, and game fixtures.
-- **Integration/review:** cross-feature regressions, documentation, and release checks.
+- **Compatibility:** profile and format implementation, importers, and exporters.
+- **Integration:** connect features to the live editor, pack session, persistence, and existing UI.
 
 ### Coordination rules
 
@@ -305,22 +303,20 @@ These are ordering blocks, not calendar promises. Re-estimate after each usable 
 - Assign one owner to each branch or heavily shared file.
 - Keep PRs small and tied to complete creator tasks.
 - Separate behavior-preserving refactors from new features.
-- Review exact PR heads and rerun affected checks after integration.
-- Do not claim in-game compatibility from unit tests alone.
+- Integrate working code without turning review or testing into a separate development stage.
+- Keep unverified game targets labeled experimental; implementation is not in-game certification.
 
-## Definition of done
+## Development milestone completion (initial push)
 
-A feature is ready when it:
+A milestone is implemented when:
 
-- Solves a concrete creator task through the visible UI.
-- Has defined cancel, undo, and redo behavior.
-- Survives save/reopen and relevant recovery paths.
-- Handles invalid input without damaging current work.
-- Has focused regression tests and relevant browser checks.
-- Documents target-format restrictions.
-- Includes a real game check when changed export behavior requires one.
+- Its feature is accessible and usable through the editor, not just an API or planning document.
+- Edits use the canonical document or pack history and have appropriate undo/cancel behavior.
+- Editable source state survives the relevant Save/Open path.
+- Invalid input is handled without destroying existing work.
+- Unsupported or unverified target behavior is not misrepresented as production-ready.
 
-Use the existing test infrastructure and add evidence where it reduces meaningful risk. Avoid requiring a formal certification exercise for every small change.
+Do not make separate QA, game fixture, benchmarking, research, documentation, user study, or release-approval stages prerequisites for initial development. Ordinary developer checks are useful but are not milestones. Formal compatibility and release verification will be done later, before claiming verified support.
 
 ## Risks to watch
 
