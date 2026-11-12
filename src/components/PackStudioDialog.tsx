@@ -4,10 +4,11 @@ import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { renameProject } from "../editor/domain";
 import { decodeNativeProject, nativeFilename } from "../editor/nativeArchive";
-import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
+import { openNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
+import { buildPackZipInWorker } from "../editor/packJobs";
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
-import { JAVA_1214_REPLACEMENTS, makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
+import { JAVA_1214_REPLACEMENTS } from "../pack/javaPackBuilder";
 import { describeTextureDependencies, searchPackModels } from "../pack/assetBrowser";
 import {
   activePackDocument, activePackModel, addPackModel, createPackSession,
@@ -64,6 +65,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const setSession = onChange ?? setLocal;
   const [lastSavedRevision, setLastSavedRevision] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [opening, setOpening] = useState(false);
   const [message, setMessage] = useState("");
   const [modelQuery, setModelQuery] = useState("");
@@ -73,6 +75,8 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const addFileRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  const jobAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => jobAbortRef.current?.abort(), []);
 
   const pack = session.present.pack;
   const active = activePackModel(session);
@@ -195,11 +199,15 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   };
 
   const save = async () => {
-    if (saving) return;
+    if (jobAbortRef.current) return;
+    const controller = new AbortController();
+    jobAbortRef.current = controller;
     setSaving(true);
     const captured = sessionRef.current;
     try {
-      const bytes = await encodeNativePack(captured.present.pack, captured.present.sources);
+      const bytes = await buildPackZipInWorker("native",
+        captured.present.pack, captured.present.sources, controller.signal);
+      if (controller.signal.aborted) return;
       startBrowserDownload({
         filename: nativeFilename(captured.present.pack.name),
         mimeType: "application/zip",
@@ -208,27 +216,44 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       if (sessionRef.current === captured) setLastSavedRevision(captured.revision);
       setMessage("Pack-aware .3dmc source download started. Keep it as your editable backup.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not prepare the source pack.");
+      if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Could not prepare the source pack.");
     } finally {
+      if (jobAbortRef.current === controller) jobAbortRef.current = null;
       setSaving(false);
     }
   };
 
-  const exportPack = () => {
+  const exportPack = async () => {
+    if (jobAbortRef.current) return;
+    const controller = new AbortController();
+    jobAbortRef.current = controller;
+    setExporting(true);
+    const captured = sessionRef.current;
     try {
-      const result = makeIndexedJava1214Pack(
-        sessionRef.current.present.pack, sessionRef.current.present.sources);
-      const slug = pack.name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 55) || "pack";
+      const bytes = await buildPackZipInWorker("java",
+        captured.present.pack, captured.present.sources, controller.signal);
+      if (controller.signal.aborted) return;
+      const sourcePack = captured.present.pack;
+      const slug = sourcePack.name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 55) || "pack";
       startBrowserDownload({
         filename: slug + "-java-1.21.4-experimental.zip",
-        mimeType: "application/zip", content: result.zip
+        mimeType: "application/zip", content: bytes
       });
-      setMessage(pack.exportBlockVisuals === false ?
+      setMessage(sourcePack.exportBlockVisuals === false ?
         "Item-only experimental ZIP download started. No vanilla blockstates were replaced." :
         "Experimental ZIP download started. Review the block and item visuals in Minecraft Java 1.21.4.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Export blocked. No source assets changed.");
+      if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Export blocked. No source assets changed.");
+    } finally {
+      if (jobAbortRef.current === controller) jobAbortRef.current = null;
+      setExporting(false);
     }
+  };
+
+  const cancelPackJob = () => {
+    if (!jobAbortRef.current) return;
+    jobAbortRef.current.abort();
+    setMessage("Pack preparation canceled. No download was started.");
   };
 
   const textureList = active.textures.map(binding => {
@@ -272,10 +297,13 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button type="button" disabled={opening} onClick={() => fileRef.current?.click()}>
         <FolderOpen size={15}/>Open source pack
       </button>
-      <button type="button" disabled={saving} onClick={() => void save()}>
-        <Save size={15}/>{saving ? "Saving…" : "Save pack .3dmc"}
+      <button type="button" disabled={saving || exporting} onClick={() => void save()}>
+        <Save size={15}/>{saving ? "Preparing source…" : "Save pack .3dmc"}
       </button>
-      <button type="button" onClick={exportPack}><Download size={15}/>Export Java ZIP</button>
+      <button type="button" disabled={saving || exporting} onClick={() => void exportPack()}>
+        <Download size={15}/>{exporting ? "Building ZIP…" : "Export Java ZIP"}
+      </button>
+      {(saving || exporting) && <button type="button" onClick={cancelPackJob}>Cancel preparation</button>
       <button type="button" disabled={!session.past.length}
         onClick={() => change(undoPackSession)} aria-label="Undo pack operation">Undo</button>
       <button type="button" disabled={!session.future.length}
