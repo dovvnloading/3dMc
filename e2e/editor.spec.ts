@@ -1132,3 +1132,97 @@ test("six-face box UV generation is a one-step edit and survives native Save/Ope
   await reopened.getByRole("button", { name: "Up" }).click();
   await expect(reopened.getByRole("textbox", { name: "Face UV V1" })).toHaveValue("2.2");
 });
+
+test("layered Paint workflow preserves raw layer RGBA, opacity and order through native Save/Open", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const pixels = page.locator(".texture-pixel-wrap canvas");
+  const read = () => pixels.evaluate(node => {
+    const canvas = node as HTMLCanvasElement;
+    return Array.from(canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data);
+  });
+  const before = await read();
+  const panel = page.getByRole("region", { name: "Texture layers" });
+  await panel.getByRole("button", { name: "Enable editable texture layers" }).click();
+  await expect(panel.getByRole("button", { name: "Select layer Layer 2" })).toHaveAttribute("aria-pressed", "true");
+  expect(await read()).toEqual(before);
+  await pixels.click({ position: { x: 20, y: 20 } });
+  const painted = await read();
+  expect(painted).not.toEqual(before);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await read()).toEqual(before);
+  await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
+  expect(await read()).toEqual(painted);
+
+  const opacity = panel.getByRole("spinbutton", { name: "Active layer opacity" });
+  await opacity.fill("50"); await opacity.press("Enter");
+  const half = await read();
+  expect(half).not.toEqual(before);
+  expect(half).not.toEqual(painted);
+  await panel.getByRole("button", { name: "Hide layer Layer 2" }).click();
+  expect(await read()).toEqual(before);
+  await panel.getByRole("button", { name: "Show layer Layer 2" }).click();
+  expect(await read()).toEqual(half);
+  await panel.getByRole("button", { name: "Move layer Layer 2 down" }).click();
+  expect(await read()).toEqual(before);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await read()).toEqual(half);
+
+  const rename = panel.getByRole("textbox", { name: "Rename layer Layer 2" });
+  await rename.fill("Ink highlights"); await rename.press("Enter");
+  await expect(panel.getByRole("textbox", { name: "Rename layer Ink highlights" }))
+    .toHaveValue("Ink highlights");
+
+  const [source] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await source.path();
+  if (!path) throw new Error("Layered native source file missing");
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const files = unzipSync(new Uint8Array(await (await import("node:fs/promises")).readFile(path)));
+  const manifest = JSON.parse(strFromU8(files["manifest.json"]!));
+  expect(manifest.layers).toHaveLength(2);
+  const serialized = JSON.parse(strFromU8(files["document.json"]!));
+  expect(serialized.textures[0].layers).toHaveLength(2);
+  expect(serialized.textures[0].layers[1].name).toBe("Ink highlights");
+  expect(files[manifest.layers[0]]).toBeDefined();
+  expect(files[manifest.layers[1]]).toBeDefined();
+
+  await page.locator('input[type="file"][accept*=".3dmc"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await expect(panel.getByRole("textbox", { name: "Rename layer Ink highlights" }))
+    .toBeVisible();
+  await expect(panel.getByRole("spinbutton", { name: "Active layer opacity" }))
+    .toHaveValue("50");
+  expect(await read()).toEqual(half);
+
+  await panel.getByRole("button", { name: "Flatten editable texture layers" }).click();
+  await expect(panel.getByRole("button", { name: "Enable editable texture layers" })).toBeVisible();
+  expect(await read()).toEqual(half);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  await expect(panel.getByRole("textbox", { name: "Rename layer Ink highlights" }))
+    .toBeVisible();
+  expect(await read()).toEqual(half);
+});
+
+test("PNG replacement explicitly warns when it would discard editable source layers", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const panel = page.getByRole("region", { name: "Texture layers" });
+  await panel.getByRole("button", { name: "Enable editable texture layers" }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download texture PNG" }).click()
+  ]);
+  const png = await download.path();
+  if (!png) throw new Error("Texture PNG missing");
+  await page.locator('input[accept=".png,image/png"]').setInputFiles(png);
+  const modal = page.getByRole("dialog", { name: "Replace the shared texture?" });
+  await expect(modal.getByText(/removes all editable raster layers/)).toBeVisible();
+  await modal.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.getByRole("button", { name: "Flatten editable texture layers" }))
+    .toBeVisible();
+});
