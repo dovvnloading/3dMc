@@ -50,6 +50,7 @@ import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
+import { TextureLayersPanel } from "./components/TextureLayersPanel";
 import { TextureImportDialog } from "./components/TextureImportDialog";
 import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./editor/textureImport";
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
@@ -993,7 +994,9 @@ export function App() {
             </div>}
           </div>
         </> : <div className="empty-inspector"><Box size={28}/><h2>Nothing selected</h2><p>Choose an element in the scene or click a visible part in the viewport.</p><button className="text-button quiet" onClick={addElement}><Plus size={15}/>Add cuboid</button></div>}
-        {mode === "paint" && <div className="paint-options"><SectionHeading title="Paint controls"/><div className="paint-import-actions">
+        {mode === "paint" && <div className="paint-options"><SectionHeading title="Paint controls"/>
+          <TextureLayersPanel key={texture.id} texture={texture} commit={commitDocument}/>
+          <div className="paint-import-actions">
           <button type="button" onClick={() => { setTextureImportMode("replace"); textureFileRef.current?.click(); }} disabled={textureReading}><ImagePlus size={14}/>Replace PNG</button>
           <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button></div>
           <div className="form-caption">Brush color</div>
