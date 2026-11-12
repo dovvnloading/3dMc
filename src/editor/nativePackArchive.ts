@@ -37,12 +37,13 @@ interface SourceEntry {
 
 function fail(message: string): never { throw new NativeProjectError(message); }
 
-function object(value: unknown, required: readonly string[], label: string): Record<string, unknown> {
+function object(value: unknown, required: readonly string[], label: string,
+                optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return fail(label + " must be a JSON object.");
   const r = value as Record<string, unknown>;
-  const actual = Object.keys(r).sort().join(",");
-  if (actual !== [...required].sort().join(","))
+  if (required.some(key => !Object.hasOwn(r, key)) ||
+      Object.keys(r).some(key => !required.includes(key) && !optional.includes(key)))
     return fail(label + " has unsupported or missing fields.");
   return r;
 }
@@ -195,7 +196,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
   const sources = sourceEntries.map((entry, index) => {
     const raw = object(decodeJson(files.get(entry.document)!, entry.document), [
       "schemaVersion", "id", "name", "target", "cuboids", "textures", "activeTextureId"
-    ], entry.document);
+    ], entry.document, ["groups"]);
     if (raw.schemaVersion !== 3 || raw.id !== entry.id || !Array.isArray(raw.textures) ||
         raw.textures.length !== entry.textures.length)
       fail("Native pack source document is incompatible or misidentified.");
