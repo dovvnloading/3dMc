@@ -61,6 +61,10 @@ export function commitTextureDraft(current: EditorDocument, source: EditorDocume
   const texture = textureById(source, textureId);
   if (!texture) throw new TextureEditError("The texture no longer exists. No pixels were changed.");
   assertImage({ width: texture.width, height: texture.height, pixels });
+  if (texture.layers)
+    throw new TextureEditError(
+      "This sheet has editable layers. Flatten it in Paint mode before using whole-sheet region operations."
+    );
   return setTexturePixels(current, pixels, textureId);
 }
 
@@ -107,7 +111,10 @@ export function makeFaceTextureUnique(document: EditorDocument, nodeId: string, 
     throw new TextureEditError("All 16 texture slots are in use. Remove/remap a texture before making this face unique.");
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(newId) || textureById(document, newId))
     throw new TextureEditError("The new texture identifier is invalid or already exists.");
-  const copied: PixelTexture = { ...texture, id: newId, name: (node.name + " · " + direction).slice(0, 100), pixels: [...texture.pixels] };
+  const copied: PixelTexture = { ...texture, id: newId, name: (node.name + " · " + direction).slice(0, 100),
+    pixels: [...texture.pixels],
+    ...(texture.layers ? { layers: texture.layers.map(layer => ({ ...layer, pixels: [...layer.pixels] })) } : {})
+  };
   const faces = copyFaces(node.faces); faces[direction].textureId = newId;
   return { ...document, activeTextureId: newId, textures: [...document.textures, copied],
     cuboids: document.cuboids.map(item => item.id === nodeId ? { ...node, faces } : item) };
