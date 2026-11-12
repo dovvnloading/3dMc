@@ -9,3 +9,14 @@
 .batch-array-apply{justify-self:stretch;padding:9px 12px;border-radius:5px;border:1px solid #46554b;background:#25312a;color:#d8e3dc;cursor:pointer;font-size:12px}
 .batch-array-apply:disabled{opacity:.45;cursor:not-allowed}
 .batch-array-apply:focus-visible{outline:2px solid #80dbbf;outline-offset:2px}
+
+/* Flat organizational groups are editor-only; their children remain real scene options. */
+.scene-group-row{display:flex;align-items:center;gap:5px;margin:6px 5px 2px;padding:5px 6px;border:1px solid var(--divider);border-radius:5px;background:var(--panel);min-width:0}
+.scene-group-row button{flex-shrink:0;border:0;background:transparent;color:var(--secondary);font-size:10px;cursor:pointer;padding:4px;border-radius:4px}
+.scene-group-row button:hover{color:var(--text);background:var(--control)}
+.scene-group-row button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.scene-group-row svg.closed{transform:rotate(-90deg)}
+.scene-group-name{box-sizing:border-box;flex:1;min-width:0;background:transparent;border:1px solid transparent;border-radius:3px;color:var(--text);font:inherit;font-size:12px;padding:4px}
+.scene-group-name:focus{border-color:var(--interactive-border);outline:2px solid var(--focus)}
+.scene-row.grouped-part{padding-left:24px}
+.scene-selection-tools button:disabled{opacity:.4;cursor:not-allowed}
