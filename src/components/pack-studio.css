@@ -93,3 +93,11 @@
 .pack-item-studio .pack-studio-help{margin-top:10px;line-height:1.5}
 @media(max-width:750px){.pack-item-workspace{grid-template-columns:1fr}.pack-item-preview{height:205px}}
 @media(max-width:480px){.pack-item-fields .pack-studio-resource-fields{grid-template-columns:1fr}.pack-item-studio-header{flex-direction:column}}
+
+.pack-item-header-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+.pack-item-header-actions button,.pack-item-import-review button{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;font-size:11px;border-radius:5px;border:1px solid var(--interactive-border);background:var(--control);color:var(--text);cursor:pointer}
+.pack-item-header-actions button:disabled{opacity:.4;cursor:not-allowed}
+.pack-item-import-review{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin:11px 0;border:1px solid var(--divider);background:var(--control);border-radius:6px}
+.pack-item-import-review p{flex:1 1 220px;font-size:11px;color:var(--secondary);margin:0;line-height:1.5}
+.pack-item-import-message{font-size:11px;color:var(--secondary);line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:750px){.pack-item-studio-header{flex-wrap:wrap}.pack-item-header-actions{justify-content:flex-start}}
