@@ -56,7 +56,7 @@ export function TextureSurface(props: Props) {
   };
 
   const pointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (event.button !== 0 || strokePointer.current !== null) return;
+    if (event.button !== 0 || strokePointer.current !== null || editUV) return;
     const point = pointAt(event);
     setCursor(point);
     if (props.tool === "eyedropper") { props.onSample(point); return; }
@@ -97,6 +97,10 @@ export function TextureSurface(props: Props) {
   }, [props.painting]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    if (editUV) {
+      if (event.key === "Escape") { event.preventDefault(); setEditUV(false); }
+      return;
+    }
     const delta: Record<string, Texel> = {
       ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]
     };
