@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FolderOpen, Layers3, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
@@ -8,6 +8,7 @@ import { openNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "../edit
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
 import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
+import { planIndexedJava1214Pack } from "../pack/exportPreflight";
 import { describeTextureDependencies, searchPackModels } from "../pack/assetBrowser";
 import {
   activePackDocument, activePackModel, addPackModel, createPackSession,
@@ -78,6 +79,9 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const activeDoc = activePackDocument(session);
   const dirty = session.revision !== lastSavedRevision;
   const visibleModels = searchPackModels(pack, session.present.sources, modelQuery);
+  const exportPlan = useMemo(() => planIndexedJava1214Pack(pack, session.present.sources),
+    [pack, session.present.sources]);
+  const exportBlockers = exportPlan.issues.filter(issue => issue.severity === "error");
 
   const change = (operation: (current: PackSession) => PackSession) => {
     try {
@@ -258,7 +262,10 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button type="button" disabled={saving} onClick={() => void save()}>
         <Save size={15}/>{saving ? "Saving…" : "Save pack .3dmc"}
       </button>
-      <button type="button" onClick={exportPack}><Download size={15}/>Export Java ZIP</button>
+      <button type="button" onClick={exportPack} disabled={exportBlockers.length > 0}
+        title={exportBlockers.length ? "Resolve export blockers shown in the ZIP preview." : undefined}>
+        <Download size={15}/>Export Java ZIP
+      </button>
       <button type="button" disabled={!session.past.length}
         onClick={() => change(undoPackSession)} aria-label="Undo pack operation">Undo</button>
       <button type="button" disabled={!session.future.length}
@@ -378,6 +385,27 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. The main editor Save now downloads the complete pack source.</p>
       </section>
     </div>
+    <details className="pack-studio-export-preview">
+      <summary>Preview Java ZIP files ({exportPlan.files.length})</summary>
+      <p>Java 1.21.4 experimental visual replacements: <strong>
+        {exportPlan.replacements.join(", ") || "Unavailable until the pack is valid"}
+      </strong>. No block behavior or gameplay changes are included.</p>
+      {exportBlockers.length > 0 && <div className="pack-studio-export-blockers" role="alert">
+        <strong>Export blocked — correct these source or resource paths first:</strong>
+        <ul>{exportBlockers.map((issue, index) =>
+          <li key={issue.code + index}>{issue.sourceName ? issue.sourceName + ": " : ""}{issue.message}</li>)}</ul>
+      </div>}
+      <ul className="pack-studio-export-files" aria-label="Generated Java ZIP files">
+        {exportPlan.files.map((file, index) =>
+          <li key={file.path + index}>
+            <code>{file.path}</code>
+            <span>{file.kind === "metadata" ? "Pack metadata" :
+              file.kind.replace("-", " ") + " · " + file.sourceName}</span>
+          </li>)}
+      </ul>
+      <p>This list is derived from the export preflight, not from a saved ZIP.
+        Export validates again before download; appearance in Minecraft still requires an in-game check.</p>
+    </details>
     <div className="pack-studio-foot">
       <span aria-live="polite">{message || (external ? "All models share live editing, Undo, and local recovery. Download a .3dmc source backup to keep a portable copy." : dirty ? "Unsaved Pack Studio changes. Save your .3dmc source pack." : "Pack Studio source is ready.")}</span>
       {!external && confirmClose && <div className="pack-studio-confirm" role="group" aria-label="Confirm discard unsaved pack">
