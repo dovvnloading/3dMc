@@ -1053,7 +1053,8 @@ export function App() {
       }}>Remove and remap</button></div>
     </ModalDialog>}
     {pendingTexture && <TextureImportDialog image={pendingTexture} isAdding={textureSource.current?.mode === "new"} currentWidth={texture.width} currentHeight={texture.height}
-      paintedFaces={doc.cuboids.filter(node => node.material === "texture").length} onClose={() => { setPendingTexture(null); textureSource.current = null; }} onConfirm={applyImportedTexture}/>}
+      paintedFaces={doc.cuboids.filter(node => node.material === "texture").length}
+      hasLayers={!!texture.layers && textureSource.current?.mode === "replace"} onClose={() => { setPendingTexture(null); textureSource.current = null; }} onConfirm={applyImportedTexture}/>}
     {pendingPack && <ModalDialog className="modal import-modal" labelledBy="pack-import-title" onCancel={() => setPendingPack(null)}>
       <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" : "Pack cannot be safely imported"}</h2></div></div>
       {pendingPack.status === "editable" ? <><p>This pack matches the supported 3dMc experimental export format. Import it as a <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
