@@ -111,7 +111,7 @@ export function importTextureIntoDocument(
   return parseDocument({
     ...document,
     textures: document.textures.map(t => t.id === current.id
-      ? { ...t, name: image.name, width, height, pixels } : t)
+      ? { id: t.id, name: image.name, width, height, pixels } : t)
   });
 }
 
