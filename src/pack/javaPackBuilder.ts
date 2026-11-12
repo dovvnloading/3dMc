@@ -73,9 +73,11 @@ export function makeIndexedJava1214Pack(index: PackDocument,
   add("pack.mcmeta", jsonBytes({
     pack: {
       pack_format: RESOURCE_PACK_FORMAT,
-      description: pack.items?.length ?
-        "3dMc experimental block and item visuals - Java Edition 1.21.4" :
-        "3dMc experimental block visual - Java Edition 1.21.4"
+      description: pack.exportBlockVisuals === false ?
+        "3dMc experimental item visuals - Java Edition 1.21.4" :
+        pack.items?.length ?
+          "3dMc experimental block and item visuals - Java Edition 1.21.4" :
+          "3dMc experimental block visual - Java Edition 1.21.4"
     }
   }));
 
@@ -98,7 +100,8 @@ export function makeIndexedJava1214Pack(index: PackDocument,
     const issues = inspectJava1214(doc);
     if (issues.some(issue => issue.severity === "error"))
       throw new JavaExportBlocked(issues);
-    notices.push(...issues.filter(issue => issue.severity === "warning"));
+    notices.push(...issues.filter(issue => issue.severity === "warning" &&
+      (includeBlocks || issue.code !== "VISUAL_REPLACEMENT_ONLY")));
 
     const model = buildJava1214Model(doc);
     const bindings = new Map(asset.textures.map(binding => [
