@@ -1097,3 +1097,38 @@ test("editable color palette persists additions and ordering in native source pr
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
   await expect(page.getByRole("button", { name: "Choose color #123abc" })).toBeVisible();
 });
+
+test("six-face box UV generation is a one-step edit and survives native Save/Open", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const mapping = page.getByRole("region", { name: "Face UV mapping" });
+  await mapping.getByRole("button", { name: "North" }).click();
+  const uv = (name: string) => mapping.getByRole("textbox", { name: "Face UV " + name });
+  await mapping.getByRole("button", { name: "Generate six-face box UV layout" }).click();
+  await expect(uv("U1")).toHaveValue("4");
+  await expect(uv("V1")).toHaveValue("6.2");
+  await expect(uv("U2")).toHaveValue("8");
+  await expect(uv("V2")).toHaveValue("9.8");
+  await mapping.getByRole("button", { name: "Up" }).click();
+  await expect(uv("V1")).toHaveValue("2.2");
+  await expect(uv("V2")).toHaveValue("6.2");
+
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  await expect(uv("U1")).toHaveValue("0");
+  await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
+  await expect(uv("V1")).toHaveValue("2.2");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error("Box UV native project was not downloaded");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const reopened = page.getByRole("region", { name: "Face UV mapping" });
+  await reopened.getByRole("button", { name: "Up" }).click();
+  await expect(reopened.getByRole("textbox", { name: "Face UV V1" })).toHaveValue("2.2");
+});
