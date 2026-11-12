@@ -213,16 +213,16 @@ export function parsePackDocument(input: unknown): PackDocument {
           !JAVA_1214_ITEM_TARGETS.includes(
             replaces.path as typeof JAVA_1214_ITEM_TARGETS[number]))
         fail("Unsupported Java 1.21.4 item replacement. Choose stick, paper, apple, or diamond_sword.");
-      if (typeof item.handAnimationOnSwap !== "boolean")
+      const handAnimationOnSwap = item.handAnimationOnSwap;
+      if (typeof handAnimationOnSwap !== "boolean")
         fail("Item hand animation setting must be true or false.");
       return {
         id, sourceModelId, resource: itemResource, replaces,
-        handAnimationOnSwap: item.handAnimationOnSwap,
-        display: parseItemDisplay(item.display)
+        handAnimationOnSwap, display: parseItemDisplay(item.display)
       };
     });
-    unique(items.map(item => item.id), "item IDs");
-    unique(items.map(item => gameFilePath("items", item.replaces)), "item replacements");
+    unique(items!.map(item => item.id), "item IDs");
+    unique(items!.map(item => gameFilePath("items", item.replaces)), "item replacements");
   }
   unique([...models.map(model => gameFilePath("models", model.resource)),
     ...(items ?? []).map(item => gameFilePath("models", item.resource))], "model paths");
