@@ -970,3 +970,7 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .uv-drag-handle.handle-ne,.uv-drag-handle.handle-sw{cursor:nesw-resize}
 .uv-drag-handle:focus-visible{outline:2px solid white;outline-offset:2px}
 .face-uv-clipboard{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+
+.face-paint-constrain{display:flex;align-items:center;gap:8px;margin:14px 0 6px;padding:9px 10px;border:1px solid var(--divider);border-radius:6px;background:var(--control);font-size:11px;color:var(--text);cursor:pointer}
+.face-paint-constrain input{accent-color:var(--accent)}
+.face-paint-hint{font-size:11px;color:var(--secondary);line-height:1.5;margin:0 0 8px}
