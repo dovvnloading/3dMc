@@ -1,6 +1,6 @@
 import type { EditorDocument, Vec3 } from "./domain";
 import { activeTexture, setTexturePixels, textureById, updateCuboid } from "./domain";
-import type { Texel } from "./pixels";
+import type { Texel, PixelMask } from "./pixels";
 import { drawRectangle, drawStroke } from "./pixels";
 
 export type BrushSize = 1 | 2 | 4;
@@ -15,6 +15,7 @@ export interface PaintGesture {
   /** Shapes always rebuild the preview from this immutable start point. */
   readonly start: Texel;
   readonly brush: BrushMode;
+  readonly mask?: PixelMask;
   readonly color: string;
   readonly size: BrushSize;
   readonly alpha: 0 | 255;
@@ -24,15 +25,15 @@ export interface PaintGesture {
 export function beginPaintGesture(
   source: EditorDocument, texel: Texel, face: string,
   color: string, size: BrushSize, brush: BrushMode = "pencil",
-  textureId = source.activeTextureId
+  textureId = source.activeTextureId, mask?: PixelMask
 ): PaintGesture {
   const texture = textureById(source, textureId) ?? activeTexture(source);
   const alpha: 0 | 255 = brush === "eraser" ? 0 : 255;
   return {
     source, textureId: texture.id,
     pixels: drawStroke(texture.pixels, texture.width,
-      texture.height, texel, texel, color, size, alpha),
-    previous: texel, start: texel, brush, face, color, size, alpha
+      texture.height, texel, texel, color, size, alpha, mask),
+    previous: texel, start: texel, brush, mask, face, color, size, alpha
   };
 }
 
@@ -47,7 +48,7 @@ export function continuePaintGesture(
     const shape = gesture.brush === "line" ? drawStroke : drawRectangle;
     return { ...gesture,
       pixels: shape(source.pixels, source.width, source.height,
-        gesture.start, texel, gesture.color, gesture.size, gesture.alpha),
+        gesture.start, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask),
       previous: texel
     };
   }
@@ -55,7 +56,7 @@ export function continuePaintGesture(
   const from = face === gesture.face ? gesture.previous : texel;
   return { ...gesture,
     pixels: drawStroke(gesture.pixels, source.width, source.height,
-      from, texel, gesture.color, gesture.size, gesture.alpha),
+      from, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask),
     previous: texel, face
   };
 }
