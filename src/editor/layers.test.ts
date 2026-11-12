@@ -163,11 +163,13 @@ describe("source-backed raster layers and deterministic flattening", () => {
     expect(JSON.stringify(source)).toBe(before);
 
     const corrupted = unzipSync(standalone);
-    corrupted["textures/main/layers/paint.png"][50] ^= 1;
+    const damagedLayer = corrupted["textures/main/layers/paint.png"]!;
+    damagedLayer[50] = damagedLayer[50]! ^ 1;
     const tampered = zipSync(corrupted, { level: 0, mtime: new Date(1980, 0, 1) });
     await expect(decodeNativeProject(tampered)).rejects.toThrow(/checksum|SHA-256/i);
     const corruptedPack = unzipSync(bytes);
-    corruptedPack["models/0/textures/main/layers/paint.png"][50] ^= 1;
+    const damagedPackLayer = corruptedPack["models/0/textures/main/layers/paint.png"]!;
+    damagedPackLayer[50] = damagedPackLayer[50]! ^ 1;
     await expect(decodeNativePack(zipSync(corruptedPack, { level: 0, mtime: new Date(1980, 0, 1) })))
       .rejects.toThrow(/checksum|SHA-256/i);
   });
