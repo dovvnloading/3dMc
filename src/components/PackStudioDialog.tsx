@@ -223,7 +223,9 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         filename: slug + "-java-1.21.4-experimental.zip",
         mimeType: "application/zip", content: result.zip
       });
-      setMessage("Experimental ZIP download started. Review the block and item visuals in Minecraft Java 1.21.4.");
+      setMessage(pack.exportBlockVisuals === false ?
+        "Item-only experimental ZIP download started. No vanilla blockstates were replaced." :
+        "Experimental ZIP download started. Review the block and item visuals in Minecraft Java 1.21.4.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Export blocked. No source assets changed.");
     }
@@ -253,6 +255,18 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <span>Saved as one portable .3dmc pack source; source model names are independent.</span>
     </div>
     <div className="pack-studio-tools">
+      <label className="pack-studio-export-blocks">
+        <input type="checkbox" aria-label="Also replace vanilla block visuals"
+          checked={pack.exportBlockVisuals !== false}
+          disabled={!(pack.items?.length) && pack.exportBlockVisuals !== false}
+          onChange={event => {
+            const enabled = event.currentTarget.checked;
+            change(current => editPackIndex(current, index => ({
+              ...index, exportBlockVisuals: enabled
+            })));
+          }}/>
+        Also replace vanilla blocks
+      </label>
       <input ref={fileRef} type="file" hidden accept=".3dmc,application/zip"
         onChange={event => void choosePack(event)}/>
       <button type="button" disabled={opening} onClick={() => fileRef.current?.click()}>
@@ -346,7 +360,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
               <option key={target} value={target}>minecraft:{target}</option>)}
           </select>
         </label>
-        <p className="pack-studio-help">Each replacement target must be unique. This resource pack changes visuals, not gameplay or collision.</p>
+        <p className="pack-studio-help">Each replacement target must be unique. With block replacement disabled above, block models remain editable source assets but their vanilla blockstates are not exported. This resource pack changes visuals, not gameplay or collision.</p>
         <h4>Texture dependencies</h4>
         <div className="pack-studio-textures">
           {textureList.map(({ asset, sourceTexture }) => {

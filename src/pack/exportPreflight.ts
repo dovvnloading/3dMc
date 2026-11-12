@@ -25,6 +25,7 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
   }
 
   const issues: ExportIssue[] = [];
+  const includeBlocks = pack.exportBlockVisuals !== false;
   if (pack.models.length > MAX_INDEXED_EXPORT_MODELS) {
     issues.push({
       severity: "error", code: "PACK_TOO_MANY_MODELS",
@@ -66,7 +67,8 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
       });
     }
 
-    reserve(gameFilePath("blockstates", model.replaces), "blockstate " + model.id, model, source.name);
+    if (includeBlocks)
+      reserve(gameFilePath("blockstates", model.replaces), "blockstate " + model.id, model, source.name);
     reserve(gameFilePath("models", model.resource), "model " + model.id, model, source.name);
 
     for (const binding of model.textures) {
@@ -100,11 +102,12 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
     reserve(gameFilePath("items", item.replaces), "item definition " + item.id, owner, source.name);
   }
 
-  const replacements = pack.models.map(model => resourceKey(model.replaces));
+  const replacements = includeBlocks ? pack.models.map(model => resourceKey(model.replaces)) : [];
   const itemReplacements = (pack.items ?? []).map(item => resourceKey(item.replaces));
   issues.push({
     severity: "warning", code: "PACK_VISUAL_REPLACEMENTS_ONLY",
-    message: "This pack replaces visuals for " + replacements.join(", ") +
+    message: "This pack replaces visuals for " +
+      (replacements.length ? replacements.join(", ") : "no vanilla blocks") +
       (itemReplacements.length ? "; items " + itemReplacements.join(", ") : "") +
       ", not collision, lighting, crafting, or gameplay."
   });
@@ -113,7 +116,8 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
     message: "Check this experimental pack in Minecraft Java 1.21.4. " +
       (itemReplacements.length ?
         "Item models and their inventory/hand display transforms still need in-game verification." :
-        pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block") ?
+        (includeBlocks &&
+          (pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block"))) ?
           "Combined packs and iron-block replacements still need their own in-game verification." :
           "The browser preview is only an approximation of Minecraft rendering.")
   });

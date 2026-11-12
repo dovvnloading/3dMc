@@ -70,10 +70,16 @@ export function inspectGeneratedItemSettings(bytes: Uint8Array, packInput: PackD
     const pack = parsePackDocument(packInput);
     verifyPackSources(pack, sources);
     const files = readExactStoredZip(bytes, ZIP_LIMITS);
-    const baseline = makeIndexedJava1214Pack({ ...pack, items: [] }, sources);
+    const includeBlocks = pack.exportBlockVisuals !== false;
+    // Reconstruct a block-enabled baseline even when the current pack is
+    // item-only; omit the blockstate paths when comparing its source graph.
+    const baselinePack = { ...pack, items: [], exportBlockVisuals: true };
+    const baseline = makeIndexedJava1214Pack(baselinePack, sources);
     const baselineFiles = unzipSync(baseline.zip);
     for (const path of baseline.paths) {
-      if (path === "pack.mcmeta") continue; // Description changes when items are present.
+      if (path === "pack.mcmeta" ||
+          (!includeBlocks && path.includes("/blockstates/"))) continue;
+      // Pack description changes when items are present.
       const actual = files.get(path);
       if (!actual || !equalBytes(actual, baselineFiles[path]!))
         fail("The game ZIP has changed or missing block resources: " + path +

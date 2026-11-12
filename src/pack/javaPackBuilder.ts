@@ -81,6 +81,7 @@ export function makeIndexedJava1214Pack(index: PackDocument,
 
   const notices: ExportIssue[] = [];
   const writtenTextures = new Set<string>();
+  const includeBlocks = pack.exportBlockVisuals !== false;
   // Reuse each source model's fully resolved texture aliases for its item
   // appearances. Do not duplicate or convert the source RGBA bytes.
   const resolvedModels = new Map<string, ReturnType<typeof buildJava1214Model>>();
@@ -120,7 +121,7 @@ export function makeIndexedJava1214Pack(index: PackDocument,
     });
     resolvedModels.set(asset.id, model);
 
-    add(gameFilePath("blockstates", asset.replaces), jsonBytes({
+    if (includeBlocks) add(gameFilePath("blockstates", asset.replaces), jsonBytes({
       variants: { "": { model: resourceKey(asset.resource) } }
     }));
     add(gameFilePath("models", asset.resource), jsonBytes(model));
@@ -159,7 +160,8 @@ export function makeIndexedJava1214Pack(index: PackDocument,
   if (zip.length > MAX_INDEXED_EXPORT_BYTES)
     throw new PackIndexError("Indexed pack exceeds the 12 MB experimental export budget.");
   const uniqueNotices = [...new Map(notices.map(note => [note.code, note])).values()];
-  if (pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block"))
+  if (includeBlocks &&
+      (pack.models.length > 1 || pack.models.some(model => model.replaces.path !== "diamond_block")))
     uniqueNotices.push({
       severity: "warning", code: "NEW_REPLACEMENT_UNVERIFIED",
       message: "Additional targets and combined packs need their own Minecraft 1.21.4 in-game checks."
@@ -170,7 +172,7 @@ export function makeIndexedJava1214Pack(index: PackDocument,
   });
   return {
     zip, paths: Object.keys(files),
-    replaces: pack.models.map(asset => resourceKey(asset.replaces)),
+    replaces: includeBlocks ? pack.models.map(asset => resourceKey(asset.replaces)) : [],
     itemReplacements: (pack.items ?? []).map(item => resourceKey(item.replaces)),
     issues: uniqueNotices, gameVerified: false
   };

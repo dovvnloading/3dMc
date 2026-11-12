@@ -63,6 +63,8 @@ export interface PackDocument {
   models: PackModelAsset[];
   textures: PackTextureAsset[];
   items?: PackItemAsset[];
+  /** Defaults to true for historical projects. Turn off for item-only ZIPs. */
+  exportBlockVisuals?: boolean;
 }
 
 export class PackIndexError extends Error {
@@ -135,12 +137,15 @@ function unique(keys: readonly string[], label: string): void {
 export function parsePackDocument(input: unknown): PackDocument {
   const raw = record(input, [
     "schemaVersion", "id", "name", "targetProfile", "activeModelId", "models", "textures"
-  ], "pack index", ["items"]);
+  ], "pack index", ["items", "exportBlockVisuals"]);
   if (raw.schemaVersion !== PACK_INDEX_VERSION || raw.targetProfile !== PACK_TARGET_PROFILE)
     fail("Unsupported pack index version or Minecraft target profile. Source was not changed.");
   const id = sourceId(raw.id, "pack ID");
   const name = displayName(raw.name, "pack name");
   const activeModelId = identifier(raw.activeModelId, "active model ID");
+  const exportBlockVisuals = raw.exportBlockVisuals;
+  if (exportBlockVisuals !== undefined && typeof exportBlockVisuals !== "boolean")
+    fail("Block visual export setting must be true or false.");
 
   if (!Array.isArray(raw.models) || raw.models.length < 1 || raw.models.length > MAX_PACK_MODELS)
     fail("Pack index requires 1–32 model assets.");
@@ -225,6 +230,8 @@ export function parsePackDocument(input: unknown): PackDocument {
     unique(items!.map(item => item.id), "item IDs");
     unique(items!.map(item => gameFilePath("items", item.replaces)), "item replacements");
   }
+  if (exportBlockVisuals === false && !(items?.length))
+    fail("An item-only pack needs at least one item asset.");
   unique([...models.map(model => gameFilePath("models", model.resource)),
     ...(items ?? []).map(item => gameFilePath("models", item.resource))], "model paths");
   unique(models.map(model => gameFilePath("blockstates", model.replaces)), "blockstate replacements");
@@ -236,7 +243,9 @@ export function parsePackDocument(input: unknown): PackDocument {
 
   return { schemaVersion: PACK_INDEX_VERSION, id, name,
     targetProfile: PACK_TARGET_PROFILE, activeModelId, models, textures,
-    ...(items ? { items } : {}) };
+    ...(items ? { items } : {}),
+    ...(exportBlockVisuals !== undefined ?
+      { exportBlockVisuals: exportBlockVisuals as boolean } : {}) };
 }
 
 /** Existing editable source becomes one indexed block, with original export paths. */
