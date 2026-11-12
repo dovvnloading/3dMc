@@ -44,12 +44,13 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(hash), (n) => n.toString(16).padStart(2, "0")).join("");
 }
 
-function exactKeys(value: unknown, expected: readonly string[], path: string): Record<string, unknown> {
+function exactKeys(value: unknown, expected: readonly string[], path: string,
+                   optional: readonly string[] = []): Record<string, unknown> {
   if (!value || Array.isArray(value) || typeof value !== "object")
     reject(path + " must be a JSON object.");
   const record = value as Record<string, unknown>;
-  const actual = Object.keys(record).sort().join(",");
-  if (actual !== [...expected].sort().join(","))
+  if (expected.some(key => !Object.hasOwn(record, key)) ||
+      Object.keys(record).some(key => !expected.includes(key) && !optional.includes(key)))
     reject(path + " has unsupported or missing fields. No data was imported.");
   return record;
 }
@@ -300,7 +301,7 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
 
   const doc = exactKeys(decodeJson(files.get("document.json")!, "document.json"), [
     "schemaVersion","id","name","target","cuboids","textures","activeTextureId"
-  ], "document.json");
+  ], "document.json", ["groups"]);
   if (doc.schemaVersion !== 3 || !Array.isArray(doc.textures) ||
       doc.textures.length !== manifest.textures.length)
     reject("Native v2 document/schema texture count does not agree.");
