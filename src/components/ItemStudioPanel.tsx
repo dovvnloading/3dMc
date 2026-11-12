@@ -174,7 +174,7 @@ export function ItemStudioPanel({ session, source, onEdit }: Props) {
                 <ItemNumberField key={field + context + axis}
                   label={itemContextName(context) + " " + field + " " + axis}
                   minimum={minimum} maximum={maximum}
-                  value={selected.display[context][field][index]}
+                  value={selected.display[context][field][index]!}
                   onCommit={value => editValue(field, index as ItemAxis, value)}/>)}</div>
             </fieldset>;
           })}
