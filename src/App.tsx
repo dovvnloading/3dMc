@@ -52,6 +52,8 @@ import { TextureImportDialog } from "./components/TextureImportDialog";
 import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./editor/textureImport";
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
 import { FaceUVInspector } from "./components/FaceUVInspector";
+import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
+import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
 import { inspectJava1214Pack } from "./import/javaPack";
@@ -148,6 +150,7 @@ export function App() {
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const setSelectedId = useCallback((id: string | null) => setSelection(selectOnly(id)), []);
   const [selectedFace, setSelectedFace] = useState<FaceDirection>("north");
+  const [uvClipboard, setUVClipboard] = useState<FaceUVClipboard | null>(null);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const selected = doc.cuboids.find(node => node.id === selectedId) ?? null;
   const faceAsset = selected ? textureById(doc, selected.faces[selectedFace].textureId) : null;
@@ -462,6 +465,7 @@ export function App() {
       if (command && key === "z") { event.preventDefault(); if (event.shiftKey) runRedo(); else runUndo(); return; }
       if (command && key === "y") { event.preventDefault(); runRedo(); return; }
       if (command || event.altKey) return;
+      if (key === "escape" && document.querySelector('[data-uv-dragging="true"]')) return;
       if (key === "escape") { clearStroke(); setShapeMenuOpen(false); switchTool("select"); }
       if (key === "v") switchTool("select");
       if (key === "w" && mode === "model") switchTool("move");
@@ -901,6 +905,11 @@ export function App() {
         {mode === "paint" && <TextureSurface pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
+          uvEditable={!!selected && selected.visible && !selected.locked && selected.material === "texture"}
+          onCommitUV={(sourceFace, rect) => commitDocument(current =>
+            current === doc && selected && selected.faces[selectedFace] === sourceFace
+              ? applyFaceUV(current, selected.id, selectedFace,
+                { uv: rect, rotation: sourceFace.rotation }, sourceFace) : current)}
           onBegin={beginPaint} onMove={continuePaint} onEnd={finishPaint} onCancel={clearStroke} onSample={samplePaint} onFill={fillPaint}/>}
       </main>
       <aside className="inspector-panel" aria-label="Properties inspector"><SectionHeading title="Inspector" trailing={<Settings2 size={17} className="section-muted-icon"/>}/>
@@ -912,7 +921,11 @@ export function App() {
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace} setFace={direction => {
               clearStroke(); setSelectedFace(direction);
               publishHistory(state => { const next = selectTexture(state.present, selected.faces[direction].textureId); return next === state.present ? state : { ...state, present: next }; });
-            }} commitDocument={commitDocument} textures={doc.textures} textureWidth={faceAsset?.width ?? texture.width} textureHeight={faceAsset?.height ?? texture.height}/>}
+            }} commitDocument={commitDocument} textures={doc.textures} textureWidth={faceAsset?.width ?? texture.width} textureHeight={faceAsset?.height ?? texture.height}
+              copiedUV={uvClipboard}
+              onCopyUV={() => setUVClipboard(copyFaceUV(selected.faces[selectedFace]))}
+              onPasteUV={() => { if (uvClipboard) commitDocument(current =>
+                applyFaceUV(current, selected.id, selectedFace, uvClipboard)); }}/>}
             <div className="inspector-group"><SectionHeading title="Transform" trailing={<SlidersHorizontal size={15} className="section-muted-icon"/>}/>
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/><AxisRow title="Size" selected={selected} property="size" commitDocument={commitDocument}/>
               <div className="form-group"><MoveSnapControl value={snap} onChange={setSnap}/></div>
