@@ -17,10 +17,10 @@ export const NATIVE_PACK_CONTAINER_VERSION = 3 as const;
 export const MAX_NATIVE_PACK_BYTES = 12_000_000;
 export const MAX_NATIVE_PACK_SOURCES = 8;
 const MAX_PACK_INDEX_BYTES = 80_000;
-const MAX_PACK_MANIFEST_BYTES = 40_000;
+const MAX_PACK_MANIFEST_BYTES = 180_000;
 const MAX_PACK_SOURCE_DESCRIPTOR_BYTES = 2_500_000;
 const MAX_PACK_IMAGE_BYTES = 70_000;
-const PACK_FILES_LIMIT = 2 + MAX_NATIVE_PACK_SOURCES * 17;
+const PACK_FILES_LIMIT = 2 + MAX_NATIVE_PACK_SOURCES * (17 + 16 * 8);
 const STAMP = new Date(1980, 0, 1);
 const DECODER = new TextDecoder("utf-8", { fatal: true });
 
@@ -33,6 +33,7 @@ interface SourceEntry {
   id: string;
   document: string;
   textures: string[];
+  layers?: string[];
 }
 
 function fail(message: string): never { throw new NativeProjectError(message); }
@@ -67,13 +68,15 @@ function texturePath(index: number, id: string): string {
 
 const NATIVE_PACK_ZIP_LIMITS: NativeZipLimits = {
   maxArchiveBytes: MAX_NATIVE_PACK_BYTES, minEntries: 3, maxEntries: PACK_FILES_LIMIT,
+  maxPathLength: 260,
   // Accept legacy paths so the v1/v2 parser can migrate them in memory, but
   // the v3 manifest must enumerate and hash the exact new path set.
   isAllowedPath: (path) =>
     path === "manifest.json" || path === "pack.json" || path === "document.json" ||
     /^textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path) ||
     /^models\/(?:0|[1-9][0-9]*)\/document\.json$/.test(path) ||
-    /^models\/(?:0|[1-9][0-9]*)\/textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path),
+    /^models\/(?:0|[1-9][0-9]*)\/textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path) ||
+    /^models\/(?:0|[1-9][0-9]*)\/textures\/[a-zA-Z0-9_-]{1,100}\/layers\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path),
   maxEntryBytes: (path) =>
     path === "manifest.json" ? MAX_PACK_MANIFEST_BYTES :
     path === "pack.json" ? MAX_PACK_INDEX_BYTES :
@@ -104,20 +107,32 @@ export async function encodeNativePack(index: PackDocument,
   for (let index = 0; index < referenced.length; index++) {
     const doc = byId.get(referenced[index]!)!;
     const document = docPath(index);
+    const layerPaths: string[] = [];
     const descriptors = doc.textures.map(texture => {
       const path = texturePath(index, texture.id);
-      const { pixels: _pixels, ...metadata } = texture;
+      const { pixels: _pixels, layers: _layers, ...metadata } = texture;
       files[path] = encodeRgbaPng(texture.width, texture.height, texture.pixels);
       if (files[path]!.length > MAX_PACK_IMAGE_BYTES)
         fail("Source texture exceeds its native size budget: " + path);
-      return { ...metadata, path };
+      const layers = texture.layers?.map(layer => {
+        const layerPath = "models/" + index + "/textures/" +
+          texture.id + "/layers/" + layer.id + ".png";
+        const { pixels: _pixelData, ...info } = layer;
+        files[layerPath] = encodeRgbaPng(texture.width, texture.height, layer.pixels);
+        if (files[layerPath]!.length > MAX_PACK_IMAGE_BYTES)
+          fail("Raster layer exceeds its native size budget: " + layerPath);
+        layerPaths.push(layerPath);
+        return { ...info, path: layerPath };
+      });
+      return { ...metadata, path, ...(layers ? { layers } : {}) };
     });
     const json = encodeJson({ ...doc, textures: descriptors });
     if (json.length > MAX_PACK_SOURCE_DESCRIPTOR_BYTES)
       fail("Source document exceeds its native metadata budget: " + doc.id);
     files[document] = json;
     manifestSources.push({ id: doc.id, document,
-      textures: descriptors.map(entry => entry.path) });
+      textures: descriptors.map(entry => entry.path),
+      ...(layerPaths.length ? { layers: layerPaths } : {}) });
   }
 
   const hashes: Record<string, string> = {};
@@ -159,7 +174,8 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
     fail("Native pack has an invalid number of source documents.");
 
   const sourceEntries: SourceEntry[] = (manifestRaw.sources as unknown[]).map((raw, i) => {
-    const s = object(raw, ["id", "document", "textures"], "manifest source " + i);
+    const s = object(raw, ["id", "document", "textures"], "manifest source " + i,
+      ["layers"]);
     if (typeof s.id !== "string" || s.id.length < 1 || s.id.length > 100 ||
         s.document !== docPath(i) || !Array.isArray(s.textures) ||
         s.textures.length < 1 || s.textures.length > 16 ||
@@ -168,11 +184,20 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
           path.startsWith("models/" + i + "/textures/")) ||
         new Set(s.textures).size !== s.textures.length)
       fail("Native pack source paths or IDs are invalid.");
-    return { id: s.id as string, document: s.document as string, textures: s.textures as string[] };
+    const layers = s.layers === undefined ? [] : s.layers;
+    if (!Array.isArray(layers) || layers.length > 16 * 8 ||
+        !layers.every(path => typeof path === "string" &&
+          /^models\/(?:0|[1-9][0-9]*)\/textures\/[a-zA-Z0-9_-]{1,100}\/layers\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path) &&
+          path.startsWith("models/" + i + "/textures/")) ||
+        new Set(layers).size !== layers.length)
+      fail("Native pack has invalid or duplicated raster layer paths.");
+    return { id: s.id as string, document: s.document as string,
+      textures: s.textures as string[], ...(layers.length ? { layers } : {}) };
   });
   if (new Set(sourceEntries.map(s => s.id)).size !== sourceEntries.length)
     fail("Native pack has duplicate source document IDs.");
-  const paths = ["pack.json", ...sourceEntries.flatMap(s => [s.document, ...s.textures])];
+  const paths = ["pack.json", ...sourceEntries.flatMap(s =>
+    [s.document, ...s.textures, ...(s.layers ?? [])])];
   const expected = new Set(["manifest.json", ...paths]);
   if (expected.size !== files.size || [...files.keys()].some(p => !expected.has(p)))
     fail("Native pack contains unknown, missing or untracked source files.");
@@ -202,7 +227,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
       fail("Native pack source document is incompatible or misidentified.");
     const textures = (raw.textures as unknown[]).map((value, position) => {
       const descriptor = object(value, ["id", "name", "width", "height", "path"],
-        "source texture descriptor");
+        "source texture descriptor", ["layers", "activeLayerId"]);
       const path = entry.textures[position]!;
       if (descriptor.path !== path ||
           typeof descriptor.id !== "string" ||
@@ -211,9 +236,30 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
       const png = read3dMcRgbaPng(files.get(path)!);
       if (png.width !== descriptor.width || png.height !== descriptor.height)
         fail("Native pack texture dimensions disagree with its metadata.");
+      const descriptors = descriptor.layers === undefined ? undefined :
+        (Array.isArray(descriptor.layers) ? descriptor.layers :
+          fail("Raster layer descriptors must be an array."));
+      const layers = descriptors?.map((value: unknown) => {
+        const layer = object(value, ["id","name","visible","opacity","path"], "raster layer");
+        const layerPath = "models/" + index + "/textures/" + descriptor.id +
+          "/layers/" + layer.id + ".png";
+        if (layer.path !== layerPath || !entry.layers?.includes(layerPath))
+          fail("Missing or unlisted native raster layer: " + layerPath);
+        const image = read3dMcRgbaPng(files.get(layerPath)!);
+        if (image.width !== png.width || image.height !== png.height)
+          fail("Native raster layer dimensions do not match their texture.");
+        return { id: layer.id, name: layer.name, visible: layer.visible,
+          opacity: layer.opacity, pixels: image.pixels };
+      });
       return { id: descriptor.id, name: descriptor.name,
-        width: png.width, height: png.height, pixels: png.pixels };
+        width: png.width, height: png.height, pixels: png.pixels,
+        ...(layers ? { layers, activeLayerId: descriptor.activeLayerId } : {}) };
     });
+    const used = textures.flatMap(texture => (texture.layers ?? []).map(layer =>
+      "models/" + index + "/textures/" + texture.id + "/layers/" + layer.id + ".png"));
+    if (used.length !== (entry.layers?.length ?? 0) ||
+        used.some(path => !entry.layers?.includes(path)))
+      fail("Native pack contains unreferenced raster layer images.");
     return parseDocument({ ...raw, textures });
   });
   verifyPackSources(pack, sources);
