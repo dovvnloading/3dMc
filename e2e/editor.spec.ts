@@ -1003,3 +1003,56 @@ test("line and rectangle tools preview on the shared sheet and commit one edit e
   await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
   expect(await all()).toEqual(outlined);
 });
+
+test("UV-constrained painting clips shapes to a selected face's texture pixels", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const mapping = page.getByRole("region", { name: "Face UV mapping" });
+  const editField = async (field: string, value: string) => {
+    const input = mapping.getByRole("textbox", { name: "Face UV " + field });
+    await input.fill(value);
+    await input.press("Enter");
+  };
+  await editField("U1", "4"); await editField("V1", "4");
+  await editField("U2", "8"); await editField("V2", "8");
+
+  const canvas = page.locator(".texture-pixel-wrap canvas");
+  const read = () => canvas.evaluate(element => {
+    const c = element as HTMLCanvasElement;
+    return Array.from(c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data);
+  });
+  const at = (pixels: number[], x: number, y: number) =>
+    pixels.slice((y * 32 + x) * 4, (y * 32 + x) * 4 + 4);
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("Texture canvas not available");
+  const xy = (x: number, y: number) => ({
+    x: bounds.x + (x + .5) * bounds.width / 32,
+    y: bounds.y + (y + .5) * bounds.height / 32
+  });
+  const before = await read();
+  await page.getByRole("checkbox", { name: "Constrain paint to selected face UV" }).check();
+  await page.getByRole("button", { name: "Choose color #80dbbf" }).click();
+  await page.getByRole("button", { name: "Line tool (L)" }).click();
+
+  const first = xy(3, 10), last = xy(21, 10);
+  await page.mouse.move(first.x, first.y); await page.mouse.down();
+  await page.mouse.move(last.x, last.y, { steps: 5 }); await page.mouse.up();
+  const line = await read();
+  expect(at(line, 10, 10)).toEqual([128, 219, 191, 255]);
+  expect(at(line, 3, 10)).toEqual(at(before, 3, 10));
+  expect(at(line, 20, 10)).toEqual(at(before, 20, 10));
+
+  await page.getByRole("button", { name: "Rectangle outline (U)" }).click();
+  const upper = xy(6, 6), lower = xy(13, 13);
+  await page.mouse.move(upper.x, upper.y); await page.mouse.down();
+  await page.mouse.move(lower.x, lower.y, { steps: 5 }); await page.mouse.up();
+  const outlined = await read();
+  expect(at(outlined, 13, 12)).toEqual([128, 219, 191, 255]);
+  expect(at(outlined, 6, 6)).toEqual(at(before, 6, 6));
+  expect(at(outlined, 11, 11)).toEqual(at(line, 11, 11));
+
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await read()).toEqual(line);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await read()).toEqual(before);
+});
