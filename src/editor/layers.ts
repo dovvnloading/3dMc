@@ -193,9 +193,11 @@ export function clearRasterLayer(doc: EditorDocument, textureId: string,
                                  id: string): EditorDocument {
   return editTexture(doc, textureId, t => {
     requireLayer(t, id);
+    const layer = requireLayer(t, id);
+    if (layer.pixels.every(value => value === 0)) return t;
     const zeros = new Array<number>(t.width * t.height * 4).fill(0);
-    return setRasterLayerPixels({ ...doc, textures: [t] }, textureId, id, zeros)
-      .textures[0]!;
+    return publish(t, t.layers!.map(entry =>
+      entry.id === id ? { ...entry, pixels: zeros } : entry));
   });
 }
 
