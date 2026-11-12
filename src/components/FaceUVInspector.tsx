@@ -5,6 +5,7 @@ import {
 } from "../editor/domain";
 import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV, PixelTexture } from "../editor/domain";
 import type { FaceUVClipboard } from "../editor/uvEditing";
+import { generateBoxUV } from "../editor/boxUv";
 import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
 
 function UVField({ label, value, opposite, disabled, onCommit }: {
@@ -129,6 +130,15 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
     </div>
     <button type="button" className="face-reset" disabled={selected.locked}
       onClick={reset}><RotateCcw size={14}/>Reset this face to full texture</button>
+    <button type="button" className="face-reset" disabled={selected.locked || !selected.visible}
+      aria-label="Generate six-face box UV layout"
+      onClick={() => commitDocument(doc => generateBoxUV(doc, selected.id))}>
+      Generate six-face box UV layout
+    </button>
+    <p className="face-uv-note">
+      Box layout arranges six proportional face rectangles in a compact UV cross and resets their rotations.
+      It does not paint, repack image pixels or change texture assignments.
+    </p>
     <p className="face-uv-note">
       A texture is shared by every face that references its pixels.
       The editor preview uses the authored mapping; check your pack in Minecraft to confirm its appearance.
