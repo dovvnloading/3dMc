@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Axis, EditorDocument } from "../editor/domain";
-import { alignSelection, distributeSelection, selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
+import { alignSelection, distributeSelection, mirrorSelection, selectionBounds, setEachSize, setSelectionBounds, transformSelection } from "../editor/selection";
 
 interface Props {
   document: EditorDocument;
@@ -116,6 +116,15 @@ export function SelectionInspector(props: Props) {
           </button>)}
         </div>
         {nodes.length < 3 && <p className="batch-help">Select three or more editable parts to distribute centers.</p>}
+        <h4>Mirror geometry</h4>
+        <p className="batch-help">Reflect selected parts across the selection center on one axis. Their dimensions and painted face UVs stay unchanged; texture pixels are not flipped.</p>
+        <div className="batch-distribute" role="group" aria-label="Mirror selected parts">
+          {axes.map(axis => <button type="button" key={axis} disabled={disabled}
+            aria-label={"Mirror selected parts on " + label(axis)}
+            onClick={() => props.apply(doc => mirrorSelection(doc, props.ids, axis))}>
+            Mirror {label(axis)}
+          </button>)}
+        </div>
       </div>
       <div className="inspector-group">
         <h3>Selection actions</h3>
