@@ -4,11 +4,42 @@ import { createSampleDocument, setTexturePixels } from "../editor/domain";
 import { JAVA_PACK_PATHS, JavaExportBlocked, makeJava1214Pack } from "../export/javaBlock";
 import { inspectJava1214Pack } from "../import/javaPack";
 import { indexLegacyProject, PackIndexError, parsePackDocument } from "./packDocument";
-import { makeIndexedJava1214Pack, MAX_INDEXED_EXPORT_MODELS } from "./javaPackBuilder";
+import { JAVA_1214_REPLACEMENTS, makeIndexedJava1214Pack,
+  MAX_INDEXED_EXPORT_MODELS } from "./javaPackBuilder";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 describe("indexed Java 1.21.4 pack writer", () => {
+  it("exports eight distinct property-free block replacements in one deterministic pack", () => {
+    const first = createSampleDocument();
+    const pack = clone(indexLegacyProject(first));
+    const sources = [first];
+    for (let index = 1; index < JAVA_1214_REPLACEMENTS.length; index++) {
+      const source = { ...createSampleDocument(), id: "expansion-source-" + index,
+        name: "Visual " + index };
+      sources.push(source);
+      pack.models.push({
+        id: "model-" + index, sourceDocumentId: source.id,
+        resource: { namespace: "art", path: "block/custom_" + index },
+        replaces: { namespace: "minecraft", path: JAVA_1214_REPLACEMENTS[index]! },
+        provenance: "editor",
+        textures: [{ sourceTextureId: "main", textureAssetId: "texture-" + index }]
+      });
+      pack.textures.push({
+        id: "texture-" + index, sourceDocumentId: source.id, sourceTextureId: "main",
+        resource: { namespace: "art", path: "block/paint_" + index }
+      });
+    }
+    const result = makeIndexedJava1214Pack(pack, sources);
+    expect(result.replaces).toEqual(JAVA_1214_REPLACEMENTS.map(name => "minecraft:" + name));
+    expect(result.paths.filter(path => path.startsWith("assets/minecraft/blockstates/"))).toHaveLength(8);
+    expect(makeIndexedJava1214Pack(pack, [...sources].reverse()).zip).toEqual(result.zip);
+    expect(result.paths).toHaveLength(new Set(result.paths).size);
+    const files = unzipSync(result.zip);
+    for (const target of JAVA_1214_REPLACEMENTS)
+      expect(files["assets/minecraft/blockstates/" + target + ".json"]).toBeDefined();
+  });
+
   it("reproduces the legacy diamond-block ZIP byte for byte", () => {
     const source = createSampleDocument();
     const index = indexLegacyProject(source);
