@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { EditorDocument, PixelTexture } from "../editor/domain";
 import {
-  MAX_RASTER_LAYERS, addRasterLayer, flattenTextureLayers, moveRasterLayer,
+  MAX_RASTER_LAYERS, addRasterLayer, clearRasterLayer, duplicateRasterLayer,
+  flattenTextureLayers, mergeRasterLayerDown, moveRasterLayer,
   removeRasterLayer, renameRasterLayer, selectRasterLayer,
   setRasterLayerOpacity, setRasterLayerVisibility
 } from "../editor/layers";
@@ -126,6 +127,21 @@ export function TextureLayersPanel({ texture, commit }: Props) {
           disabled={layers.length >= MAX_RASTER_LAYERS} onClick={create}>
           Add layer
         </button>
+        <button type="button" aria-label="Duplicate active texture layer"
+          disabled={!active || layers.length >= MAX_RASTER_LAYERS}
+          onClick={() => {
+            if (!active) return;
+            const id = "layer_" + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+            commit(doc => duplicateRasterLayer(doc, texture.id, active.id, id));
+          }}>Duplicate</button>
+        <button type="button" aria-label="Merge active texture layer down"
+          disabled={!active || layers.findIndex(layer => layer.id === active.id) <= 0}
+          onClick={() => { if (active) commit(doc =>
+            mergeRasterLayerDown(doc, texture.id, active.id)); }}>Merge down</button>
+        <button type="button" aria-label="Clear active texture layer"
+          disabled={!active} onClick={() => {
+            if (active) commit(doc => clearRasterLayer(doc, texture.id, active.id));
+          }}>Clear layer</button>
         <button type="button" aria-label="Delete active texture layer"
           disabled={layers.length <= 1 || !active}
           onClick={() => { if (active) commit(doc => removeRasterLayer(doc, texture.id, active.id)); }}>
