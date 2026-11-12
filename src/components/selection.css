@@ -20,3 +20,10 @@
 .scene-group-name:focus{border-color:var(--interactive-border);outline:2px solid var(--focus)}
 .scene-row.grouped-part{padding-left:24px}
 .scene-selection-tools button:disabled{opacity:.4;cursor:not-allowed}
+
+.move-snap-control{display:grid;gap:9px;margin:12px 0 9px}
+.move-snap-control label{display:grid;gap:5px;min-width:0;font-size:11px;color:var(--secondary)}
+.move-snap-control input{width:100%;min-width:0;box-sizing:border-box;padding:8px;background:var(--control);color:var(--text);border:1px solid var(--interactive-border);border-radius:5px;font:inherit;font-size:12px}
+.move-snap-control input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.move-snap-control input[aria-invalid=true]{border-color:#e0988c}
+.move-snap-control small{color:#f3b0a4;font-size:11px}
