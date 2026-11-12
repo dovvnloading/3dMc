@@ -4,7 +4,7 @@ import { commit, createHistory, redo, undo } from "./history";
 import {
   alignSelection, distributeSelection, mirrorSelection,
   beginSelectionGesture, cancelSelectionGesture, commitSelectionGesture,
-  deleteSelection, duplicateSelection, emptySelection, reconcileSelection,
+  deleteSelection, duplicateSelection, repeatSelection, emptySelection, reconcileSelection,
   selectAt, selectOnly, selectionBounds, setEachSize, setSelectionBounds, transformSelection
 } from "./selection";
 
@@ -167,6 +167,54 @@ describe("multi-selection alignment and distribution", () => {
     const hidden = { ...source, cuboids: source.cuboids.map(node =>
       node.id === "base" ? { ...node, visible: false } : node) };
     expect(() => alignSelection(hidden, ["body", "base"], 1, "maximum")).toThrow(/hidden/);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+});
+
+describe("duplicate array modeling", () => {
+  it("repeats two painted/solid parts with exact spacing, stable IDs and one undo step", () => {
+    const source = createSampleDocument();
+    const before = JSON.stringify(source);
+    const ids = ["a1", "b1", "a2", "b2", "a3", "b3"];
+    const result = repeatSelection(source, ["body", "base"], ids, 3, [0, 4, -2]);
+    expect(result.cuboids).toHaveLength(source.cuboids.length + 6);
+    expect(result.cuboids.slice(7).map(node => node.id)).toEqual(ids);
+    expect(result.cuboids[7]!.from).toEqual([3, 7, 1]);
+    expect(result.cuboids[8]!.from).toEqual([2, 5, 0]);
+    expect(result.cuboids[9]!.from).toEqual([3, 11, -1]);
+    expect(result.cuboids[11]!.from).toEqual([3, 15, -3]);
+    expect(result.cuboids[7]!.faces).toEqual(source.cuboids[0]!.faces);
+    expect(result.cuboids[7]!.faces).not.toBe(source.cuboids[0]!.faces);
+    expect(result.cuboids[7]!.material).toBe("texture");
+    expect(result.cuboids[8]!.material).toBe("solid");
+    expect(result.textures).toBe(source.textures);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(parseDocument(result)).toEqual(result);
+    const action = commit(createHistory(source), result);
+    expect(action.past).toHaveLength(1);
+    expect(undo(action).present).toBe(source);
+    expect(redo(undo(action)).present).toBe(result);
+  });
+
+  it("rejects invalid counts, IDs, offsets, excessive parts or locked selection without partial edits", () => {
+    const source = createSampleDocument();
+    const before = JSON.stringify(source);
+    const ids = ["copy1", "copy2"];
+    expect(() => repeatSelection(source, selected, ids, 0, [1, 0, 0])).toThrow(/1–64/);
+    expect(() => repeatSelection(source, selected, ids, 65, [1, 0, 0])).toThrow(/1–64/);
+    expect(() => repeatSelection(source, selected, ids, 1, [0, 0, 0])).toThrow(/nonzero/);
+    expect(() => repeatSelection(source, selected, ids, 1, [NaN, 0, 0])).toThrow(/finite/);
+    expect(() => repeatSelection(source, selected, ["body", "copy2"], 1, [1, 0, 0])).toThrow(/identifiers/);
+    expect(() => repeatSelection(source, selected, ["copy1", "copy1"], 1, [1, 0, 0])).toThrow(/identifiers/);
+    expect(() => repeatSelection(source, selected, ids, 2, [1, 0, 0])).toThrow(/identifiers/);
+    expect(() => repeatSelection(source, selected, ids, 1, [300, 0, 0])).toThrow(/geometry bounds/);
+    const locked = { ...source, cuboids: source.cuboids.map(node =>
+      node.id === "body" ? { ...node, locked: true } : node) };
+    expect(() => repeatSelection(locked, selected, ids, 1, [1, 0, 0])).toThrow(/locked/);
+    const big = { ...source, cuboids: Array.from({ length: 1999 }, (_, i) => ({
+      ...source.cuboids[0]!, id: "part-" + i
+    })) };
+    expect(() => repeatSelection(big, ["part-0"], ids, 2, [1, 0, 0])).toThrow(/2,000/);
     expect(JSON.stringify(source)).toBe(before);
   });
 });
