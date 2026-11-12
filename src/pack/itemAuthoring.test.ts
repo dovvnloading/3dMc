@@ -160,6 +160,37 @@ describe("Java 1.21.4 item authoring profile", () => {
     expect(makeIndexedJava1214Pack(reopened.pack, reopened.sources).zip).toEqual(generated.zip);
   });
 
+
+  it("exports item-only visuals without any vanilla blockstate replacement", async () => {
+    const source = createSampleDocument();
+    const pack = indexLegacyProject(source);
+    expect(() => parsePackDocument({ ...pack, exportBlockVisuals: false }))
+      .toThrow(/item-only pack needs/);
+    const itemOnly = parsePackDocument({
+      ...pack, items: [fixture()], exportBlockVisuals: false
+    });
+    const before = JSON.stringify(source);
+    const out = makeIndexedJava1214Pack(itemOnly, [source]);
+    expect(out.replaces).toEqual([]);
+    expect(out.itemReplacements).toEqual(["minecraft:stick"]);
+    const files = unzipSync(out.zip);
+    expect(Object.keys(files).some(path => path.includes("/blockstates/"))).toBe(false);
+    expect(files["assets/minecraft/items/stick.json"]).toBeDefined();
+    expect(files["assets/3dmc/models/item/stick.json"]).toBeDefined();
+    expect(JSON.parse(strFromU8(files["pack.mcmeta"]!)).pack.description)
+      .toContain("item visuals");
+    expect(out.issues.some(issue => issue.code === "VISUAL_REPLACEMENT_ONLY")).toBe(false);
+    const problems = inspectIndexedJava1214Pack(itemOnly, [source]);
+    expect(problems.filter(issue => issue.severity === "error")).toEqual([]);
+    expect(problems.find(issue => issue.code === "PACK_VISUAL_REPLACEMENTS_ONLY")?.message)
+      .toContain("no vanilla blocks");
+    const bytes = await encodeNativePack(itemOnly, [source]);
+    const restored = await decodeNativePack(bytes);
+    expect(restored.pack.exportBlockVisuals).toBe(false);
+    expect(makeIndexedJava1214Pack(restored.pack, restored.sources).zip).toEqual(out.zip);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
   it("rejects item model collisions and source-format blockers before writing a ZIP", () => {
     const source = createSampleDocument();
     const pack = indexLegacyProject(source);

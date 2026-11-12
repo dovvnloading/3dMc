@@ -75,6 +75,23 @@ describe("exact generated Java item settings importer", () => {
     expect(restored.items[0]!.display.gui.translation).toEqual([2, 1, -0.5]);
   });
 
+
+  it("reopens the exact item-only subset without importing any blockstate replacement", () => {
+    const { source, pack, withItems } = fixture();
+    const itemOnly = parsePackDocument({ ...withItems, exportBlockVisuals: false });
+    const zip = makeIndexedJava1214Pack(itemOnly, [source]).zip;
+    const files = unzipSync(zip);
+    expect(Object.keys(files).some(path => path.includes("/blockstates/"))).toBe(false);
+    const result = inspectGeneratedItemSettings(zip, itemOnly, [source]);
+    if (result.status !== "compatible") throw new Error(result.problems.join("; "));
+    expect(result.pack.exportBlockVisuals).toBe(false);
+    expect(result.items).toEqual(itemOnly.items);
+    expect(makeIndexedJava1214Pack(result.pack, [source]).zip).toEqual(zip);
+    expect(inspectGeneratedItemSettings(zip, pack, [source])).toMatchObject({
+      status: "blocked"
+    });
+  });
+
   it("rejects modified geometry, external files and invalid item routing atomically", () => {
     const { source, pack, gameZip } = fixture();
     const changedSource = setAxisValue(source, "body", "position", 0, 4);

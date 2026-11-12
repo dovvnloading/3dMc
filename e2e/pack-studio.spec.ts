@@ -415,3 +415,49 @@ test("Pack Studio can expand beyond two models with distinct property-free block
   await studio.getByRole("button", { name: "Redo pack operation" }).click();
   await expect(models).toHaveCount(4);
 });
+
+test("item-only resource pack contains no vanilla blockstate replacements", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  const replaceBlocks = studio.getByRole("checkbox",
+    { name: "Also replace vanilla block visuals" });
+  await expect(replaceBlocks).toBeDisabled();
+  await studio.getByRole("button", { name: "Add Java item" }).click();
+  await expect(replaceBlocks).toBeEnabled();
+  await replaceBlocks.uncheck();
+  await expect(replaceBlocks).not.toBeChecked();
+
+  const [game] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const gamePath = await game.path();
+  if (!gamePath) throw new Error("Item-only Java ZIP download missing.");
+  const files = unzipSync(new Uint8Array(await readFile(gamePath)));
+  expect(Object.keys(files).filter(path => path.includes("/blockstates/"))).toEqual([]);
+  expect(files["assets/minecraft/items/stick.json"]).toBeDefined();
+  expect(files["assets/3dmc/models/item/stick_" + "nonexistent" + ".json"]).toBeUndefined();
+
+  const [project] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Save pack .3dmc" }).click()
+  ]);
+  const projectPath = await project.path();
+  if (!projectPath) throw new Error("Item-only editable source missing.");
+  const sourceFiles = unzipSync(new Uint8Array(await readFile(projectPath)));
+  const savedIndex = JSON.parse(strFromU8(sourceFiles["pack.json"]!));
+  expect(savedIndex.exportBlockVisuals).toBe(false);
+
+  await studio.getByRole("button", { name: "Undo pack operation" }).click();
+  await expect(replaceBlocks).toBeChecked();
+  await studio.getByRole("button", { name: "Redo pack operation" }).click();
+  await expect(replaceBlocks).not.toBeChecked();
+  await studio.locator('input[type="file"][accept*=".3dmc"]').first()
+    .setInputFiles(projectPath);
+  await studio.getByRole("button", { name: "Load selected pack" }).click();
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  await expect(page.getByRole("dialog", { name: "Pack Studio" })
+    .getByRole("checkbox", { name: "Also replace vanilla block visuals" }))
+    .not.toBeChecked();
+});
