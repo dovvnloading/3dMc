@@ -336,13 +336,15 @@ test("Java item settings import restores authored display values without replaci
   await guiAngle.fill("22");
   await guiAngle.press("Enter");
   await expect(guiAngle).toHaveValue("22");
-  const before = await Promise.all([
+  const [sourceBefore] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Download legacy JSON backup" }).click()
+    studio.getByRole("button", { name: "Save pack .3dmc" }).click()
   ]);
-  const beforePath = await before[0].path();
-  if (!beforePath) throw new Error("Editable source backup missing.");
-  const sourceBytes = await readFile(beforePath, "utf8");
+  const beforePath = await sourceBefore.path();
+  if (!beforePath) throw new Error("Editable pack source backup missing.");
+  const beforeFiles = unzipSync(new Uint8Array(await readFile(beforePath)));
+  const sourceBytes = beforeFiles["models/0/document.json"]!;
+  const textureBytes = beforeFiles["models/0/textures/main.png"]!;
 
   await studio.locator('input[type="file"][accept=".zip,application/zip"]')
     .setInputFiles(exported);
@@ -350,13 +352,15 @@ test("Java item settings import restores authored display values without replaci
   await expect(guiAngle).toHaveValue("22");
   await studio.getByRole("button", { name: "Apply imported item settings" }).click();
   await expect(guiAngle).toHaveValue("67");
-  const after = await Promise.all([
+  const [sourceAfter] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Download legacy JSON backup" }).click()
+    studio.getByRole("button", { name: "Save pack .3dmc" }).click()
   ]);
-  const afterPath = await after[0].path();
-  if (!afterPath) throw new Error("Editable source backup missing after import.");
-  expect(await readFile(afterPath, "utf8")).toBe(sourceBytes);
+  const afterPath = await sourceAfter.path();
+  if (!afterPath) throw new Error("Editable pack source backup missing after import.");
+  const afterFiles = unzipSync(new Uint8Array(await readFile(afterPath)));
+  expect(afterFiles["models/0/document.json"]).toEqual(sourceBytes);
+  expect(afterFiles["models/0/textures/main.png"]).toEqual(textureBytes);
 
   const [recreated] = await Promise.all([
     page.waitForEvent("download"),
