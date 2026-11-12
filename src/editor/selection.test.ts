@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createSampleDocument, parseDocument } from "./domain";
 import { commit, createHistory, redo, undo } from "./history";
 import {
-  alignSelection, distributeSelection,
+  alignSelection, distributeSelection, mirrorSelection,
   beginSelectionGesture, cancelSelectionGesture, commitSelectionGesture,
   deleteSelection, duplicateSelection, emptySelection, reconcileSelection,
   selectAt, selectOnly, selectionBounds, setEachSize, setSelectionBounds, transformSelection
@@ -168,6 +168,41 @@ describe("multi-selection alignment and distribution", () => {
       node.id === "base" ? { ...node, visible: false } : node) };
     expect(() => alignSelection(hidden, ["body", "base"], 1, "maximum")).toThrow(/hidden/);
     expect(JSON.stringify(source)).toBe(before);
+  });
+});
+
+describe("selection geometry mirror", () => {
+  it("reflects selected part positions around the shared pivot as one reversible edit", () => {
+    const source = createSampleDocument();
+    const mirrored = mirrorSelection(source, ["body", "base"], 1);
+    expect(mirrored.cuboids[0]!.from).toEqual([3, 1, 3]);
+    expect(mirrored.cuboids[0]!.to).toEqual([13, 10, 13]);
+    expect(mirrored.cuboids[1]!.from).toEqual([2, 10, 2]);
+    expect(mirrored.cuboids[1]!.to).toEqual([14, 12, 14]);
+    expect(mirrored.cuboids[2]).toBe(source.cuboids[2]);
+    expect(mirrored.cuboids[0]!.faces).toBe(source.cuboids[0]!.faces);
+    expect(mirrored.cuboids[0]!.to[1] - mirrored.cuboids[0]!.from[1]).toBe(9);
+    expect(mirrored.textures).toBe(source.textures);
+    expect(parseDocument(mirrored)).toEqual(mirrored);
+    const action = commit(createHistory(source), mirrored);
+    expect(action.past).toHaveLength(1);
+    expect(undo(action).present).toBe(source);
+    expect(redo(undo(action)).present).toBe(mirrored);
+    const restored = mirrorSelection(mirrored, ["body", "base"], 1);
+    expect(restored.cuboids).toEqual(source.cuboids);
+  });
+
+  it("returns the original for an empty or symmetrical selection, and rejects locked members", () => {
+    const source = createSampleDocument();
+    expect(mirrorSelection(source, [], 0)).toBe(source);
+    expect(mirrorSelection(source, ["body", "base"], 0)).toBe(source);
+    const locked = { ...source, cuboids: source.cuboids.map(node =>
+      node.id === "base" ? { ...node, locked: true } : node) };
+    expect(() => mirrorSelection(locked, ["body", "base"], 1)).toThrow(/locked/);
+    const hidden = { ...source, cuboids: source.cuboids.map(node =>
+      node.id === "body" ? { ...node, visible: false } : node) };
+    expect(() => mirrorSelection(hidden, ["body", "base"], 1)).toThrow(/hidden/);
+    expect(source.cuboids[0]!.from).toEqual([3, 3, 3]);
   });
 });
 
