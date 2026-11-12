@@ -43,6 +43,7 @@ import { claimRecoveryWriter, readAnyRecovery, renewRecoveryWriter, rotateRecove
 import type { AnyRecoveryCandidate, RecoveryLease } from "./editor/recovery";
 import { floodFill, readHex } from "./editor/pixels";
 import { facePaintMask } from "./editor/paintMask";
+import { activeRasterLayer, setRasterLayerPixels } from "./editor/layers";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
 import type { PaintGesture } from "./editor/gestures";
 import type { Texel } from "./editor/pixels";
@@ -343,8 +344,12 @@ export function App() {
     const source = historyRef.current.present;
     const mask = paintMask(source, textureId, face);
     if (mask === null) { setNotice("Choose a visible, unlocked painted face using this texture, or disable UV-constrained painting."); return; }
-    const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask);
-    drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
+    try {
+      const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask);
+      drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Cannot paint the active texture layer.");
+    }
   }, [color, brushSize, tool, paintMask]);
   const continuePaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
     const current = drag.current; if (!current || current.textureId !== textureId) return;
@@ -369,8 +374,16 @@ export function App() {
       const sheet = textureById(current, textureId); if (!sheet) return current;
       const mask = paintMask(current, textureId, faceKey);
       if (mask === null) return current;
-      const changed = setTexturePixels(current,
-        floodFill(sheet.pixels, sheet.width, sheet.height, texel, color, mask), textureId);
+      const layer = activeRasterLayer(sheet);
+      if (sheet.layers && !layer) return current;
+      if (layer && (!layer.visible || layer.opacity === 0)) {
+        setNotice("Show the active layer and increase its opacity before filling.");
+        return current;
+      }
+      const input = layer?.pixels ?? sheet.pixels;
+      const filled = floodFill(input, sheet.width, sheet.height, texel, color, mask);
+      const changed = layer ? setRasterLayerPixels(current, textureId, layer.id, filled)
+        : setTexturePixels(current, filled, textureId);
       return changed === current ? current : selectTexture(changed, textureId);
     });
   }, [color, tool, commitDocument, paintMask]);
