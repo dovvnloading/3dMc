@@ -9,6 +9,7 @@ import { encodeRgbaPng } from "../export/png";
 import { gameFilePath, PackIndexError, parsePackDocument, resourceKey,
   verifyPackSources } from "./packDocument";
 import type { PackDocument, PackModelAsset, ResourceLocation } from "./packDocument";
+import { javaItemDisplay } from "./itemProfile";
 
 /**
  * Candidates whose vanilla Java 1.21.4 blockstates contain one empty-string
@@ -23,6 +24,7 @@ export interface IndexedJavaPackResult {
   zip: Uint8Array;
   paths: string[];
   replaces: string[];
+  itemReplacements: string[];
   issues: ExportIssue[];
   gameVerified: false;
 }
@@ -68,12 +70,17 @@ export function makeIndexedJava1214Pack(index: PackDocument,
   add("pack.mcmeta", jsonBytes({
     pack: {
       pack_format: RESOURCE_PACK_FORMAT,
-      description: "3dMc experimental block visual - Java Edition 1.21.4"
+      description: pack.items?.length ?
+        "3dMc experimental block and item visuals - Java Edition 1.21.4" :
+        "3dMc experimental block visual - Java Edition 1.21.4"
     }
   }));
 
   const notices: ExportIssue[] = [];
   const writtenTextures = new Set<string>();
+  // Reuse each source model's fully resolved texture aliases for its item
+  // appearances. Do not duplicate or convert the source RGBA bytes.
+  const resolvedModels = new Map<string, ReturnType<typeof buildJava1214Model>>();
   for (const asset of pack.models) {
     if (!JAVA_1214_REPLACEMENTS.includes(asset.replaces.path as typeof JAVA_1214_REPLACEMENTS[number]))
       throw new PackIndexError(
@@ -107,6 +114,7 @@ export function makeIndexedJava1214Pack(index: PackDocument,
         model.textures["solid_" + index] =
           resourceKey(generatedSolidResource(pack, asset, index));
     });
+    resolvedModels.set(asset.id, model);
 
     add(gameFilePath("blockstates", asset.replaces), jsonBytes({
       variants: { "": { model: resourceKey(asset.resource) } }
@@ -131,6 +139,18 @@ export function makeIndexedJava1214Pack(index: PackDocument,
         encodeRgbaPng(MIN_JAVA_TEXTURE_SIZE, MIN_JAVA_TEXTURE_SIZE, pixels));
     });
   }
+  for (const item of pack.items ?? []) {
+    const base = resolvedModels.get(item.sourceModelId);
+    if (!base) throw new PackIndexError(
+      "Item source model is missing: " + item.sourceModelId);
+    const itemModel = { ...base, display: javaItemDisplay(item.display) };
+    // Java 1.21.4 selects an items/ definition, not legacy model overrides.
+    add(gameFilePath("models", item.resource), jsonBytes(itemModel));
+    add(gameFilePath("items", item.replaces), jsonBytes({
+      model: { type: "minecraft:model", model: resourceKey(item.resource) },
+      hand_animation_on_swap: item.handAnimationOnSwap
+    }));
+  }
   const zip = zipSync(files, { level: 0, mtime: new Date(1980, 0, 1) });
   if (zip.length > MAX_INDEXED_EXPORT_BYTES)
     throw new PackIndexError("Indexed pack exceeds the 12 MB experimental export budget.");
@@ -140,9 +160,14 @@ export function makeIndexedJava1214Pack(index: PackDocument,
       severity: "warning", code: "NEW_REPLACEMENT_UNVERIFIED",
       message: "Additional targets and combined packs need their own Minecraft 1.21.4 in-game checks."
     });
+  if (pack.items?.length) uniqueNotices.push({
+    severity: "warning", code: "ITEM_GAME_CHECK_REQUIRED",
+    message: "Java 1.21.4 item definitions and display contexts are experimental. Test the exported visuals in game before claiming compatibility."
+  });
   return {
     zip, paths: Object.keys(files),
     replaces: pack.models.map(asset => resourceKey(asset.replaces)),
+    itemReplacements: (pack.items ?? []).map(item => resourceKey(item.replaces)),
     issues: uniqueNotices, gameVerified: false
   };
 }
