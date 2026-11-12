@@ -76,9 +76,13 @@ export function inspectGeneratedItemSettings(bytes: Uint8Array, packInput: PackD
     const baselinePack = { ...pack, items: [], exportBlockVisuals: true };
     const baseline = makeIndexedJava1214Pack(baselinePack, sources);
     const baselineFiles = unzipSync(baseline.zip);
+    const omittedBlockPaths = new Set([
+      ...pack.models.map(model => gameFilePath("models", model.resource)),
+      ...pack.models.map(model => gameFilePath("blockstates", model.replaces))
+    ]);
     for (const path of baseline.paths) {
       if (path === "pack.mcmeta" ||
-          (!includeBlocks && path.includes("/blockstates/"))) continue;
+          (!includeBlocks && omittedBlockPaths.has(path))) continue;
       // Pack description changes when items are present.
       const actual = files.get(path);
       if (!actual || !equalBytes(actual, baselineFiles[path]!))

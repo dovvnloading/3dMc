@@ -177,6 +177,7 @@ describe("Java 1.21.4 item authoring profile", () => {
     expect(Object.keys(files).some(path => path.includes("/blockstates/"))).toBe(false);
     expect(files["assets/minecraft/items/stick.json"]).toBeDefined();
     expect(files["assets/3dmc/models/item/stick.json"]).toBeDefined();
+    expect(files["assets/3dmc/models/block/lantern.json"]).toBeUndefined();
     expect(JSON.parse(strFromU8(files["pack.mcmeta"]!)).pack.description)
       .toContain("item visuals");
     expect(out.issues.some(issue => issue.code === "VISUAL_REPLACEMENT_ONLY")).toBe(false);

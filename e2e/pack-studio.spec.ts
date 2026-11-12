@@ -437,7 +437,7 @@ test("item-only resource pack contains no vanilla blockstate replacements", asyn
   const files = unzipSync(new Uint8Array(await readFile(gamePath)));
   expect(Object.keys(files).filter(path => path.includes("/blockstates/"))).toEqual([]);
   expect(files["assets/minecraft/items/stick.json"]).toBeDefined();
-  expect(files["assets/3dmc/models/item/stick_" + "nonexistent" + ".json"]).toBeUndefined();
+  expect(files["assets/3dmc/models/block/lantern.json"]).toBeUndefined();
 
   const [project] = await Promise.all([
     page.waitForEvent("download"),

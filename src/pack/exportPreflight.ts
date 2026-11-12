@@ -69,7 +69,8 @@ export function inspectIndexedJava1214Pack(input: PackDocument,
 
     if (includeBlocks)
       reserve(gameFilePath("blockstates", model.replaces), "blockstate " + model.id, model, source.name);
-    reserve(gameFilePath("models", model.resource), "model " + model.id, model, source.name);
+    if (includeBlocks)
+      reserve(gameFilePath("models", model.resource), "model " + model.id, model, source.name);
 
     for (const binding of model.textures) {
       const texture = assetsById.get(binding.textureAssetId)!;

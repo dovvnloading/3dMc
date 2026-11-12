@@ -127,7 +127,8 @@ export function makeIndexedJava1214Pack(index: PackDocument,
     if (includeBlocks) add(gameFilePath("blockstates", asset.replaces), jsonBytes({
       variants: { "": { model: resourceKey(asset.resource) } }
     }));
-    add(gameFilePath("models", asset.resource), jsonBytes(model));
+    if (includeBlocks)
+      add(gameFilePath("models", asset.resource), jsonBytes(model));
 
     for (const binding of asset.textures) {
       const texture = textureAssets.get(binding.textureAssetId)!;
