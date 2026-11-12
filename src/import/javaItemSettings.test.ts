@@ -48,7 +48,11 @@ describe("exact generated Java item settings importer", () => {
     const imported = inspectGeneratedItemSettings(gameZip, pack, [source]);
     if (imported.status !== "compatible")
       throw new Error(imported.problems.join("; "));
-    expect(imported.items).toEqual(withItems.items);
+    // Game ZIPs contain resource paths and display data, not internal source IDs.
+    expect(imported.items.map(({ id: _id, ...fields }) => fields))
+      .toEqual(withItems.items!.map(({ id: _id, ...fields }) => fields));
+    expect(imported.items.map(item => item.id))
+      .toEqual(["import_item_stick", "import_item_paper"]);
     expect(imported.pack.items!.map(item => item.replaces.path)).toEqual(["stick", "paper"]);
     expect(imported.pack.items![0]!.display.gui.translation).toEqual([2, 1, -0.5]);
     expect(imported.pack.items![1]!.handAnimationOnSwap).toBe(false);
@@ -131,7 +135,10 @@ describe("exact generated Java item settings importer", () => {
     });
 
     const damaged = gameZip.slice();
-    damaged[10] = damaged[10]! ^ 8;
+    // Flip a byte inside pack.mcmeta's actual payload, not a harmless
+    // timestamp field in the ZIP header. The CRC must reject this modification.
+    const body = 30 + "pack.mcmeta".length + 4;
+    damaged[body] = damaged[body]! ^ 8;
     expect(inspectGeneratedItemSettings(damaged, pack, [source])).toMatchObject({
       status: "blocked"
     });
