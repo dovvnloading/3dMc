@@ -134,6 +134,26 @@ export function alignSelection(document: EditorDocument, ids: readonly string[],
   return publish(document, moved);
 }
 
+/**
+ * Reflect selected cuboid geometry around the shared selection center.
+ * Size, face bindings, UV rotations, textures and scene order remain intact:
+ * this mirrors part placement, not the pixels painted on each face.
+ */
+export function mirrorSelection(document: EditorDocument, ids: readonly string[],
+  axis: Axis): EditorDocument {
+  const nodes = editableSelection(document, ids);
+  const bounds = selectionBounds(nodes);
+  if (!bounds) return document;
+  const sum = bounds.from[axis] + bounds.to[axis];
+  return publish(document, nodes.map(node => {
+    const from = [...node.from] as [number, number, number];
+    const to = [...node.to] as [number, number, number];
+    from[axis] = rounded(sum - node.to[axis]);
+    to[axis] = rounded(sum - node.from[axis]);
+    return { ...node, from, to };
+  }));
+}
+
 /** Keep the outermost centers fixed and space intermediate centers evenly. */
 export function distributeSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis): EditorDocument {
