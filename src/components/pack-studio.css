@@ -52,3 +52,44 @@
 .pack-studio-edit-model:hover{background:var(--raised)}
 .pack-studio-usage{color:var(--accent)!important;font-size:11px}
 .pack-studio-usage-list{list-style:disc;margin:0 0 0 14px;padding:0;color:var(--secondary);font-size:11px;line-height:1.5}
+
+
+/* Java 1.21.4 item authoring extends the source pack, not a second workspace. */
+.pack-item-studio{margin-top:16px;padding:14px;border:1px solid var(--divider);border-radius:8px;background:var(--panel);min-width:0}
+.pack-item-studio-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.pack-item-studio-header h3{margin:0 0 5px;font-size:14px}
+.pack-item-studio-header h3 span{font-size:10px;font-weight:400;color:var(--secondary)}
+.pack-item-studio-header p{font-size:11px;color:var(--secondary);line-height:1.55;margin:0;max-width:640px}
+.pack-item-studio-header>button,.pack-item-bottom-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--interactive-border);border-radius:5px;background:var(--control);color:var(--text);padding:8px 11px;font-size:11px;cursor:pointer}
+.pack-item-studio-header>button:disabled{opacity:.45;cursor:not-allowed}
+.pack-item-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.pack-item-tabs button{padding:7px 9px;border-radius:5px;border:1px solid var(--divider);background:var(--control);color:var(--text);font-size:11px;cursor:pointer}
+.pack-item-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--selected);color:var(--accent)}
+.pack-item-workspace{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(220px,1fr);gap:15px;margin-top:12px}
+.pack-item-fields,.pack-item-preview-column{min-width:0}
+.pack-item-select{display:grid;gap:6px;color:var(--secondary);font-size:11px;margin:9px 0}
+.pack-item-select select{padding:8px 9px;color:var(--text);background:var(--control);border:1px solid var(--interactive-border);border-radius:5px;font-size:12px;min-width:0}
+.pack-item-fields .pack-studio-resource-fields{grid-template-columns:minmax(0,1fr) minmax(0,1.9fr)}
+.pack-item-generated-paths{display:grid;gap:5px;margin:10px 0;color:var(--secondary);font-size:10px}
+.pack-item-generated-paths span{overflow-wrap:anywhere}
+.pack-item-generated-paths code{color:var(--text)}
+.pack-item-hand-animation{display:flex;align-items:center;gap:7px;color:var(--secondary);font-size:11px;padding:5px 0}
+.pack-item-hand-animation input{accent-color:var(--accent)}
+.pack-item-transform-grid{display:grid;gap:8px}
+.pack-item-transform{margin:0;min-width:0;padding:10px;border:1px solid var(--divider);border-radius:6px}
+.pack-item-transform legend{font-size:11px;color:var(--text);padding:0 5px}
+.pack-item-transform>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pack-item-number{display:grid;gap:4px;min-width:0;font-size:10px;color:var(--secondary)}
+.pack-item-number input{box-sizing:border-box;min-width:0;width:100%;padding:7px 6px;border:1px solid var(--interactive-border);background:var(--control);border-radius:5px;color:var(--text);font-size:12px}
+.pack-item-number input[aria-invalid="true"]{border-color:#de938b}
+.pack-item-number small{font-size:10px;color:#de938b;line-height:1.4}
+.pack-item-bottom-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.pack-item-preview-column{border:1px solid var(--divider);padding:10px;border-radius:7px;background:var(--control);align-self:start}
+.pack-item-preview-column h4{font-size:12px;margin:0 0 10px}
+.pack-item-preview{width:100%;height:230px;min-height:180px;background:#171d20;border-radius:6px;overflow:hidden}
+.pack-item-preview canvas{touch-action:pan-y}
+.pack-item-preview-fallback{padding:18px;font-size:11px;color:var(--secondary)}
+.pack-item-preview-column p{margin-bottom:0}
+.pack-item-studio .pack-studio-help{margin-top:10px;line-height:1.5}
+@media(max-width:750px){.pack-item-workspace{grid-template-columns:1fr}.pack-item-preview{height:205px}}
+@media(max-width:480px){.pack-item-fields .pack-studio-resource-fields{grid-template-columns:1fr}.pack-item-studio-header{flex-direction:column}}
