@@ -16,6 +16,7 @@ import {
 } from "../pack/packSession";
 import type { PackSession } from "../pack/packSession";
 import { ModalDialog } from "./ModalDialog";
+import { ItemStudioPanel } from "./ItemStudioPanel";
 import "./pack-studio.css";
 
 interface Props {
@@ -220,7 +221,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         filename: slug + "-java-1.21.4-experimental.zip",
         mimeType: "application/zip", content: result.zip
       });
-      setMessage("Experimental ZIP download started. Check both replacements in Minecraft Java 1.21.4.");
+      setMessage("Experimental ZIP download started. Review the block and item visuals in Minecraft Java 1.21.4.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Export blocked. No source assets changed.");
     }
@@ -378,6 +379,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         <p className="pack-studio-help">Pack archive saves all source models, names, RGBA pixels and UV bindings. The main editor Save now downloads the complete pack source.</p>
       </section>
     </div>
+    <ItemStudioPanel session={session} source={activeDoc} onEdit={change}/>
     <div className="pack-studio-foot">
       <span aria-live="polite">{message || (external ? "All models share live editing, Undo, and local recovery. Download a .3dmc source backup to keep a portable copy." : dirty ? "Unsaved Pack Studio changes. Save your .3dmc source pack." : "Pack Studio source is ready.")}</span>
       {!external && confirmClose && <div className="pack-studio-confirm" role="group" aria-label="Confirm discard unsaved pack">
