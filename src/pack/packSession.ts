@@ -1,4 +1,5 @@
 import { parseDocument } from "../editor/domain";
+import { trimHistorySnapshots } from "../editor/history";
 import type { EditorDocument } from "../editor/domain";
 import { gameFilePath, parsePackDocument, resourceKey, verifyPackSources } from "./packDocument";
 import type { PackDocument, PackItemAsset, PackModelAsset, PackTextureAsset, ResourceLocation } from "./packDocument";
@@ -22,7 +23,6 @@ export interface PackSession {
 }
 
 export const MAX_PACK_SESSION_MODELS = 8;
-const MAX_HISTORY = 50;
 
 export class PackSessionError extends Error {
   constructor(message: string) {
@@ -54,7 +54,8 @@ function commitSnapshot(session: PackSession, candidate: PackSnapshot): PackSess
   const present = validate(candidate, session.present);
   return {
     present,
-    past: [...session.past, session.present].slice(-MAX_HISTORY),
+    past: trimHistorySnapshots([...session.past, session.present], present,
+      snapshot => snapshot.sources),
     future: [],
     revision: session.revision + 1
   };
@@ -268,7 +269,8 @@ export function redoPackSession(session: PackSession): PackSession {
   if (!session.future.length) return session;
   return {
     present: restore(session, session.future[0]!),
-    past: [...session.past, session.present].slice(-MAX_HISTORY),
+    past: trimHistorySnapshots([...session.past, session.present],
+      session.future[0]!, snapshot => snapshot.sources),
     future: session.future.slice(1),
     revision: session.revision + 1
   };
