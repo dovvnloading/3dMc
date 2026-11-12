@@ -7,7 +7,7 @@ export type FaceUVClipboard = Pick<FaceUV, "uv" | "rotation">;
 
 const bound = (value: number, lower: number, upper: number) =>
   Math.max(lower, Math.min(value, upper));
-const round = (value: number) => Math.round(value * 10000) / 10000;
+const round = (value: number) => Math.round(value * 1000000) / 1000000;
 
 function validRect(rect: FaceUVRect): boolean {
   return rect.length === 4 && rect.every(value =>
@@ -35,10 +35,11 @@ export function dragFaceUV(rect: FaceUVRect, handle: UVDragHandle,
   if (handle === "move") {
     const shiftX = bound(dx, -Math.min(rect[0], rect[2]), 16 - Math.max(rect[0], rect[2]));
     const shiftY = bound(dy, -Math.min(rect[1], rect[3]), 16 - Math.max(rect[1], rect[3]));
-    return [
+    const next: FaceUVRect = [
       round(rect[0] + shiftX), round(rect[1] + shiftY),
       round(rect[2] + shiftX), round(rect[3] + shiftY)
     ];
+    return validRect(next) ? next : rect;
   }
   const uField = handle === "nw" || handle === "sw" ? 0 : 2;
   const vField = handle === "nw" || handle === "ne" ? 1 : 3;
@@ -56,7 +57,7 @@ export function dragFaceUV(rect: FaceUVRect, handle: UVDragHandle,
   };
   result[uField] = editEdge(uField, width, dx);
   result[vField] = editEdge(vField, height, dy);
-  return result;
+  return validRect(result) ? result : rect;
 }
 
 /** Copy only UV bounds and rotation; pasting cannot change the texture asset. */
