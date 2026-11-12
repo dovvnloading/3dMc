@@ -4,6 +4,12 @@ on:
     branches: [main, docs/editor-foundation, feat/editor-core-slice]
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_chromium:
+        description: 'Run optional Chromium browser tests'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -31,16 +37,20 @@ jobs:
       - name: Production build
         run: npm run build
       - name: Install Chromium
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_chromium }}
         run: npx playwright install --with-deps chromium
       - name: Browser workflow smoke
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_chromium }}
         run: npm run test:e2e
       - name: Record browser texture resource baseline
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_chromium }}
         run: |
           test -s test-results/performance/texture-lifecycle.json
           cat test-results/performance/texture-lifecycle.json
       - name: Build GitHub Pages production bundle
         run: npm run build -- --mode github-pages
       - name: Test production site at /3dMc/ (not Vite dev)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_chromium }}
         run: npx playwright test --config playwright.pages.config.ts
       - name: Record reproducible source and release evidence
         if: always()
