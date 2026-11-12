@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drawStroke, floodFill } from "./pixels";
+import { drawRectangle, drawStroke, floodFill } from "./pixels";
 
 describe("opaque pixel brush and transparent eraser", () => {
   it("draws opaque pixels, then erases all RGBA channels without touching its source", () => {
@@ -85,5 +85,30 @@ describe("bounded and diagonal-safe fill", () => {
     expect(result.slice(0, 4)).toEqual([171, 205, 239, 255]);
     expect(result.slice(-4)).toEqual([171, 205, 239, 255]);
     expect(pixels.slice(0, 4)).toEqual([1, 2, 3, 128]);
+  });
+});
+
+describe("pixel rectangle outlines", () => {
+  it("draws only the inclusive outline and leaves the interior untouched", () => {
+    const initial = new Array<number>(8 * 8 * 4).fill(0);
+    const result = drawRectangle(initial, 8, 8, [5, 5], [1, 2], "#1263df", 1);
+    const at = (x: number, y: number) =>
+      result.slice((y * 8 + x) * 4, (y * 8 + x) * 4 + 4);
+    expect(at(1, 2)).toEqual([18, 99, 223, 255]);
+    expect(at(3, 2)).toEqual([18, 99, 223, 255]);
+    expect(at(5, 4)).toEqual([18, 99, 223, 255]);
+    expect(at(3, 5)).toEqual([18, 99, 223, 255]);
+    expect(at(3, 3)).toEqual([0, 0, 0, 0]);
+    expect(at(0, 0)).toEqual([0, 0, 0, 0]);
+    expect(initial.every(value => value === 0)).toBe(true);
+  });
+  it("clips brush footprints at the edge and supports opaque and clear pixels", () => {
+    const initial = new Array<number>(5 * 5 * 4).fill(255);
+    const next = drawRectangle(initial, 5, 5, [0, 0], [4, 4], "#ffffff", 2, 0);
+    const alpha = (x: number, y: number) => next[(y * 5 + x) * 4 + 3];
+    expect(alpha(0, 0)).toBe(0);
+    expect(alpha(4, 4)).toBe(0);
+    expect(alpha(2, 2)).toBe(255);
+    expect(initial.every(value => value === 255)).toBe(true);
   });
 });

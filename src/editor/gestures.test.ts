@@ -51,6 +51,37 @@ describe("atomic painter gesture", () => {
   });
 });
 
+describe("straight line and outlined rectangle gestures", () => {
+  it("rebuilds each preview from original pixels rather than leaving previous ghost lines", () => {
+    const source = createSampleDocument();
+    let line = beginPaintGesture(source, [2, 2], "body:north", "#ff00ee", 1, "line");
+    line = continuePaintGesture(line, [10, 2], "body:north");
+    line = continuePaintGesture(line, [10, 8], "body:north");
+    const afterLine = commitPaintGesture(source, line);
+    expect(pixelsAt(afterLine, 10, 8)).toBe("#ff00ee");
+    expect(pixelsAt(afterLine, 6, 2)).not.toBe("#ff00ee");
+    expect(cancelPaintGesture(line)).toBe(source);
+    expect(commit(createHistory(source), afterLine).past).toHaveLength(1);
+    expect(undo(commit(createHistory(source), afterLine)).present).toBe(source);
+  });
+  it("renders final rectangle corners, retains source, and refuses cross-face seams", () => {
+    const source = createSampleDocument();
+    let rect = beginPaintGesture(source, [4, 4], "body:north", "#ff00ee", 1, "rectangle");
+    rect = continuePaintGesture(rect, [12, 10], "body:north");
+    const previous = rect;
+    rect = continuePaintGesture(rect, [24, 24], "body:south");
+    expect(rect).toBe(previous);
+    const painted = commitPaintGesture(source, rect);
+    expect(pixelsAt(painted, 4, 4)).toBe("#ff00ee");
+    expect(pixelsAt(painted, 8, 4)).toBe("#ff00ee");
+    expect(pixelsAt(painted, 12, 8)).toBe("#ff00ee");
+    expect(pixelsAt(painted, 8, 10)).toBe("#ff00ee");
+    expect(pixelsAt(painted, 8, 7)).not.toBe("#ff00ee");
+    expect(pixelsAt(painted, 24, 24)).not.toBe("#ff00ee");
+    expect(cancelPaintGesture(rect)).toBe(source);
+  });
+});
+
 describe("atomic gizmo transform", () => {
   it("does not change geometry until a final pointer-up transform is committed", () => {
     const doc = createSampleDocument();
