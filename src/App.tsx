@@ -42,6 +42,7 @@ import type { NewProjectOptions } from "./editor/templates";
 import { claimRecoveryWriter, readAnyRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, savePackRecovery, RecoveryOwnershipLost, RecoverySnapshotTooLarge } from "./editor/recovery";
 import type { AnyRecoveryCandidate, RecoveryLease } from "./editor/recovery";
 import { floodFill, readHex } from "./editor/pixels";
+import { facePaintMask } from "./editor/paintMask";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
 import type { PaintGesture } from "./editor/gestures";
 import type { Texel } from "./editor/pixels";
@@ -165,6 +166,7 @@ export function App() {
   const [snap, setSnap] = useState(1);
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
   const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState<1 | 2 | 4>(1);
+  const [constrainPaint, setConstrainPaint] = useState(false);
   const [search, setSearch] = useState("");
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
   const [inspectorOpen, setInspectorOpen] = useState(() => window.innerWidth > 760);
@@ -322,12 +324,28 @@ export function App() {
     applyBatch(current => commitSelectionGesture(current, gesture, translation, scale));
   }, [applyBatch]);
 
+  const paintMask = useCallback((source: EditorDocument, textureId: string,
+    faceKey = "texture-canvas") => {
+    if (!constrainPaint) return undefined;
+    let nodeId = selectedId;
+    let direction = selectedFace;
+    if (faceKey !== "texture-canvas") {
+      const colon = faceKey.lastIndexOf(":");
+      if (colon < 0) return null;
+      nodeId = faceKey.slice(0, colon);
+      direction = faceKey.slice(colon + 1) as FaceDirection;
+    }
+    return nodeId ? facePaintMask(source, nodeId, direction, textureId) : null;
+  }, [constrainPaint, selectedId, selectedFace]);
   const beginPaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current ||
         (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle")) return;
-    const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool, textureId);
+    const source = historyRef.current.present;
+    const mask = paintMask(source, textureId, face);
+    if (mask === null) { setNotice("Choose a visible, unlocked painted face using this texture, or disable UV-constrained painting."); return; }
+    const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask);
     drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
-  }, [color, brushSize, tool]);
+  }, [color, brushSize, tool, paintMask]);
   const continuePaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
     const current = drag.current; if (!current || current.textureId !== textureId) return;
     const next = continuePaintGesture(current, texel, face); drag.current = next; setDraftPixels(next.pixels);
@@ -344,14 +362,18 @@ export function App() {
     const sheet = textureById(historyRef.current.present, textureId);
     if (sheet) setColor(readHex(sheet.pixels, sheet.width, texel));
   }, []);
-  const fillPaint = useCallback((texel: Texel, textureId = historyRef.current.present.activeTextureId) => {
+  const fillPaint = useCallback((texel: Texel,
+    textureId = historyRef.current.present.activeTextureId, faceKey?: string) => {
     if (tool !== "fill" || !writerRef.current || awaitingRecoveryRef.current) return;
     commitDocument(current => {
       const sheet = textureById(current, textureId); if (!sheet) return current;
-      const changed = setTexturePixels(current, floodFill(sheet.pixels, sheet.width, sheet.height, texel, color), textureId);
+      const mask = paintMask(current, textureId, faceKey);
+      if (mask === null) return current;
+      const changed = setTexturePixels(current,
+        floodFill(sheet.pixels, sheet.width, sheet.height, texel, color, mask), textureId);
       return changed === current ? current : selectTexture(changed, textureId);
     });
-  }, [color, tool, commitDocument]);
+  }, [color, tool, commitDocument, paintMask]);
   const changeMode = (next: Mode) => {
     clearStroke(); setMode(next);
     if (next === "paint") setSelectedId(selectedId);
@@ -965,6 +987,14 @@ export function App() {
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
           <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
           <div className="form-caption">Brush size</div><div className="segmented">{([1, 2, 4] as const).map(size => <button key={size} aria-pressed={brushSize === size} disabled={tool === "fill" || tool === "eyedropper"} onClick={() => setBrushSize(size)}>{size} px</button>)}</div>
+          <label className="face-paint-constrain">
+            <input type="checkbox" aria-label="Constrain paint to selected face UV"
+              checked={constrainPaint} onChange={event => { clearStroke(); setConstrainPaint(event.currentTarget.checked); }}/>
+            <span>Constrain to selected face UV</span>
+          </label>
+          {constrainPaint && <p className="face-paint-hint">
+            Paint and fill are clipped to the active face's texture region. Shared pixels may still appear on other faces.
+          </p>}
         </div>}
         <div className="inspector-bottom"><Info size={15}/><span>Experimental Java exporter · check your pack in game</span></div>
       </aside>
