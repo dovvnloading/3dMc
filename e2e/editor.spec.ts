@@ -1056,3 +1056,44 @@ test("UV-constrained painting clips shapes to a selected face's texture pixels",
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
   expect(await read()).toEqual(before);
 });
+
+test("editable color palette persists additions and ordering in native source projects", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const add = page.getByRole("button", { name: "Add selected color to palette" });
+  await expect(add).toBeDisabled();
+  await page.locator('input[aria-label="Custom paint color"]').fill("#123abc");
+  await expect(add).toBeEnabled();
+  await add.click();
+  await expect(page.getByRole("button", { name: "Choose color #123abc" })).toBeVisible();
+  await expect(page.getByText("9/16 swatches")).toBeVisible();
+
+  await page.getByRole("button", { name: "Move selected swatch left" }).click();
+  const [backup] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download legacy JSON backup" }).click()
+  ]);
+  const jsonPath = await backup.path();
+  if (!jsonPath) throw new Error("Palette source backup missing");
+  const saved = JSON.parse(await (await import("node:fs/promises")).readFile(jsonPath, "utf8"));
+  expect(saved.palette).toHaveLength(9);
+  expect(saved.palette[7]).toBe("#123abc");
+
+  const [archive] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await archive.path();
+  if (!path) throw new Error("Palette native source missing");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await expect(page.getByRole("button", { name: "Choose color #123abc" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Choose color #123abc" }).click();
+  await page.getByRole("button", { name: "Remove selected palette swatch" }).click();
+  await expect(page.getByRole("button", { name: "Choose color #123abc" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  await expect(page.getByRole("button", { name: "Choose color #123abc" })).toBeVisible();
+});
