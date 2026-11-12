@@ -1,7 +1,9 @@
 import { parseDocument } from "../editor/domain";
 import type { EditorDocument } from "../editor/domain";
 import { gameFilePath, parsePackDocument, resourceKey, verifyPackSources } from "./packDocument";
-import type { PackDocument, PackModelAsset, PackTextureAsset, ResourceLocation } from "./packDocument";
+import type { PackDocument, PackItemAsset, PackModelAsset, PackTextureAsset, ResourceLocation } from "./packDocument";
+import { updateItemDisplay } from "./itemProfile";
+import type { ItemAxis, ItemDisplayContext, ItemDisplayTransform } from "./itemProfile";
 
 /**
  * Pack-wide editing state independent of React, renderer objects and local
@@ -156,7 +158,8 @@ export function removePackModel(session: PackSession, modelId: string): PackSess
   return commitSnapshot(session, {
     pack: {
       ...pack, models, activeModelId,
-      textures: pack.textures.filter(texture => textureIds.has(texture.id))
+      textures: pack.textures.filter(texture => textureIds.has(texture.id)),
+      ...(pack.items ? { items: pack.items.filter(item => item.sourceModelId !== modelId) } : {})
     },
     sources: session.present.sources.filter(doc => sourceIds.has(doc.id))
   });
@@ -187,6 +190,59 @@ export function setTextureResource(session: PackSession, textureAssetId: string,
     ...pack,
     textures: pack.textures.map(entry => entry.id === textureAssetId ?
       { ...entry, resource } : entry)
+  }));
+}
+
+/** Item creation and edits join the same source/pack content history. */
+export function addPackItem(session: PackSession, item: PackItemAsset): PackSession {
+  if (session.present.pack.items?.some(existing => existing.id === item.id))
+    fail("The item asset ID already exists.");
+  return editPackIndex(session, pack => ({
+    ...pack, items: [...(pack.items ?? []), item]
+  }));
+}
+
+export function removePackItem(session: PackSession, itemId: string): PackSession {
+  if (!session.present.pack.items?.some(item => item.id === itemId))
+    fail("The item asset no longer exists.");
+  return editPackIndex(session, pack => ({
+    ...pack, items: pack.items!.filter(item => item.id !== itemId)
+  }));
+}
+
+export function setPackItemResource(session: PackSession, itemId: string,
+  model: ResourceLocation, replaces: ResourceLocation): PackSession {
+  const item = session.present.pack.items?.find(entry => entry.id === itemId) ??
+    fail("The item asset no longer exists.");
+  if (resourceKey(item.resource) === resourceKey(model) &&
+      resourceKey(item.replaces) === resourceKey(replaces)) return session;
+  return editPackIndex(session, pack => ({
+    ...pack, items: pack.items!.map(entry => entry.id === itemId ?
+      { ...entry, resource: model, replaces } : entry)
+  }));
+}
+
+export function setPackItemDisplay(session: PackSession, itemId: string,
+  context: ItemDisplayContext, field: keyof ItemDisplayTransform,
+  axis: ItemAxis, value: number): PackSession {
+  const item = session.present.pack.items?.find(entry => entry.id === itemId) ??
+    fail("The item asset no longer exists.");
+  const display = updateItemDisplay(item.display, context, field, axis, value);
+  if (display === item.display) return session;
+  return editPackIndex(session, pack => ({
+    ...pack, items: pack.items!.map(entry => entry.id === itemId ?
+      { ...entry, display } : entry)
+  }));
+}
+
+export function setItemHandAnimation(session: PackSession, itemId: string,
+  enabled: boolean): PackSession {
+  const item = session.present.pack.items?.find(entry => entry.id === itemId) ??
+    fail("The item asset no longer exists.");
+  if (item.handAnimationOnSwap === enabled) return session;
+  return editPackIndex(session, pack => ({
+    ...pack, items: pack.items!.map(entry => entry.id === itemId ?
+      { ...entry, handAnimationOnSwap: enabled } : entry)
   }));
 }
 
