@@ -284,3 +284,45 @@ test("single-element array rejects empty spacing before creating copies", async 
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
   expect(await source(page)).toEqual(original);
 });
+
+test("named Scene groups collapse, rename, select and survive native save/reopen", async ({ page }) => {
+  await selectPair(page);
+  await page.getByRole("button", { name: "Group selected parts" }).click();
+  await expect(page.getByRole("textbox", { name: "Rename group Group 1" })).toBeVisible();
+  await expect(rows(page)).toHaveCount(7);
+
+  const rename = page.getByRole("textbox", { name: "Rename group Group 1" });
+  await rename.fill("Frame pieces");
+  await rename.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Rename group Frame pieces" }))
+    .toHaveValue("Frame pieces");
+
+  await page.getByRole("button", { name: "Collapse group Frame pieces" }).click();
+  await expect(rows(page)).toHaveCount(5);
+  await page.getByRole("button", { name: "Select group Frame pieces" }).click();
+  await expect(page.getByRole("heading", { name: "2 parts selected" })).toBeVisible();
+  await page.getByRole("button", { name: "Expand group Frame pieces" }).click();
+  await expect(rows(page)).toHaveCount(7);
+  const grouped = await source(page);
+  expect(grouped.groups).toHaveLength(1);
+  expect(grouped.groups![0]).toMatchObject({
+    name: "Frame pieces", memberIds: ["body", "base"]
+  });
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Save project", exact: true }).click()
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error("Grouped project archive missing");
+  await page.locator('input[type="file"][accept*=".3dmc"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project", exact: true }).click();
+  expect(await source(page)).toEqual(grouped);
+  await expect(page.getByRole("textbox", { name: "Rename group Frame pieces" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Ungroup Frame pieces" }).click();
+  expect((await source(page)).groups).toEqual([]);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  expect(await source(page)).toEqual(grouped);
+});
