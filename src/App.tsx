@@ -53,6 +53,7 @@ import { TextureImportDialog } from "./components/TextureImportDialog";
 import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./editor/textureImport";
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
 import { FaceUVInspector } from "./components/FaceUVInspector";
+import { PaletteControls } from "./components/PaletteControls";
 import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
@@ -65,7 +66,6 @@ import type { ExportIssue } from "./export/javaBlock";
 type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed" | "blocked";
 type WriterStatus = "checking" | "owned" | "blocked" | "failed";
 type CommitFn = (document: EditorDocument) => EditorDocument;
-const SWATCHES = ["#f5d184", "#80dbbf", "#bb8870", "#c76d68", "#aebce2", "#f1f2f6", "#384f49", "#222e38"];
 
 function IconButton({ label, children, onClick, disabled = false, active = false }: {
   label: string; children: ReactNode; onClick: () => void; disabled?: boolean; active?: boolean;
@@ -983,7 +983,9 @@ export function App() {
         {mode === "paint" && <div className="paint-options"><SectionHeading title="Paint controls"/><div className="paint-import-actions">
           <button type="button" onClick={() => { setTextureImportMode("replace"); textureFileRef.current?.click(); }} disabled={textureReading}><ImagePlus size={14}/>Replace PNG</button>
           <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button></div>
-          <div className="form-caption">Brush color</div><div className="palette">{SWATCHES.map(swatch => <button key={swatch} style={{ background: swatch }} className={swatch === color ? "chosen" : ""} aria-label={"Choose color " + swatch} title={swatch} onClick={() => setColor(swatch)}>{swatch === color && <Check size={14}/>}</button>)}</div>
+          <div className="form-caption">Brush color</div>
+          <PaletteControls document={doc} color={color} onChoose={setColor}
+            onEdit={change => commitDocument(change)}/>
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
           <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
           <div className="form-caption">Brush size</div><div className="segmented">{([1, 2, 4] as const).map(size => <button key={size} aria-pressed={brushSize === size} disabled={tool === "fill" || tool === "eyedropper"} onClick={() => setBrushSize(size)}>{size} px</button>)}</div>
