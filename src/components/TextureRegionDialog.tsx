@@ -30,6 +30,7 @@ export function TextureRegionDialog(props: Props) {
   } catch (error) { invalid = error instanceof Error ? error.message : "Invalid region."; }
   const stale = props.current !== props.source;
   const changed = pixels.some((value, index) => value !== props.texture.pixels[index]);
+  const layered = !!props.texture.layers;
   const scale = Math.min(12, Math.max(4, Math.floor(384 / props.texture.width)));
   useEffect(() => {
     canvasRef.current?.getContext("2d")?.putImageData(new ImageData(new Uint8ClampedArray(pixels), image.width, image.height), 0, 0);
@@ -86,10 +87,10 @@ export function TextureRegionDialog(props: Props) {
         </label>)}</div>
         <div className="creator-button-grid">
           <button type="button" disabled={!!invalid} onClick={copy}>Copy region</button>
-          <button type="button" disabled={!!invalid || !props.clipboard} onClick={paste}>Paste at region corner</button>
-          <button type="button" disabled={!!invalid} onClick={() => perform(() => setPixels(mirrorPixelRegion(image, rect, "horizontal")))}>Mirror pixels horizontally</button>
-          <button type="button" disabled={!!invalid} onClick={() => perform(() => setPixels(mirrorPixelRegion(image, rect, "vertical")))}>Mirror pixels vertically</button>
-          <button type="button" disabled={!!invalid} onClick={() => perform(() => setPixels(clearPixelRegion(image, rect)))}>Clear region</button>
+          <button type="button" disabled={!!invalid || !props.clipboard || layered} onClick={paste}>Paste at region corner</button>
+          <button type="button" disabled={!!invalid || layered} onClick={() => perform(() => setPixels(mirrorPixelRegion(image, rect, "horizontal")))}>Mirror pixels horizontally</button>
+          <button type="button" disabled={!!invalid || layered} onClick={() => perform(() => setPixels(mirrorPixelRegion(image, rect, "vertical")))}>Mirror pixels vertically</button>
+          <button type="button" disabled={!!invalid || layered} onClick={() => perform(() => setPixels(clearPixelRegion(image, rect)))}>Clear region</button>
           <button type="button" disabled={!changed} onClick={() => { setPixels(props.texture.pixels); setMessage(null); }}>Reset preview</button>
         </div>
         <p className="creator-help" role="status">{props.clipboard ? `Editor clipboard: ${props.clipboard.width} × ${props.clipboard.height} RGBA pixels. It remains available when switching texture sheets.` : "The editor clipboard is local to this session; no system clipboard access is requested."}</p>
@@ -97,9 +98,14 @@ export function TextureRegionDialog(props: Props) {
     </div>
     {(invalid || message) && <p className="creator-error" role="alert">{invalid ?? message}</p>}
     {stale && <p className="creator-error" role="alert">The source changed. Cancel and reopen this preview; newer work will not be overwritten.</p>}
+    {layered && <p className="creator-error" role="status">
+      This texture has editable layers. Copying pixels is still available, but whole-sheet
+      paste and region edits require using the explicit Flatten layers action in Paint first.
+      The existing source layers have not changed.
+    </p>}
     <p className="creator-help">Every face referencing this sheet sees the applied pixels. Clearing introduces transparency, which remains a blocker for the experimental Java exporter.</p>
     <div className="creator-dialog-actions"><button type="button" onClick={props.onClose}>Cancel preview</button>
-      <button type="button" className="creator-primary" disabled={!changed || stale || !!invalid} onClick={() => {
+      <button type="button" className="creator-primary" disabled={!changed || stale || !!invalid || layered} onClick={() => {
         if (props.onApply(current => commitTextureDraft(current, props.source, props.texture.id, pixels))) props.onClose();
       }}>Apply pixel edits</button></div>
   </CreatorDialog>;
