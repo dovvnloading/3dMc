@@ -4,7 +4,7 @@ export const MAX_RASTER_LAYERS = 8;
 export class RasterLayerError extends Error {
   constructor(message: string) { super(message); this.name = "RasterLayerError"; }
 }
-const fail = (message: string): never => { throw new RasterLayerError(message); };
+function fail(message: string): never { throw new RasterLayerError(message); }
 const identifier = (id: string) => /^[a-zA-Z0-9_-]{1,100}$/.test(id);
 const validPixels = (pixels: unknown, w: number, h: number): pixels is number[] =>
   Array.isArray(pixels) && pixels.length === w * h * 4 &&
