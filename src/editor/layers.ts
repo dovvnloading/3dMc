@@ -154,6 +154,51 @@ export function removeRasterLayer(doc: EditorDocument, textureId: string, id: st
     return publish(t, layers, activeLayerId);
   });
 }
+/** Duplicate a real layer's editable RGBA, without changing the source layer. */
+export function duplicateRasterLayer(doc: EditorDocument, textureId: string,
+                                     id: string, newId: string): EditorDocument {
+  if (!identifier(newId)) fail("Duplicate layer ID is invalid.");
+  return editTexture(doc, textureId, t => {
+    const original = requireLayer(t, id);
+    if (t.layers!.length >= MAX_RASTER_LAYERS) fail("At most eight raster layers per texture.");
+    if (t.layers!.some(layer => layer.id === newId)) fail("Duplicate layer ID already exists.");
+    const layers = [...t.layers!];
+    const index = layers.findIndex(layer => layer.id === id);
+    layers.splice(index + 1, 0, {
+      ...original, id: newId, name: (original.name.slice(0, 95) + " copy").slice(0, 100),
+      pixels: [...original.pixels]
+    });
+    return publish(t, layers, newId);
+  });
+}
+
+/** Merge selected paint and the layer directly below using normal source-over. */
+export function mergeRasterLayerDown(doc: EditorDocument, textureId: string,
+                                     id: string): EditorDocument {
+  return editTexture(doc, textureId, t => {
+    requireLayer(t, id);
+    const index = t.layers!.findIndex(layer => layer.id === id);
+    if (index <= 0) fail("Choose a layer above another layer to merge down.");
+    const below = t.layers![index - 1]!, current = t.layers![index]!;
+    const combined = flattenRasterLayers([below, current], t.width, t.height);
+    const merged: RasterLayer = { ...below, visible: true, opacity: 1, pixels: combined };
+    const layers = t.layers!.filter((_, position) => position !== index)
+      .map(layer => layer.id === below.id ? merged : layer);
+    return publish(t, layers, below.id);
+  });
+}
+
+/** Clear source RGBA on the active layer; never clear other layers. */
+export function clearRasterLayer(doc: EditorDocument, textureId: string,
+                                 id: string): EditorDocument {
+  return editTexture(doc, textureId, t => {
+    requireLayer(t, id);
+    const zeros = new Array<number>(t.width * t.height * 4).fill(0);
+    return setRasterLayerPixels({ ...doc, textures: [t] }, textureId, id, zeros)
+      .textures[0]!;
+  });
+}
+
 export function flattenTextureLayers(doc: EditorDocument, textureId: string): EditorDocument {
   return editTexture(doc, textureId, t => {
     if (!t.layers) return t;
