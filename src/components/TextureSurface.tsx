@@ -61,7 +61,7 @@ export function TextureSurface(props: Props) {
     setCursor(point);
     if (props.tool === "eyedropper") { props.onSample(point); return; }
     if (props.tool === "fill") { props.onFill(point); return; }
-    if (props.tool !== "pencil" && props.tool !== "eraser") return;
+    if (!["pencil", "eraser", "line", "rectangle"].includes(props.tool)) return;
     strokePointer.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
     props.onBegin(point, FACE);
@@ -76,6 +76,7 @@ export function TextureSurface(props: Props) {
   const pointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
     if (strokePointer.current !== event.pointerId) return;
     strokePointer.current = null;
+    props.onMove(pointAt(event), FACE);
     props.onEnd();
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -107,7 +108,8 @@ export function TextureSurface(props: Props) {
         Math.max(0, Math.min(props.height - 1, y + movement[1]))
       ]);
     } else if (event.key === " " &&
-      (props.tool === "pencil" || props.tool === "eraser")) {
+      (props.tool === "pencil" || props.tool === "eraser" ||
+       props.tool === "line" || props.tool === "rectangle")) {
       event.preventDefault();
       props.onBegin(cursor, FACE);
       props.onEnd();

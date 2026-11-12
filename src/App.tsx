@@ -4,7 +4,7 @@ import {
   AlertCircle, ArrowDown, ArrowUp, Box, Check, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
   FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
-  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
+  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2, Minus, Square
 } from "lucide-react";
 import {
   activeTexture, addTexture, affectedFaces, textureById, removeTexture, renameTexture, selectTexture,
@@ -323,7 +323,8 @@ export function App() {
   }, [applyBatch]);
 
   const beginPaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
-    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current || (tool !== "pencil" && tool !== "eraser")) return;
+    if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current ||
+        (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle")) return;
     const started = beginPaintGesture(historyRef.current.present, texel, face, color, brushSize, tool, textureId);
     drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
   }, [color, brushSize, tool]);
@@ -474,6 +475,8 @@ export function App() {
       if (key === "e" && mode === "paint") switchTool("eraser");
       if (key === "g" && mode === "paint") switchTool("fill");
       if (key === "i" && mode === "paint") switchTool("eyedropper");
+      if (key === "l" && mode === "paint") switchTool("line");
+      if (key === "u" && mode === "paint") switchTool("rectangle");
       if (key === "f") navigate("iso");
       if ((key === "delete" || key === "backspace") && mode === "model" && selectedIds.length) {
         event.preventDefault(); deleteCurrentSelection();
@@ -894,11 +897,13 @@ export function App() {
           <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
         </> : <>
           <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
-          <IconButton active={tool === "eraser"} label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
+          <IconButton active={tool === "line"} label="Line tool (L)" onClick={() => switchTool("line")}><Minus size={18}/></IconButton>
+          <IconButton active={tool === "rectangle"} label="Rectangle outline (U)" onClick={() => switchTool("rectangle")}><Square size={18}/></IconButton>
+          <IconButton active={tool === "eraser" label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
           <IconButton active={tool === "fill"} label="Fill connected area (G)" onClick={() => switchTool("fill")}><PaintBucket size={18}/></IconButton>
           <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
         </>}</div>}
-        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? tool === "fill" ? "Fill a four-connected RGBA region · one undo step" : tool === "eraser" ? "Erase RGBA pixels in 3D or 2D · Esc cancels" : "Paint in 3D or on the texture sheet · Esc cancels stroke" : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : "Drag a gizmo axis to resize · R"}</div>
+        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? tool === "fill" ? "Fill a four-connected RGBA region · one undo step" : tool === "eraser" ? "Erase RGBA pixels in 3D or 2D · Esc cancels" : tool === "line" ? "Drag a straight pixel line · release to commit · Esc cancels" : tool === "rectangle" ? "Drag a rectangle outline · release to commit · Esc cancels" : "Paint in 3D or on the texture sheet · Esc cancels stroke" : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
@@ -958,7 +963,7 @@ export function App() {
           <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button></div>
           <div className="form-caption">Brush color</div><div className="palette">{SWATCHES.map(swatch => <button key={swatch} style={{ background: swatch }} className={swatch === color ? "chosen" : ""} aria-label={"Choose color " + swatch} title={swatch} onClick={() => setColor(swatch)}>{swatch === color && <Check size={14}/>}</button>)}</div>
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
-          <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
+          <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
           <div className="form-caption">Brush size</div><div className="segmented">{([1, 2, 4] as const).map(size => <button key={size} aria-pressed={brushSize === size} disabled={tool === "fill" || tool === "eyedropper"} onClick={() => setBrushSize(size)}>{size} px</button>)}</div>
         </div>}
         <div className="inspector-bottom"><Info size={15}/><span>Experimental Java exporter · check your pack in game</span></div>

@@ -1,10 +1,10 @@
 import type { EditorDocument, Vec3 } from "./domain";
 import { activeTexture, setTexturePixels, textureById, updateCuboid } from "./domain";
 import type { Texel } from "./pixels";
-import { drawStroke } from "./pixels";
+import { drawRectangle, drawStroke } from "./pixels";
 
 export type BrushSize = 1 | 2 | 4;
-export type BrushMode = "pencil" | "eraser";
+export type BrushMode = "pencil" | "eraser" | "line" | "rectangle";
 export interface PaintGesture {
   /** One immutable source document, captured before any preview pixels. */
   readonly source: EditorDocument;
@@ -12,6 +12,9 @@ export interface PaintGesture {
   readonly pixels: number[];
   readonly face: string;
   readonly previous: Texel;
+  /** Shapes always rebuild the preview from this immutable start point. */
+  readonly start: Texel;
+  readonly brush: BrushMode;
   readonly color: string;
   readonly size: BrushSize;
   readonly alpha: 0 | 255;
@@ -29,7 +32,7 @@ export function beginPaintGesture(
     source, textureId: texture.id,
     pixels: drawStroke(texture.pixels, texture.width,
       texture.height, texel, texel, color, size, alpha),
-    previous: texel, face, color, size, alpha
+    previous: texel, start: texel, brush, face, color, size, alpha
   };
 }
 
@@ -37,7 +40,18 @@ export function continuePaintGesture(
   gesture: PaintGesture, texel: Texel, face: string
 ): PaintGesture {
   const source = textureById(gesture.source, gesture.textureId)!;
-  // Never draw a connecting line through a UV atlas seam or across cuboids.
+  if (gesture.brush === "line" || gesture.brush === "rectangle") {
+    // A geometric shape is one face-local operation. Do not connect sampled
+    // coordinates across other 3D faces or UV seams.
+    if (face !== gesture.face) return gesture;
+    const shape = gesture.brush === "line" ? drawStroke : drawRectangle;
+    return { ...gesture,
+      pixels: shape(source.pixels, source.width, source.height,
+        gesture.start, texel, gesture.color, gesture.size, gesture.alpha),
+      previous: texel
+    };
+  }
+  // The freehand brush never connects through a UV atlas seam or cuboid.
   const from = face === gesture.face ? gesture.previous : texel;
   return { ...gesture,
     pixels: drawStroke(gesture.pixels, source.width, source.height,
