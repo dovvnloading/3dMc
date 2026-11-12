@@ -956,3 +956,17 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .pack-editor-selector select:focus-visible,.pack-editor-selector button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .export-issue-source{font-size:10px;font-weight:600;color:var(--accent);overflow-wrap:anywhere}
+
+/* UV edit mode is opt-in: pointer events still reach the paint canvas otherwise. */
+.texture-header-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.uv-edit-toggle,.face-uv-clipboard button{border:1px solid var(--interactive-border);border-radius:5px;background:var(--control);color:var(--text);padding:7px 9px;font-size:11px;cursor:pointer}
+.uv-edit-toggle.active{border-color:var(--accent);background:var(--selected);color:var(--accent)}
+.uv-edit-toggle:disabled,.face-uv-clipboard button:disabled{opacity:.45;cursor:not-allowed}
+.uv-snap-toggle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--secondary)}
+.uv-snap-toggle input{accent-color:var(--accent)}
+.uv-selection-rect.uv-interactive{pointer-events:auto;cursor:move;touch-action:none;background:#80dbbf17;user-select:none;box-sizing:border-box}
+.uv-selection-rect.uv-interactive:focus-visible{outline:2px dashed white;outline-offset:2px}
+.uv-drag-handle{position:absolute;width:13px;height:13px;border:2px solid #14251e;border-radius:3px;background:var(--accent);padding:0;transform:translate(-50%,-50%);cursor:nwse-resize;touch-action:none}
+.uv-drag-handle.handle-ne,.uv-drag-handle.handle-sw{cursor:nesw-resize}
+.uv-drag-handle:focus-visible{outline:2px solid white;outline-offset:2px}
+.face-uv-clipboard{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
