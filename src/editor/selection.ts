@@ -1,5 +1,5 @@
 import type { Axis, Cuboid, EditorDocument, Vec3 } from "./domain";
-import { copyFaces, isValidCuboid } from "./domain";
+import { copyFaces, isValidCuboid, pruneGroupMembers } from "./domain";
 
 /** Selection belongs to the session, never the native document or undo history. */
 export interface Selection {
@@ -191,7 +191,9 @@ export function deleteSelection(document: EditorDocument, ids: readonly string[]
   const nodes = editableSelection(document, ids);
   if (!nodes.length) return document;
   const removed = new Set(nodes.map(node => node.id));
-  return { ...document, cuboids: document.cuboids.filter(node => !removed.has(node.id)) };
+  return { ...document, cuboids: document.cuboids.filter(node => !removed.has(node.id)),
+    ...(document.groups ? { groups: pruneGroupMembers(document.groups, removed) } : {})
+  };
 }
 
 /** IDs are supplied by the caller once, outside React's replayable updater. */
