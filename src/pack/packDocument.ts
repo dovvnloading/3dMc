@@ -218,7 +218,8 @@ export function parsePackDocument(input: unknown): PackDocument {
         fail("Item hand animation setting must be true or false.");
       return {
         id, sourceModelId, resource: itemResource, replaces,
-        handAnimationOnSwap, display: parseItemDisplay(item.display)
+        handAnimationOnSwap: handAnimationOnSwap as boolean,
+        display: parseItemDisplay(item.display)
       };
     });
     unique(items!.map(item => item.id), "item IDs");
