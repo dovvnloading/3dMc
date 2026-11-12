@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import type { Texel } from "../editor/pixels";
-import type { FaceDirection, FaceUV } from "../editor/domain";
-import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
+import type { FaceDirection, FaceUV, FaceUVRect } from "../editor/domain";
+import { faceLabel } from "../editor/uv";
+import { UVRegionOverlay } from "./UVRegionOverlay";
 import type { Tool } from "./EditorViewport";
 import { Minus, Plus } from "lucide-react";
 
@@ -15,6 +16,8 @@ interface Props {
   painting: boolean;
   face: FaceUV | null;
   faceName: FaceDirection | null;
+  uvEditable: boolean;
+  onCommitUV: (source: FaceUV, rect: FaceUVRect) => void;
   onBegin: (texel: Texel, face: string) => void;
   onMove: (texel: Texel, face: string) => void;
   onEnd: () => void;
@@ -30,9 +33,11 @@ export function TextureSurface(props: Props) {
   const strokePointer = useRef<number | null>(null);
   const [zoom, setZoom] = useState(() => props.width >= 64 || props.height >= 64 ? 4 : 8);
   const [cursor, setCursor] = useState<Texel>([0, 0]);
-  const region = props.face
-    ? logicalUVToPixelRect(props.face.uv, props.width, props.height)
-    : null;
+  const [editUV, setEditUV] = useState(false);
+  const [pixelSnap, setPixelSnap] = useState(true);
+  useEffect(() => { setEditUV(false); }, [props.tool]);
+  useEffect(() => { if (!props.face || !props.uvEditable) setEditUV(false); },
+    [props.face, props.uvEditable]);
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -122,6 +127,19 @@ export function TextureSurface(props: Props) {
       <div><strong>Texture sheet</strong>
         <span>{props.faceName ? faceLabel(props.faceName) + " face UV" : "Shared texture"} · {props.width} × {props.height}</span>
       </div>
+      <div className="texture-header-tools">
+        {props.face && <button type="button" aria-label="Edit face UV on texture sheet"
+          aria-pressed={editUV} disabled={!props.uvEditable}
+          className={"uv-edit-toggle" + (editUV ? " active" : "")}
+          onClick={() => { setEditUV(current => !current); props.onCancel(); }}>
+          {editUV ? "Done editing UV" : "Edit face UV"}
+        </button>}
+        {editUV && <label className="uv-snap-toggle">
+          <input type="checkbox" checked={pixelSnap}
+            onChange={event => setPixelSnap(event.currentTarget.checked)}/>
+          Snap UV to pixels
+        </label>}
+      </div>
       <div className="zoom-controls" aria-label="Texture zoom">
         <button title="Zoom out" onClick={() => setZoom((n) => Math.max(4, n - 2))}><Minus size={14}/></button>
         <span>{zoom}×</span>
@@ -137,15 +155,12 @@ export function TextureSurface(props: Props) {
           onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
           onPointerCancel={pointerCancel} onLostPointerCapture={lostCapture}
           onKeyDown={onKeyDown} />
-        {region && <div className="uv-selection-rect" aria-hidden="true"
-          style={{
-            left: Math.min(region[0], region[2]) * zoom,
-            top: Math.min(region[1], region[3]) * zoom,
-            width: Math.abs(region[2] - region[0]) * zoom,
-            height: Math.abs(region[3] - region[1]) * zoom
-          }}>
-          <span>{props.faceName ? faceLabel(props.faceName) : "Face"}</span>
-        </div>}
+        {props.face && props.faceName && <UVRegionOverlay
+          face={props.face} name={props.faceName}
+          width={props.width} height={props.height} zoom={zoom}
+          editing={editUV && props.uvEditable} pixelSnap={pixelSnap}
+          onCommit={props.onCommitUV}/>}
+
         <div className="texel-focus" aria-hidden="true"
           style={{ width: zoom, height: zoom, left: cursor[0] * zoom, top: cursor[1] * zoom }} />
       </div>
@@ -155,6 +170,8 @@ export function TextureSurface(props: Props) {
       <span>Alpha {Math.round((props.pixels[(cursor[1] * props.width + cursor[0]) * 4 + 3] ?? 255) / 255 * 100)}%</span>
       <span>Color <i className="color-dot" style={{ background: props.color }}/>{props.color.toUpperCase()}</span>
     </div>
-    <p className="texture-note">Pencil, eraser and contiguous fill edit the same shared RGBA sheet used by painted 3D faces. The outlined region is sampled by the selected face; changes can affect other faces sharing those pixels. Arrow keys move the focus; Space uses the active brush or fill.</p>
+    <p className="texture-note">{editUV ?
+      "Drag the UV rectangle to move it, or drag a corner to resize it. Arrow keys on the region and handles move one pixel; Shift moves four. Release commits one edit; Escape cancels." :
+      "Brushes and fill edit the shared RGBA sheet. The outlined region belongs to the selected 3D face; choose Edit face UV to change its mapping without changing pixels."}</p>
   </section>;
 }
