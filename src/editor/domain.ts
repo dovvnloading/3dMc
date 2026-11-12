@@ -75,6 +75,13 @@ export interface PixelTexture {
   pixels: number[];
 }
 
+/** Flat, editor-only organizational groups. No transforms or Minecraft export semantics. */
+export interface EditorGroup {
+  id: string;
+  name: string;
+  memberIds: string[];
+}
+
 export interface EditorDocument {
   schemaVersion: 3;
   id: string;
@@ -86,6 +93,8 @@ export interface EditorDocument {
     status: "unverified";
   };
   cuboids: Cuboid[];
+  /** Optional for backward compatibility with existing v3 native source files. */
+  groups?: EditorGroup[];
   textures: PixelTexture[];
   activeTextureId: string;
 }
@@ -147,7 +156,7 @@ export function parseDocument(input: unknown): EditorDocument {
   const inputRecord = input as Record<string, unknown>;
   const isLegacy = value.schemaVersion !== 3;
   if (!isLegacy && Object.keys(inputRecord).some(key =>
-    !["schemaVersion", "id", "name", "target", "cuboids", "textures", "activeTextureId"].includes(key)))
+    !["schemaVersion", "id", "name", "target", "cuboids", "groups", "textures", "activeTextureId"].includes(key)))
     throw new Error("Unsupported source document metadata cannot be silently removed.");
 
   if (!isLegacy) {
@@ -202,6 +211,35 @@ export function parseDocument(input: unknown): EditorDocument {
         !ids.has(node.faces[direction].textureId))))
     throw new Error("Invalid cuboid data or dangling per-face texture references.");
 
+  // Optional group metadata stays absent in older v3 source projects. Validate
+  // all IDs and references before accepting any imported project or checkpoint.
+  let groups: EditorGroup[] | undefined;
+  if (inputRecord.groups !== undefined) {
+    if (!Array.isArray(inputRecord.groups) || inputRecord.groups.length > 100)
+      throw new Error("Source groups must be an array with at most 100 groups.");
+    const usedGroupIds = new Set<string>();
+    const usedMembers = new Set<string>();
+    const cuboidIds = new Set(cuboids.map(node => node.id));
+    groups = inputRecord.groups.map((raw: unknown) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
+          Object.keys(raw).sort().join(",") !== "id,memberIds,name")
+        throw new Error("Source group metadata has unknown or missing fields.");
+      const item = raw as Record<string, unknown>;
+      if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(item.id) ||
+          usedGroupIds.has(item.id))
+        throw new Error("Source group IDs must be valid and unique.");
+      if (typeof item.name !== "string" || !item.name.trim() || item.name.length > 100)
+        throw new Error("Source group names must have 1–100 characters.");
+      if (!Array.isArray(item.memberIds) || item.memberIds.length < 1 ||
+          item.memberIds.some(id => typeof id !== "string" || !cuboidIds.has(id) ||
+            usedMembers.has(id) || item.memberIds.filter(candidate => candidate === id).length !== 1))
+        throw new Error("Source groups contain duplicated or missing cuboid references.");
+      usedGroupIds.add(item.id);
+      item.memberIds.forEach(id => usedMembers.add(id));
+      return { id: item.id, name: item.name, memberIds: [...item.memberIds] };
+    });
+  }
+
   return {
     schemaVersion: 3, id: value.id, name: value.name,
     target: { edition: "java", family: "static-block", candidateRelease: value.target.candidateRelease, status: "unverified" },
@@ -216,7 +254,8 @@ export function parseDocument(input: unknown): EditorDocument {
       id: t.id, name: t.name, width: t.width, height: t.height,
       pixels: [...t.pixels]
     })),
-    activeTextureId: activeId
+    activeTextureId: activeId,
+    ...(groups ? { groups } : {})
   };
 }
 
@@ -310,10 +349,21 @@ export function duplicateCuboid(doc: EditorDocument, id: string, newId: string):
   }] };
 }
 
+/** Remove deleted cuboids from every group, dropping groups that become empty. */
+export function pruneGroupMembers(groups: readonly EditorGroup[] | undefined,
+                                  removed: ReadonlySet<string>): EditorGroup[] | undefined {
+  if (!groups) return undefined;
+  return groups.map(group => ({
+    ...group, memberIds: group.memberIds.filter(id => !removed.has(id))
+  })).filter(group => group.memberIds.length > 0);
+}
+
 export function deleteCuboid(doc: EditorDocument, id: string): EditorDocument {
   const node = doc.cuboids.find((item) => item.id === id);
   if (!node || node.locked) return doc;
-  return { ...doc, cuboids: doc.cuboids.filter((item) => item.id !== id) };
+  return { ...doc, cuboids: doc.cuboids.filter((item) => item.id !== id),
+    ...(doc.groups ? { groups: pruneGroupMembers(doc.groups, new Set([id])) } : {})
+  };
 }
 
 export function renameCuboid(doc: EditorDocument, id: string, name: string): EditorDocument {
