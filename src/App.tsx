@@ -11,13 +11,14 @@ import {
   addCuboid, createSampleDocument, renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease,
   setMaterialColor, setTexturePixels, toggleFlag
 } from "./editor/domain";
-import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domain";
+import type { Cuboid, EditorDocument, EditorGroup, FaceDirection, Vec3 } from "./editor/domain";
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
 import { commitSelectionGesture, deleteSelection, duplicateSelection, repeatSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
 import { SelectionArrayTools } from "./components/SelectionArrayTools";
+import { groupSelection, renameGroup, ungroup } from "./editor/groups";
 import { ExportIssueList } from "./components/ExportIssueList";
 import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
@@ -140,6 +141,8 @@ export function App() {
     ? inspectIndexedJava1214Pack(packSession.present.pack, packSession.present.sources)
     : inspectJava1214(doc), [doc, packSession]);
   const [selection, setSelection] = useState<Selection>(() => selectOnly("body"));
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  useEffect(() => setCollapsedGroups([]), [openSession, doc.id]);
   const selectedId = selection.primary, selectedIds = selection.ids;
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const setSelectedId = useCallback((id: string | null) => setSelection(selectOnly(id)), []);
@@ -295,6 +298,12 @@ export function App() {
       setSelection({ ids: lastLayer, primary: lastLayer.at(-1) ?? null,
         anchor: lastLayer[0] ?? null });
     }
+  }, [selectedIds, applyBatch]);
+  const createGroupFromSelection = useCallback(() => {
+    if (selectedIds.length < 2) return;
+    const id = "group_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+    const name = "Group " + ((historyRef.current.present.groups?.length ?? 0) + 1);
+    if (applyBatch(current => groupSelection(current, selectedIds, id, name))) setSearch("");
   }, [selectedIds, applyBatch]);
   const deleteCurrentSelection = useCallback(() => {
     applyBatch(current => deleteSelection(current, selectedIds));
@@ -712,7 +721,22 @@ export function App() {
   };
   const visibleTexture = textureById(doc, draftTextureId ?? doc.activeTextureId) ?? texture;
   const viewPixels = draftPixels ?? visibleTexture.pixels;
-  const matching = doc.cuboids.filter(node => node.name.toLowerCase().includes(search.toLowerCase()));
+  const groupedMembers = new Set((doc.groups ?? []).flatMap(group => group.memberIds));
+  const query = search.toLowerCase().trim();
+  const sceneEntries: Array<{ kind: "group"; group: EditorGroup } | { kind: "part"; node: Cuboid }> = [];
+  for (const group of doc.groups ?? []) {
+    const candidates = doc.cuboids.filter(node => group.memberIds.includes(node.id));
+    const displayed = candidates.filter(node =>
+      node.name.toLowerCase().includes(query) || group.name.toLowerCase().includes(query));
+    if (!displayed.length) continue;
+    sceneEntries.push({ kind: "group", group });
+    if (!collapsedGroups.includes(group.id))
+      sceneEntries.push(...displayed.map(node => ({ kind: "part" as const, node })));
+  }
+  sceneEntries.push(...doc.cuboids.filter(node =>
+    !groupedMembers.has(node.id) && node.name.toLowerCase().includes(query))
+    .map(node => ({ kind: "part" as const, node })));
+  const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = writerStatus === "blocked" ? "Other tab owns recovery" : writerStatus === "failed" ? "Recovery unavailable — download backup" :
     recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save unavailable · download backup" :
@@ -774,13 +798,41 @@ export function App() {
           {PRIMITIVE_PRESETS.map(shape => <button type="button" role="menuitem" key={shape.id} onClick={() => addShape(shape.id)}><Box size={16}/><span><strong>{shape.label}</strong><small>{shape.description}</small></span></button>)}</div>}
         <div className="scene-search"><Search size={15}/><input value={search} aria-label="Filter scene elements" onChange={event => setSearch(event.target.value)} placeholder="Find an element…"/></div>
         <div className="scene-selection-tools"><button type="button" onClick={selectEditable} title="Select visible, unlocked matches (Ctrl/Cmd+A)">Select editable</button>
-          <button type="button" onClick={() => selectNode(null)}>Clear</button><span aria-live="polite">{selectedIds.length} selected</span></div>
+          <button type="button" onClick={() => selectNode(null)}>Clear</button>
+          <button type="button" disabled={mode !== "model" || selectedIds.length < 2}
+            onClick={createGroupFromSelection} aria-label="Group selected parts">Group</button>
+          <span aria-live="polite">{selectedIds.length} selected</span></div>
         <div ref={sceneListRef} className="scene-list" role="listbox" aria-label="Scene elements" aria-multiselectable="true">
           {doc.cuboids.length === 0 && <div className="scene-empty-start"><Box size={29} strokeWidth={1.2}/><strong>Your canvas is ready</strong><p>Add the first cuboid to begin shaping your asset.</p>
             <button onClick={addElement}><FilePlus2 size={14}/>Add first cuboid</button></div>}
-          {doc.cuboids.length > 0 && matching.length === 0 && <div className="empty-list">No matching elements.<button onClick={() => setSearch("")}>Clear search</button></div>}
-          {matching.map((node, index) => <div role="option" aria-selected={selectedSet.has(node.id)} tabIndex={focusableId === node.id ? 0 : -1}
-            key={node.id} className={"scene-row" + (selectedSet.has(node.id) ? " selected" : "") + (selectedId === node.id ? " primary-selected" : "") + (!node.visible ? " hidden-row" : "")}
+          {doc.cuboids.length > 0 && sceneEntries.length === 0 && <div className="empty-list">No matching elements.<button onClick={() => setSearch("")}>Clear search</button></div>}
+          {sceneEntries.map(entry => {
+            if (entry.kind === "group") {
+              const group = entry.group;
+              const collapsed = collapsedGroups.includes(group.id);
+              return <div key={group.id} className="scene-group-row" role="presentation">
+                <button type="button" aria-expanded={!collapsed}
+                  aria-label={(collapsed ? "Expand group " : "Collapse group ") + group.name}
+                  onClick={() => setCollapsedGroups(current => collapsed ?
+                    current.filter(id => id !== group.id) : [...current, group.id])}>
+                  <ChevronDown size={14} className={collapsed ? "closed" : ""}/>
+                </button>
+                <CommittedText label={"Rename group " + group.name}
+                  className="scene-group-name" value={group.name}
+                  onCommit={name => { applyBatch(current => renameGroup(current, group.id, name)); }}/>
+                <button type="button" aria-label={"Select group " + group.name}
+                  onClick={() => { clearStroke(); setSelection({
+                    ids: [...group.memberIds], primary: group.memberIds.at(-1) ?? null,
+                    anchor: group.memberIds[0] ?? null
+                  }); }}>Select</button>
+                <button type="button" aria-label={"Ungroup " + group.name}
+                  onClick={() => { applyBatch(current => ungroup(current, group.id)); }}>Ungroup</button>
+              </div>;
+            }
+            const node = entry.node;
+            const index = matching.indexOf(node);
+            return <div role="option" aria-selected={selectedSet.has(node.id)} tabIndex={focusableId === node.id ? 0 : -1}
+            key={node.id} className={"scene-row" + (groupedMembers.has(node.id) ? " grouped-part" : "") + (selectedSet.has(node.id) ? " selected" : "") + (selectedId === node.id ? " primary-selected" : "") + (!node.visible ? " hidden-row" : "")}
             onClick={event => {
               clearStroke(); setSelection(current => selectAt(current, node.id, matching.map(item => item.id), { toggle: event.ctrlKey || event.metaKey, range: event.shiftKey }));
             }} onKeyDown={event => {
@@ -803,7 +855,8 @@ export function App() {
               onClick={event => { event.stopPropagation(); commitDocument(current => toggleFlag(current, node.id, "visible")); }}>{node.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>
             <button className="scene-row-action" aria-label={(node.locked ? "Unlock " : "Lock ") + node.name} title={node.locked ? "Unlock" : "Lock"}
               onClick={event => { event.stopPropagation(); commitDocument(current => toggleFlag(current, node.id, "locked")); }}>{node.locked ? <Lock size={14}/> : <LockOpen size={14}/>}</button>
-          </div>)}
+          </div>;
+          })}
         </div>
         <div className="scene-footer"><SectionHeading title="Assets" trailing={<span className="counter">{String(doc.textures.length).padStart(2, "0")}</span>}/>
           <div className="texture-slot-list" role="group" aria-label="Texture assets">{doc.textures.map(asset => <div key={asset.id} className={"texture-slot" + (doc.activeTextureId === asset.id ? " active" : "")}>
