@@ -30,11 +30,13 @@ An independent sandbox was used as a fallback when Actions was delayed. It expos
 - **Version claims:** Bedrock, animation, Java item definitions, unsupported Java releases, general meshes and modded formats are not production-ready capabilities.
 - **Quality:** passing browser tests does not certify every device, all accessibility workflows or real Minecraft renderer parity.
 
-## Next engineering slices
+## Next development milestones — initial push
 
-1. **Game fixture and compatibility evidence:** independently test a combined diamond/iron resource pack in Java 1.21.4; record exact ZIP hash, screenshots and observed behavior. Keep the result labeled experimental until verified.
-2. **Pack authoring improvements:** improve asset browser search, naming, source organization and dependency diagnostics while retaining reference-safe undo/redo.
-3. **Larger pack reliability:** measure memory, rendering and IndexedDB quota behavior for realistic multi-source projects, including corrupt or interrupted saves and tab takeovers.
-4. **Format expansion:** extend supported replacement registries, strict Java import and then version-scoped item authoring only with representative fixtures and a documented compatibility contract.
+The current multi-model pack session, Save/Open/recovery, configurable resource paths, searchable assets, align/distribute tools and indexed Java preflight are implemented. Continue with unimplemented **features**, not more milestone tracking or verification reports.
 
-**Milestone rule:** source integrity and a complete create → edit → switch → save → reopen → export workflow take priority over additional formats.
+1. **Modeling and organization:** implement named groups and a navigable hierarchy, geometry mirroring, duplicate-with-offset/repeat tools, and better snapping.
+2. **Interactive UV and painting:** add draggable UV face regions, synchronized 3D face highlighting, UV copy/paste, line/rectangle paint and palette improvements.
+3. **Java item and format authoring:** build the version-scoped item profile, item editing and preview workflow, required output relationships and bounded supported imports.
+4. **Richer projects:** add editable raster layers, deterministic flattening, larger-project history and worker-backed import/export, then workspace/persistence polish.
+
+**Milestone rule:** each step must produce working editor code and usable creator functionality. Routine coding checks are not separate milestones. Defer Minecraft game fixtures, hardware benchmarks, test campaigns, release evidence and certification until after this implementation push; keep unverified compatibility labeled experimental.
