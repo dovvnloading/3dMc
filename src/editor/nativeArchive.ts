@@ -82,6 +82,8 @@ export interface NativeZipLimits {
   maxEntries: number;
   isAllowedPath: (name: string) => boolean;
   maxEntryBytes: (name: string) => number;
+  /** Only the strict generated-game-pack importer omits native manifest.json. */
+  requireManifest?: boolean;
 }
 
 const LEGACY_ZIP_LIMITS: NativeZipLimits = {
@@ -149,7 +151,7 @@ export function readExactStoredZip(bytes: Uint8Array,
     seen.add(name);
     pos = next;
   }
-  if (pos !== end || !seen.has("manifest.json") ||
+  if (pos !== end || (limits.requireManifest !== false && !seen.has("manifest.json")) ||
       (limits === LEGACY_ZIP_LIMITS && !seen.has("document.json")))
     reject("Native archive directory is incomplete.");
 
