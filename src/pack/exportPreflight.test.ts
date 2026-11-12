@@ -2,11 +2,53 @@ import { describe, expect, it } from "vitest";
 import { createSampleDocument } from "../editor/domain";
 import { indexLegacyProject } from "./packDocument";
 import { makeIndexedJava1214Pack } from "./javaPackBuilder";
-import { inspectIndexedJava1214Pack } from "./exportPreflight";
+import { inspectIndexedJava1214Pack, planIndexedJava1214Pack } from "./exportPreflight";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 describe("indexed pack export preflight", () => {
+  it("previews the exact generated ZIP paths, owners and two affected vanilla blocks", () => {
+    const first = createSampleDocument();
+    const second = { ...createSampleDocument(), id: "preview-second", name: "Iron source" };
+    const pack = clone(indexLegacyProject(first));
+    pack.models.push({
+      id: "model-iron", sourceDocumentId: second.id,
+      resource: { namespace: "tester", path: "block/iron_model" },
+      replaces: { namespace: "minecraft", path: "iron_block" },
+      provenance: "editor",
+      textures: [{ sourceTextureId: "main", textureAssetId: "iron-texture" }]
+    });
+    pack.textures.push({
+      id: "iron-texture", sourceDocumentId: second.id, sourceTextureId: "main",
+      resource: { namespace: "tester", path: "block/iron_paint" }
+    });
+    const snapshot = JSON.stringify({ pack, sources: [first, second] });
+    const plan = planIndexedJava1214Pack(pack, [first, second]);
+    const exported = makeIndexedJava1214Pack(pack, [first, second]);
+    expect(plan.issues.filter(issue => issue.severity === "error")).toEqual([]);
+    expect(plan.replacements).toEqual(["minecraft:diamond_block", "minecraft:iron_block"]);
+    expect(plan.files.map(file => file.path)).toEqual(exported.paths);
+    expect(plan.files[0]).toEqual({ path: "pack.mcmeta", kind: "metadata" });
+    expect(plan.files.find(file => file.path === "assets/tester/models/block/iron_model.json"))
+      .toEqual({ path: "assets/tester/models/block/iron_model.json", kind: "model",
+        sourceDocumentId: second.id, sourceName: "Iron source" });
+    expect(plan.files.some(file => file.path ===
+      "assets/tester/textures/block/iron_model/solid_1.png")).toBe(true);
+    expect(JSON.stringify({ pack, sources: [first, second] })).toBe(snapshot);
+  });
+
+  it("marks generated collisions as blockers instead of offering a misleading file preview", () => {
+    const source = createSampleDocument();
+    const pack = clone(indexLegacyProject(source));
+    pack.textures[0]!.resource.path = "block/solid_1";
+    const plan = planIndexedJava1214Pack(pack, [source]);
+    expect(plan.issues.some(issue =>
+      issue.severity === "error" && issue.code === "RESOURCE_PATH_COLLISION")).toBe(true);
+    expect(plan.files.filter(file =>
+      file.path === "assets/3dmc/textures/block/solid_1.png")).toHaveLength(2);
+    expect(inspectIndexedJava1214Pack(pack, [source])).toEqual(plan.issues);
+  });
+
   it("shows one correct replacement-scope warning without changing source data", () => {
     const source = createSampleDocument();
     const index = indexLegacyProject(source);
