@@ -974,3 +974,12 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .face-paint-constrain{display:flex;align-items:center;gap:8px;margin:14px 0 6px;padding:9px 10px;border:1px solid var(--divider);border-radius:6px;background:var(--control);font-size:11px;color:var(--text);cursor:pointer}
 .face-paint-constrain input{accent-color:var(--accent)}
 .face-paint-hint{font-size:11px;color:var(--secondary);line-height:1.5;margin:0 0 8px}
+
+/* Source-backed color swatches: selection is separate from palette edits. */
+.palette-workspace{display:grid;gap:4px;margin-bottom:10px}
+.palette-workspace .palette{margin-bottom:5px}
+.palette-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.palette-actions span{color:var(--secondary);font-size:10px;margin-right:auto}
+.palette-actions button{min-height:25px;padding:4px 8px;color:var(--text);background:var(--control);border:1px solid var(--interactive-border);border-radius:5px;font-size:11px;cursor:pointer}
+.palette-actions button:disabled{opacity:.4;cursor:not-allowed}
+.palette-actions button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
