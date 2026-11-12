@@ -23,7 +23,8 @@ export const NATIVE_FILES = [
 ] as const;
 const MAX_DOCUMENT_BYTES = 2_500_000;
 const MAX_IMAGE_BYTES = 70_000;
-const MAX_MANIFEST_BYTES = 8_192;
+const MAX_MANIFEST_BYTES = 40_000;
+const MAX_ARCHIVED_LAYERS = 16 * 8;
 const EMPTY_TIMESTAMP = new Date(1980, 0, 1);
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 
@@ -84,12 +85,15 @@ export interface NativeZipLimits {
   maxEntryBytes: (name: string) => number;
   /** Only the strict generated-game-pack importer omits native manifest.json. */
   requireManifest?: boolean;
+  maxPathLength?: number;
 }
 
 const LEGACY_ZIP_LIMITS: NativeZipLimits = {
-  maxArchiveBytes: MAX_NATIVE_BYTES, minEntries: NATIVE_FILES.length, maxEntries: 18,
+  maxArchiveBytes: MAX_NATIVE_BYTES, minEntries: NATIVE_FILES.length,
+  maxEntries: 18 + MAX_ARCHIVED_LAYERS, maxPathLength: 260,
   isAllowedPath: (name) => NATIVE_FILES.includes(name as typeof NATIVE_FILES[number]) ||
-    /^textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(name),
+    /^textures\/[a-zA-Z0-9_-]{1,100}\.png$/.test(name) ||
+    /^textures\/[a-zA-Z0-9_-]{1,100}\/layers\/[a-zA-Z0-9_-]{1,100}\.png$/.test(name),
   maxEntryBytes: (name) => name === NATIVE_FILES[0] ? MAX_MANIFEST_BYTES :
     name === NATIVE_FILES[1] ? MAX_DOCUMENT_BYTES : MAX_IMAGE_BYTES
 };
@@ -132,7 +136,7 @@ export function readExactStoredZip(bytes: Uint8Array,
     const comment = u16(view, pos + 32);
     const offset = u32(view, pos + 42);
     const next = pos + 46 + length + extra + comment;
-    if (next > end || !length || length > 180 || extra || comment ||
+    if (next > end || !length || length > (limits.maxPathLength ?? 180) || extra || comment ||
         (flags & ~0x0800) !== 0 || method !== 0 || size === 0xffffffff ||
         u32(view, pos + 20) !== size || offset === 0xffffffff)
       reject("Native ZIP contains unsupported compression, metadata or oversized entries.");
@@ -165,7 +169,7 @@ export function readExactStoredZip(bytes: Uint8Array,
     const extra = u16(view, start + 28);
     const body = start + 30 + length + extra;
     const endOfBody = body + entry.size;
-    if (!length || length > 180 || extra || endOfBody > centralStart ||
+    if (!length || length > (limits.maxPathLength ?? 180) || extra || endOfBody > centralStart ||
         u16(view, start + 6) !== entry.flags ||
         u16(view, start + 8) !== 0 ||
         u32(view, start + 14) !== entry.crc ||
@@ -197,15 +201,23 @@ export function readExactStoredZip(bytes: Uint8Array,
 export async function encodeNativeProject(document: EditorDocument): Promise<Uint8Array> {
   const clean = parseDocument(document);
   const binary: Record<string, Uint8Array> = {};
-  const descriptors: Array<{id:string;name:string;width:number;height:number;path:string}> = [];
-  const paths: string[] = [];
+  const descriptors: Array<Record<string, unknown>> = [];
+  const texturePaths: string[] = [], layerPaths: string[] = [];
   for (const texture of clean.textures) {
     const path = "textures/" + texture.id + ".png";
-    const { pixels: _pixels, ...info } = texture;
-    descriptors.push({ ...info, path });
-    paths.push(path);
+    const { pixels: _pixels, layers: _layers, ...info } = texture;
+    texturePaths.push(path);
     binary[path] = encodeRgbaPng(texture.width, texture.height, texture.pixels);
+    const layers = texture.layers?.map(layer => {
+      const layerPath = "textures/" + texture.id + "/layers/" + layer.id + ".png";
+      const { pixels: _data, ...metadata } = layer;
+      layerPaths.push(layerPath);
+      binary[layerPath] = encodeRgbaPng(texture.width, texture.height, layer.pixels);
+      return { ...metadata, path: layerPath };
+    });
+    descriptors.push({ ...info, path, ...(layers ? { layers } : {}) });
   }
+  const paths = [...texturePaths, ...layerPaths];
   const descriptor = encodeJson({
     ...clean, textures: descriptors
   });
@@ -217,7 +229,8 @@ export async function encodeNativeProject(document: EditorDocument): Promise<Uin
   const manifest = encodeJson({
     format: "3dmc-native", containerVersion: 2,
     documentSchemaVersion: 3, document: "document.json",
-    textures: paths, sha256: hashes
+    textures: texturePaths, ...(layerPaths.length ? { layers: layerPaths } : {}),
+    sha256: hashes
   });
   const archive = zipSync({
     "manifest.json": manifest, "document.json": descriptor,
@@ -280,7 +293,7 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
 
   const manifest = exactKeys(rawManifest, [
     "format","containerVersion","documentSchemaVersion","document","textures","sha256"
-  ], "manifest.json");
+  ], "manifest.json", ["layers"]);
   if (manifest.format !== "3dmc-native" || manifest.documentSchemaVersion !== 3 ||
       manifest.document !== "document.json" || !Array.isArray(manifest.textures) ||
       manifest.textures.length < 1 || manifest.textures.length > 16 ||
@@ -289,7 +302,13 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
       new Set(manifest.textures).size !== manifest.textures.length)
     reject("Native v2 manifest has unsupported asset references.");
 
-  const paths = ["document.json", ...(manifest.textures as string[])];
+  const layerPaths = manifest.layers === undefined ? [] : manifest.layers;
+  if (!Array.isArray(layerPaths) || layerPaths.length > MAX_ARCHIVED_LAYERS ||
+      !layerPaths.every(path => typeof path === "string" &&
+        /^textures\/[a-zA-Z0-9_-]{1,100}\/layers\/[a-zA-Z0-9_-]{1,100}\.png$/.test(path)) ||
+      new Set(layerPaths).size !== layerPaths.length)
+    reject("Native project has invalid or duplicated raster layer paths.");
+  const paths = ["document.json", ...(manifest.textures as string[]), ...layerPaths];
   const expected = new Set(["manifest.json", ...paths]);
   if (files.size !== expected.size || [...files.keys()].some(p => !expected.has(p)))
     reject("The native archive contains unknown, extra or missing texture files.");
@@ -317,16 +336,35 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
       exactKeys(face, ["uv","rotation","textureId"], "face");
   }
   const textures = doc.textures.map((raw,index) => {
-    const item = exactKeys(raw, ["id","name","width","height","path"], "texture");
+    const item = exactKeys(raw, ["id","name","width","height","path"], "texture",
+      ["layers", "activeLayerId"]);
     const path = (manifest.textures as string[])[index]!;
     if (item.path !== path || path !== "textures/" + item.id + ".png")
       reject("Native texture descriptor path is missing or reordered.");
     const png = read3dMcRgbaPng(files.get(path)!);
     if (png.width !== item.width || png.height !== item.height)
       reject("Native source texture dimensions do not match descriptor.");
+    const descriptors = item.layers === undefined ? undefined :
+      (Array.isArray(item.layers) ? item.layers : reject("Raster layer descriptors must be an array."));
+    const layers = descriptors?.map((entry: unknown) => {
+      const layer = exactKeys(entry, ["id", "name", "visible", "opacity", "path"], "raster layer");
+      const layerPath = "textures/" + item.id + "/layers/" + layer.id + ".png";
+      if (layer.path !== layerPath || !layerPaths.includes(layerPath))
+        reject("Raster layer file is missing from the native manifest: " + layerPath);
+      const image = read3dMcRgbaPng(files.get(layerPath)!);
+      if (image.width !== png.width || image.height !== png.height)
+        reject("Raster layer dimensions disagree with their texture.");
+      return { id: layer.id, name: layer.name, visible: layer.visible, opacity: layer.opacity,
+        pixels: image.pixels };
+    });
     return { id:item.id, name:item.name, width:png.width,
-      height:png.height, pixels:png.pixels };
+      height:png.height, pixels:png.pixels,
+      ...(layers ? { layers, activeLayerId: item.activeLayerId } : {}) };
   });
+  const used = textures.flatMap(texture => (texture.layers ?? []).map(layer =>
+    "textures/" + texture.id + "/layers/" + layer.id + ".png"));
+  if (used.length !== layerPaths.length || used.some(path => !layerPaths.includes(path)))
+    reject("Native archive contains unreferenced or missing raster layers.");
   return parseDocument({ ...doc, textures });
 }
 
