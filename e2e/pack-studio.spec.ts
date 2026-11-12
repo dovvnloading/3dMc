@@ -378,3 +378,36 @@ test("Java item settings import restores authored display values without replaci
     .toHaveCount(0);
   await expect(guiAngle).toHaveValue("67");
 });
+
+
+test("Pack Studio can expand beyond two models with distinct property-free blocks", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  const models = studio.getByRole("listbox", { name: "Pack model assets" }).getByRole("option");
+  const replacement = studio.getByRole("combobox", { name: "Pack replacement target" });
+  await expect(models).toHaveCount(1);
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+  await expect(replacement).toHaveValue("iron_block");
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+  await expect(replacement).toHaveValue("gold_block");
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+  await expect(replacement).toHaveValue("emerald_block");
+  await expect(models).toHaveCount(4);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error("Expanded resource pack missing");
+  const files = unzipSync(new Uint8Array(await readFile(path)));
+  for (const name of ["diamond_block", "iron_block", "gold_block", "emerald_block"])
+    expect(files["assets/minecraft/blockstates/" + name + ".json"]).toBeDefined();
+  expect(Object.keys(files).filter(name => name.includes("/blockstates/"))).toHaveLength(4);
+
+  await studio.getByRole("button", { name: "Undo pack operation" }).click();
+  await expect(models).toHaveCount(3);
+  await studio.getByRole("button", { name: "Redo pack operation" }).click();
+  await expect(models).toHaveCount(4);
+});
