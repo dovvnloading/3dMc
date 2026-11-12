@@ -212,3 +212,40 @@ test("asset search filters by model, replacement, and texture path without chang
   const modelSelector = page.getByRole("combobox", { name: "Active pack model" });
   await expect(modelSelector).toContainText("Frost Window");
 });
+
+test("Pack Studio previews exact Java ZIP paths and blocks generated-path collisions", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio" }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  await studio.getByRole("button", { name: "Duplicate model" }).click();
+  const preview = studio.locator(".pack-studio-export-preview");
+  await preview.locator("summary").click();
+  await expect(preview).toContainText("minecraft:diamond_block, minecraft:iron_block");
+  await expect(preview.getByRole("list", { name: "Generated Java ZIP files" }))
+    .toContainText("assets/minecraft/blockstates/iron_block.json");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    studio.getByRole("button", { name: "Export Java ZIP" }).click()
+  ]);
+  const downloaded = await download.path();
+  if (!downloaded) throw new Error("The experimental Java ZIP was not downloaded.");
+  const actual = Object.keys(unzipSync(new Uint8Array(await readFile(downloaded))));
+  const listed = await preview.getByRole("list", { name: "Generated Java ZIP files" })
+    .locator("li code").allTextContents();
+  expect(listed).toEqual(actual);
+
+  const modelPath = await studio.getByRole("textbox", { name: "Model resource path" }).inputValue();
+  const texturePath = studio.getByRole("textbox", { name: "Texture path lantern.png" });
+  await texturePath.fill(modelPath + "/solid_1");
+  await texturePath.press("Enter");
+  await expect(studio.getByRole("button", { name: "Export Java ZIP" })).toBeDisabled();
+  await expect(preview.getByRole("alert")).toContainText("Generated file path collision");
+  await expect(preview.getByRole("alert")).toContainText("solid_1.png");
+
+  await texturePath.fill("block/collision_resolved_paint");
+  await texturePath.press("Enter");
+  await expect(studio.getByRole("button", { name: "Export Java ZIP" })).toBeEnabled();
+  await expect(preview.getByRole("alert")).toHaveCount(0);
+  await expect(preview).toContainText("block/collision_resolved_paint.png");
+});
