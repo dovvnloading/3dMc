@@ -4,6 +4,7 @@ import {
   FACE_DIRECTIONS, assignFaceTexture, selectTexture, updateCuboid, updateFaceRotation, updateFaceUV
 } from "../editor/domain";
 import type { Cuboid, EditorDocument, FaceDirection, FaceRotation, FaceUV, PixelTexture } from "../editor/domain";
+import type { FaceUVClipboard } from "../editor/uvEditing";
 import { faceLabel, logicalUVToPixelRect } from "../editor/uv";
 
 function UVField({ label, value, opposite, disabled, onCommit }: {
@@ -41,7 +42,8 @@ function UVField({ label, value, opposite, disabled, onCommit }: {
   </label>;
 }
 
-export function FaceUVInspector({ selected, face, setFace, commitDocument, textures, textureWidth, textureHeight }: {
+export function FaceUVInspector({ selected, face, setFace, commitDocument, textures, textureWidth,
+  textureHeight, copiedUV, onCopyUV, onPasteUV }: {
   selected: Cuboid;
   face: FaceDirection;
   setFace: (face: FaceDirection) => void;
@@ -49,6 +51,9 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
   textures: PixelTexture[];
   textureWidth: number;
   textureHeight: number;
+  copiedUV: FaceUVClipboard | null;
+  onCopyUV: () => void;
+  onPasteUV: () => void;
 }) {
   const mapping = selected.faces[face];
   const pixels = logicalUVToPixelRect(mapping.uv, textureWidth, textureHeight);
@@ -109,6 +114,15 @@ export function FaceUVInspector({ selected, face, setFace, commitDocument, textu
         <option value={270}>270°</option>
       </select>
     </label>
+    <div className="face-uv-clipboard" role="group" aria-label="Copy and paste face UV mapping">
+      <button type="button" aria-label="Copy face UV" onClick={onCopyUV}>
+        Copy UV + rotation
+      </button>
+      <button type="button" aria-label="Paste face UV" disabled={!copiedUV || selected.locked}
+        onClick={onPasteUV}>
+        Paste UV + rotation
+      </button>
+    </div>
     <div className="face-pixel-summary">
       <span>Pixel region</span>
       <strong>{pixels.map((v) => Number(v.toFixed(2))).join(" · ")}</strong>
