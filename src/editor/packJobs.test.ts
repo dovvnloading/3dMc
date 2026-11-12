@@ -21,7 +21,7 @@ class FakeWorker {
 }
 
 const pack = { id: "test" } as PackDocument;
-const sources = {} as Record<string, EditorDocument>;
+const sources = {} as EditorDocument[];
 
 beforeEach(() => {
   FakeWorker.instances = [];
