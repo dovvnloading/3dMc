@@ -881,3 +881,68 @@ test("texture deletion requires explicit affected-face remap and supports undo",
   await page.getByRole("button", { name: /Undo \(Ctrl/ }).click();
   await expect(slots.locator(".texture-slot-select")).toHaveCount(2);
 });
+
+test("face UV sheet supports pixel-snapped drag, corner resize, cancel and copy/paste", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const mapping = page.getByRole("region", { name: "Face UV mapping" });
+  await mapping.getByRole("button", { name: "North" }).click();
+  const field = (name: string) => mapping.getByRole("textbox", { name: "Face UV " + name });
+  for (const [name, value] of [["U1", "2"], ["V1", "2"], ["U2", "10"], ["V2", "10"]]) {
+    await field(name).fill(value);
+    await field(name).press("Enter");
+  }
+  await mapping.getByRole("combobox", { name: "Face texture rotation" }).selectOption("90");
+  await mapping.getByRole("button", { name: "Copy face UV" }).click();
+
+  await page.getByRole("button", { name: "Edit face UV on texture sheet" }).click();
+  const region = page.locator(".uv-selection-rect.uv-interactive");
+  await expect(region).toBeVisible();
+  let box = await region.boundingBox();
+  if (!box) throw new Error("UV edit region is not visible");
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 16, y - 8, { steps: 4 }); // 2 right and 1 up texture pixels
+  await page.mouse.up();
+  await expect(field("U1")).toHaveValue("3");
+  await expect(field("V1")).toHaveValue("1.5");
+  await expect(field("U2")).toHaveValue("11");
+  await expect(field("V2")).toHaveValue("9.5");
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" }).click();
+  await expect(field("U1")).toHaveValue("2");
+  await expect(field("V2")).toHaveValue("10");
+  await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
+  await expect(field("U1")).toHaveValue("3");
+
+  const handle = page.getByRole("button", { name: "Resize UV U2 V2" });
+  box = await handle.boundingBox();
+  if (!box) throw new Error("UV corner handle is missing");
+  const hx = box.x + box.width / 2, hy = box.y + box.height / 2;
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(hx + 16, hy + 8, { steps: 4 });
+  await page.mouse.up();
+  await expect(field("U2")).toHaveValue("12");
+  await expect(field("V2")).toHaveValue("10");
+
+  const afterResize = [await field("U1").inputValue(), await field("V1").inputValue(),
+    await field("U2").inputValue(), await field("V2").inputValue()];
+  box = await region.boundingBox();
+  if (!box) throw new Error("Moved UV region is missing");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 16);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  expect([await field("U1").inputValue(), await field("V1").inputValue(),
+    await field("U2").inputValue(), await field("V2").inputValue()]).toEqual(afterResize);
+
+  await mapping.getByRole("button", { name: "South" }).click();
+  await mapping.getByRole("button", { name: "Paste face UV" }).click();
+  await expect(field("U1")).toHaveValue("2");
+  await expect(field("V1")).toHaveValue("2");
+  await expect(field("U2")).toHaveValue("10");
+  await expect(field("V2")).toHaveValue("10");
+  await expect(mapping.getByRole("combobox", { name: "Face texture rotation" })).toHaveValue("90");
+});
