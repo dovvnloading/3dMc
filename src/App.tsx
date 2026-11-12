@@ -14,9 +14,10 @@ import {
 import type { Cuboid, EditorDocument, FaceDirection, Vec3 } from "./editor/domain";
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
-import { commitSelectionGesture, deleteSelection, duplicateSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
+import { commitSelectionGesture, deleteSelection, duplicateSelection, repeatSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
+import { SelectionArrayTools } from "./components/SelectionArrayTools";
 import { ExportIssueList } from "./components/ExportIssueList";
 import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
@@ -284,6 +285,16 @@ export function App() {
     const ids = selectedIds.map(() => crypto.randomUUID());
     if (applyBatch(current => duplicateSelection(current, selectedIds, ids)))
       setSelection({ ids, primary: ids.at(-1) ?? null, anchor: ids[0] ?? null });
+  }, [selectedIds, applyBatch]);
+  const repeatCurrentSelection = useCallback((copies: number, step: Vec3) => {
+    if (!selectedIds.length || !Number.isSafeInteger(copies) || copies < 1 || copies > 64) return;
+    // Reserve IDs once, before React updater replay, and commit all copies atomically.
+    const ids = Array.from({ length: selectedIds.length * copies }, () => crypto.randomUUID());
+    if (applyBatch(current => repeatSelection(current, selectedIds, ids, copies, step))) {
+      const lastLayer = ids.slice(-selectedIds.length);
+      setSelection({ ids: lastLayer, primary: lastLayer.at(-1) ?? null,
+        anchor: lastLayer[0] ?? null });
+    }
   }, [selectedIds, applyBatch]);
   const deleteCurrentSelection = useCallback(() => {
     applyBatch(current => deleteSelection(current, selectedIds));
@@ -840,7 +851,8 @@ export function App() {
       </main>
       <aside className="inspector-panel" aria-label="Properties inspector"><SectionHeading title="Inspector" trailing={<Settings2 size={17} className="section-muted-icon"/>}/>
         {selectedIds.length > 1 && mode !== "paint" ? <SelectionInspector document={doc} ids={selectedIds} snap={snap} setSnap={setSnap} apply={applyBatch}
-          duplicate={duplicateCurrentSelection} remove={deleteCurrentSelection} clear={() => selectNode(null)}/> : selected ? <>
+          duplicate={duplicateCurrentSelection} repeat={repeatCurrentSelection}
+          remove={deleteCurrentSelection} clear={() => selectNode(null)}/> : selected ? <>
           <div className="selection-heading"><div className="selection-glyph"><Box size={20}/></div><div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.material === "texture" ? "Textured surface" : "Solid material"}</p></div></div>
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace} setFace={direction => {
@@ -868,6 +880,11 @@ export function App() {
                 <button type="button" aria-label="Move selected element down" disabled={selected.locked || selectedIndex < 0 || selectedIndex >= doc.cuboids.length - 1} onClick={() => commitDocument(current => moveCuboid(current, selected.id, "down"))}><ArrowDown size={14}/>Move down</button></div>
               <label className="form-caption rename-label" htmlFor="element-name">Element name</label><CommittedText id="element-name" label="Element name" className="text-control" value={selected.name} disabled={selected.locked} onCommit={name => commitDocument(current => renameCuboid(current, selected.id, name))}/>
             </div>
+            {mode === "model" && <div className="inspector-group">
+              <SectionHeading title="Duplicate array"/>
+              <SelectionArrayTools selectedCount={1} totalCount={doc.cuboids.length}
+                disabled={selected.locked || !selected.visible} onCreate={repeatCurrentSelection}/>
+            </div>}
           </div>
         </> : <div className="empty-inspector"><Box size={28}/><h2>Nothing selected</h2><p>Choose an element in the scene or click a visible part in the viewport.</p><button className="text-button quiet" onClick={addElement}><Plus size={15}/>Add cuboid</button></div>}
         {mode === "paint" && <div className="paint-options"><SectionHeading title="Paint controls"/><div className="paint-import-actions">
