@@ -301,7 +301,7 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
 
   const doc = exactKeys(decodeJson(files.get("document.json")!, "document.json"), [
     "schemaVersion","id","name","target","cuboids","textures","activeTextureId"
-  ], "document.json", ["groups"]);
+  ], "document.json", ["groups", "palette"]);
   if (doc.schemaVersion !== 3 || !Array.isArray(doc.textures) ||
       doc.textures.length !== manifest.textures.length)
     reject("Native v2 document/schema texture count does not agree.");

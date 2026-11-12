@@ -95,6 +95,8 @@ export interface EditorDocument {
   cuboids: Cuboid[];
   /** Optional for backward compatibility with existing v3 native source files. */
   groups?: EditorGroup[];
+  /** Ordered creator swatches, independent of authored pixels and material colors. */
+  palette?: string[];
   textures: PixelTexture[];
   activeTextureId: string;
 }
@@ -156,7 +158,7 @@ export function parseDocument(input: unknown): EditorDocument {
   const inputRecord = input as Record<string, unknown>;
   const isLegacy = value.schemaVersion !== 3;
   if (!isLegacy && Object.keys(inputRecord).some(key =>
-    !["schemaVersion", "id", "name", "target", "cuboids", "groups", "textures", "activeTextureId"].includes(key)))
+    !["schemaVersion", "id", "name", "target", "cuboids", "groups", "palette", "textures", "activeTextureId"].includes(key)))
     throw new Error("Unsupported source document metadata cannot be silently removed.");
 
   if (!isLegacy) {
@@ -241,6 +243,18 @@ export function parseDocument(input: unknown): EditorDocument {
     });
   }
 
+  // Keep custom swatches optional for every existing v3 project. Reject
+  // malformed or case-insensitively duplicated colors before replacing source.
+  let palette: string[] | undefined;
+  if (inputRecord.palette !== undefined) {
+    if (!Array.isArray(inputRecord.palette) ||
+        inputRecord.palette.length < 1 || inputRecord.palette.length > 16 ||
+        inputRecord.palette.some(color => !isHex(color)) ||
+        new Set(inputRecord.palette.map(color => color.toLowerCase())).size !== inputRecord.palette.length)
+      throw new Error("Source palette requires 1–16 unique hex colors.");
+    palette = [...inputRecord.palette];
+  }
+
   return {
     schemaVersion: 3, id: value.id, name: value.name,
     target: { edition: "java", family: "static-block", candidateRelease: value.target.candidateRelease, status: "unverified" },
@@ -256,7 +270,8 @@ export function parseDocument(input: unknown): EditorDocument {
       pixels: [...t.pixels]
     })),
     activeTextureId: activeId,
-    ...(groups ? { groups } : {})
+    ...(groups ? { groups } : {}),
+    ...(palette ? { palette } : {})
   };
 }
 

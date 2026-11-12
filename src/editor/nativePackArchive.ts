@@ -196,7 +196,7 @@ export async function decodeNativePack(bytes: Uint8Array): Promise<NativePackPro
   const sources = sourceEntries.map((entry, index) => {
     const raw = object(decodeJson(files.get(entry.document)!, entry.document), [
       "schemaVersion", "id", "name", "target", "cuboids", "textures", "activeTextureId"
-    ], entry.document, ["groups"]);
+    ], entry.document, ["groups", "palette"]);
     if (raw.schemaVersion !== 3 || raw.id !== entry.id || !Array.isArray(raw.textures) ||
         raw.textures.length !== entry.textures.length)
       fail("Native pack source document is incompatible or misidentified.");
