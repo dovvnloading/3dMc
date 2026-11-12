@@ -6,8 +6,9 @@ import { beginPaintGesture, commitPaintGesture, continuePaintGesture, cancelPain
 import { drawStroke } from "./pixels";
 import { makeFaceTextureUnique } from "./regions";
 import {
-  MAX_RASTER_LAYERS, activeRasterLayer, addRasterLayer, flattenRasterLayers,
-  flattenTextureLayers, moveRasterLayer, removeRasterLayer, renameRasterLayer,
+  MAX_RASTER_LAYERS, activeRasterLayer, addRasterLayer, clearRasterLayer,
+  duplicateRasterLayer, flattenRasterLayers, flattenTextureLayers,
+  mergeRasterLayerDown, moveRasterLayer, removeRasterLayer, renameRasterLayer,
   selectRasterLayer, setRasterLayerOpacity, setRasterLayerPixels, setRasterLayerVisibility
 } from "./layers";
 import { decodeNativeProject, encodeNativeProject } from "./nativeArchive";
@@ -108,6 +109,35 @@ describe("source-backed raster layers and deterministic flattening", () => {
     expect(() => setTexturePixels(source, drawStroke(original, 32, 32,
       [2, 2], [3, 3], "#ffffff", 1))).toThrow(/Flatten them explicitly/);
     expect(parseDocument(changed)).toEqual(changed);
+  });
+
+  it("duplicates, clears and merges layer pixels without losing the lower source", () => {
+    const source = open();
+    const rgba = [...source.textures[0]!.layers![1]!.pixels];
+    rgba[(5 * 32 + 6) * 4] = 255;
+    rgba[(5 * 32 + 6) * 4 + 1] = 0;
+    rgba[(5 * 32 + 6) * 4 + 2] = 90;
+    rgba[(5 * 32 + 6) * 4 + 3] = 255;
+    const drawn = setRasterLayerPixels(source, "main", "paint", rgba);
+    const duplicate = duplicateRasterLayer(drawn, "main", "paint", "paint_copy");
+    expect(duplicate.textures[0]!.layers).toHaveLength(3);
+    expect(duplicate.textures[0]!.activeLayerId).toBe("paint_copy");
+    expect(duplicate.textures[0]!.layers![2]!.pixels).toEqual(rgba);
+    expect(duplicate.textures[0]!.layers![2]!.pixels).not.toBe(rgba);
+    expect(() => duplicateRasterLayer(duplicate, "main", "paint", "paint_copy"))
+      .toThrow(/ID already exists/);
+
+    const cleared = clearRasterLayer(duplicate, "main", "paint_copy");
+    expect(cleared.textures[0]!.layers![2]!.pixels.every(value => value === 0)).toBe(true);
+    expect(clearRasterLayer(cleared, "main", "paint_copy")).toBe(cleared);
+    const merged = mergeRasterLayerDown(drawn, "main", "paint");
+    expect(merged.textures[0]!.layers).toHaveLength(1);
+    expect(merged.textures[0]!.activeLayerId).toBe("background");
+    expect(merged.textures[0]!.pixels).toEqual(drawn.textures[0]!.pixels);
+    expect(parseDocument(merged)).toEqual(merged);
+    expect(undo(commit(createHistory(drawn), merged)).present).toBe(drawn);
+    expect(source.textures[0]!.layers![0]!.pixels).toEqual(
+      createSampleDocument().textures[0]!.pixels);
   });
 
   it("rejects invalid stack references, opacity and inconsistent flat cache", () => {
