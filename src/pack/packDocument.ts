@@ -1,5 +1,7 @@
 import { parseDocument } from "../editor/domain";
 import type { EditorDocument } from "../editor/domain";
+import { JAVA_1214_ITEM_TARGETS, parseItemDisplay } from "./itemProfile";
+import type { ItemDisplay } from "./itemProfile";
 
 /**
  * Pack-wide source index, intentionally independent of the renderer and the
@@ -10,6 +12,7 @@ export const PACK_INDEX_VERSION = 1 as const;
 export const PACK_TARGET_PROFILE = "java-1.21.4-static-block" as const;
 export const MAX_PACK_MODELS = 32 as const;
 export const MAX_PACK_TEXTURES = 512 as const;
+export const MAX_PACK_ITEMS = 8 as const;
 
 export interface ResourceLocation {
   namespace: string;
@@ -37,6 +40,20 @@ export interface PackModelAsset {
   provenance: "editor" | "java-1214-import";
 }
 
+/**
+ * Optional Java 1.21.4 item authoring. Each item reuses an editable pack
+ * model's cuboids and source textures but has its own raw model and display
+ * transforms. Omitting items preserves byte-identical legacy native packs.
+ */
+export interface PackItemAsset {
+  id: string;
+  sourceModelId: string;
+  resource: ResourceLocation;
+  replaces: ResourceLocation;
+  handAnimationOnSwap: boolean;
+  display: ItemDisplay;
+}
+
 export interface PackDocument {
   schemaVersion: typeof PACK_INDEX_VERSION;
   id: string;
@@ -45,6 +62,7 @@ export interface PackDocument {
   activeModelId: string;
   models: PackModelAsset[];
   textures: PackTextureAsset[];
+  items?: PackItemAsset[];
 }
 
 export class PackIndexError extends Error {
@@ -56,11 +74,12 @@ export class PackIndexError extends Error {
 
 const fail = (message: string): never => { throw new PackIndexError(message); };
 
-function record(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
+function record(value: unknown, keys: readonly string[], label: string,
+                optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return fail(label + " must be an object.");
   const object = value as Record<string, unknown>;
-  if (Object.keys(object).some(key => !keys.includes(key)) ||
+  if (Object.keys(object).some(key => !keys.includes(key) && !optional.includes(key)) ||
       keys.some(key => !Object.hasOwn(object, key)))
     return fail(label + " contains unknown or missing fields.");
   return object;
@@ -102,7 +121,7 @@ export function resourceKey(location: ResourceLocation): string {
   return clean.namespace + ":" + clean.path;
 }
 
-export function gameFilePath(kind: "models" | "textures" | "blockstates",
+export function gameFilePath(kind: "models" | "textures" | "blockstates" | "items",
                              location: ResourceLocation): string {
   const clean = resource(location, "resource");
   return "assets/" + clean.namespace + "/" + kind + "/" + clean.path +
@@ -116,7 +135,7 @@ function unique(keys: readonly string[], label: string): void {
 export function parsePackDocument(input: unknown): PackDocument {
   const raw = record(input, [
     "schemaVersion", "id", "name", "targetProfile", "activeModelId", "models", "textures"
-  ], "pack index");
+  ], "pack index", ["items"]);
   if (raw.schemaVersion !== PACK_INDEX_VERSION || raw.targetProfile !== PACK_TARGET_PROFILE)
     fail("Unsupported pack index version or Minecraft target profile. Source was not changed.");
   const id = sourceId(raw.id, "pack ID");
@@ -175,7 +194,38 @@ export function parsePackDocument(input: unknown): PackDocument {
     };
   });
   unique(models.map(model => model.id), "model IDs");
-  unique(models.map(model => gameFilePath("models", model.resource)), "model paths");
+  const byModel = new Set(models.map(model => model.id));
+  let items: PackItemAsset[] | undefined;
+  if (raw.items !== undefined) {
+    if (!Array.isArray(raw.items) || raw.items.length > MAX_PACK_ITEMS)
+      fail("Pack index supports at most eight Java item assets.");
+    items = (raw.items as unknown[]).map((value, index) => {
+      const item = record(value, [
+        "id", "sourceModelId", "resource", "replaces", "handAnimationOnSwap", "display"
+      ], "item " + index);
+      const id = identifier(item.id, "item ID");
+      const sourceModelId = identifier(item.sourceModelId, "item source model ID");
+      if (!byModel.has(sourceModelId))
+        fail("Item " + id + " refers to a missing source model.");
+      const itemResource = resource(item.resource, "item model resource");
+      const replaces = resource(item.replaces, "item replacement");
+      if (replaces.namespace !== "minecraft" ||
+          !JAVA_1214_ITEM_TARGETS.includes(
+            replaces.path as typeof JAVA_1214_ITEM_TARGETS[number]))
+        fail("Unsupported Java 1.21.4 item replacement. Choose stick, paper, apple, or diamond_sword.");
+      if (typeof item.handAnimationOnSwap !== "boolean")
+        fail("Item hand animation setting must be true or false.");
+      return {
+        id, sourceModelId, resource: itemResource, replaces,
+        handAnimationOnSwap: item.handAnimationOnSwap,
+        display: parseItemDisplay(item.display)
+      };
+    });
+    unique(items.map(item => item.id), "item IDs");
+    unique(items.map(item => gameFilePath("items", item.replaces)), "item replacements");
+  }
+  unique([...models.map(model => gameFilePath("models", model.resource)),
+    ...(items ?? []).map(item => gameFilePath("models", item.resource))], "model paths");
   unique(models.map(model => gameFilePath("blockstates", model.replaces)), "blockstate replacements");
   if (!models.some(model => model.id === activeModelId))
     fail("Active model is missing from the pack index.");
@@ -184,7 +234,8 @@ export function parsePackDocument(input: unknown): PackDocument {
     fail("Unreferenced pack textures must be resolved before export.");
 
   return { schemaVersion: PACK_INDEX_VERSION, id, name,
-    targetProfile: PACK_TARGET_PROFILE, activeModelId, models, textures };
+    targetProfile: PACK_TARGET_PROFILE, activeModelId, models, textures,
+    ...(items ? { items } : {}) };
 }
 
 /** Existing editable source becomes one indexed block, with original export paths. */
