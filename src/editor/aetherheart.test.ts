@@ -26,6 +26,25 @@ describe("The Aetherheart showcase", () => {
     expect(parseDocument(source)).toEqual(source);
   });
 
+  it("keeps 60 distinct, open gyroscope segments and an exposed cyan centerpiece", () => {
+    const source = createAetherheartDocument();
+    const names = source.cuboids.map(node => node.name);
+    expect(new Set(names).size).toBe(names.length);
+    const rings = source.cuboids.filter(node => /^(Meridian I|Meridian II|Equatorial orbit) · segment/.test(node.name));
+    expect(rings).toHaveLength(60);
+    expect(rings.every(node => node.to.every((coordinate, axis) =>
+      coordinate > node.from[axis]!))).toBe(true);
+    const heart = source.cuboids.find(node => node.name === "Crystal facet · ascending tier 4")!;
+    expect(heart.faces.north.textureId).toBe("aether");
+    const frontBar = source.cuboids.find(node => node.name === "Crosswind filament X")!;
+    expect(frontBar.to[2]).toBeLessThan(heart.from[2]);
+    const seams = source.cuboids.filter(node => node.name.startsWith("Prismatic light seam"));
+    expect(seams).toHaveLength(8);
+    expect(seams.every(node => node.material === "texture" && node.faces.north.textureId === "ivory"))
+      .toBe(true);
+    expect(source.textures.filter(texture => texture.layers?.length === 2)).toHaveLength(3);
+  });
+
   it("uses the normal project creation flow with an independent ID and custom name", () => {
     const document = makeNewProject({
       template: "aetherheart", name: "My star engine", resolution: 64, id: "my-custom-demo"
