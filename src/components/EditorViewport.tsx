@@ -10,7 +10,6 @@ import { SelectionTransform } from "./SelectionTransform";
 import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
-import { frameDocumentCamera, isAetherheartShowcase } from "../editor/cameraFraming";
 
 export type Mode = "model" | "paint" | "preview";
 export type Tool = "select" | "move" | "resize" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle";
@@ -55,21 +54,17 @@ const dimensions = (node: Cuboid): Vec3 => [
   (node.to[2] - node.from[2]) / WORLD
 ];
 
-function CameraControls({ view, document }: { view: ViewRequest; document: EditorDocument }) {
-  const { camera, invalidate, size } = useThree();
-  // Only reframe when the view, document identity or canvas size changes.
-  // Editing geometry must not steal the orbit/zoom gesture from the creator.
-  const frame = useMemo(() => frameDocumentCamera(document, view.kind, size.width / size.height),
-    [document.id, view, size.width, size.height]);
+function CameraControls({ view }: { view: ViewRequest }) {
+  const { camera, invalidate } = useThree();
   useEffect(() => {
-    camera.position.set(...frame.position);
-    camera.lookAt(...frame.target);
-    camera.updateProjectionMatrix();
-    invalidate();
-  }, [camera, invalidate, frame]);
+    const positions: Record<ViewKind, [number, number, number]> = {
+      iso: [2.9, 2.35, 3.2], front: [0, 0.65, 4], right: [4, 0.65, 0], top: [0, 4, 0.001]
+    };
+    camera.position.set(...positions[view.kind]);
+    camera.lookAt(0, 0.58, 0); camera.updateProjectionMatrix(); invalidate();
+  }, [camera, invalidate, view]);
   return <OrbitControls makeDefault enableDamping dampingFactor={0.095}
-    target={frame.target} minDistance={0.9} maxDistance={Math.max(25, frame.distance * 3)}
-    enablePan screenSpacePanning />;
+    target={[0, 0.58, 0]} minDistance={0.9} maxDistance={25} enablePan screenSpacePanning />;
 }
 
 function useTextureMaps(textures: PixelTexture[], draftPixels: number[],
@@ -283,7 +278,6 @@ function AssetMesh(props: MeshProps) {
 }
 
 function Scene(props: ViewportProps) {
-  const showcasePreview = props.mode === "preview" && isAetherheartShowcase(props.document);
   const textureMaps = useTextureMaps(props.document.textures, props.pixels, props.draftTextureId, props.document.activeTextureId);
   // Opaque painted sheets belong in the depth-writing pass. Previously every
   // painted cuboid was blended as transparent, even with alpha=255 everywhere;
@@ -304,16 +298,11 @@ function Scene(props: ViewportProps) {
     selectedIds={ids} node={node} textureMaps={textureMaps} textures={props.document.textures}
     opaqueTextures={opaqueTextures} suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
   return <>
-    <color attach="background" args={[showcasePreview ? "#101820" : "#141619"]}/>
-    <ambientLight intensity={showcasePreview ? 1.55 : 1.35}/>
-    <directionalLight position={[3, 6, 4]} intensity={showcasePreview ? 2.45 : 2.3}
-      castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={0.1} shadow-camera-far={20}/>
+    <color attach="background" args={["#141619"]}/>
+    <ambientLight intensity={1.35}/>
+    <directionalLight position={[3, 6, 4]} intensity={2.3} castShadow shadow-mapSize={[1024, 1024]}
+      shadow-camera-near={0.1} shadow-camera-far={20}/>
     <directionalLight position={[-3, 2, -4]} intensity={0.85} color="#a3c8be"/>
-    {showcasePreview && <>
-      {/* Preview atmosphere only; these lights are not Minecraft game emission. */}
-      <pointLight position={[0, 0.74, 0]} color="#65ecff" intensity={1.05} distance={2.8} decay={2}/>
-      <pointLight position={[0, 1.12, 0]} color="#f9cc78" intensity={0.48} distance={2.1} decay={2}/>
-    </>}
     {props.mode !== "preview" && <gridHelper args={[10, 20, "#33483f", "#242c2b"]} position={[0, 0, 0]}/>}
     {props.document.cuboids.filter(node => node.visible && (!grouped || !selected.has(node.id))).map(node => renderNode(node))}
     {grouped && <SelectionTransform document={props.document} ids={ids} snap={props.snap} cancelToken={props.cancelToken}
@@ -321,7 +310,7 @@ function Scene(props: ViewportProps) {
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}
-    <CameraControls view={props.view} document={props.document}/>
+    <CameraControls view={props.view}/>
   </>;
 }
 
