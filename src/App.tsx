@@ -24,9 +24,11 @@ import { ExportIssueList } from "./components/ExportIssueList";
 import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
-import { decodeProject, MAX_PROJECT_BYTES } from "./editor/project";
-import { decodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
-import { decodeNativePack, MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
+import { nativeFilename } from "./editor/nativeArchive";
+import { MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
+import { readImportFile, runImportJobInWorker } from "./editor/importJobs";
+import { ImportProgress } from "./components/ImportProgress";
+import type { ImportProgressState } from "./components/ImportProgress";
 import { buildPackZipInWorker } from "./editor/packJobs";
 import type { NativePackProject } from "./editor/nativePackArchive";
 import { inspectIndexedJava1214Pack } from "./pack/exportPreflight";
@@ -60,7 +62,6 @@ import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
-import { inspectJava1214Pack } from "./import/javaPack";
 import type { PackImportReport } from "./import/javaPack";
 import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/javaBlock";
 import type { ExportIssue } from "./export/javaBlock";
@@ -191,6 +192,7 @@ export function App() {
   const [deletingTextureId, setDeletingTextureId] = useState<string | null>(null);
   const [deleteReplacementId, setDeleteReplacementId] = useState<string | null>(null);
   const [textureReading, setTextureReading] = useState(false), [packInspecting, setPackInspecting] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [packStudioOpen, setPackStudioOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "building" | "started">("idle");
@@ -203,10 +205,13 @@ export function App() {
   const fileIntent = useRef(0), openingProject = useRef(false);
   const saveAbortRef = useRef<AbortController | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
+  const importAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => {
     saveAbortRef.current?.abort();
     exportAbortRef.current?.abort();
+    importAbortRef.current?.abort();
   }, []);
+  useEffect(() => { importAbortRef.current?.abort(); }, [openSession]);
   const textureSource = useRef<{ document: EditorDocument; mode: "replace" | "new" } | null>(null);
 
   // PackSession is authoritative in pack mode. The legacy History is only an
@@ -600,6 +605,7 @@ export function App() {
   };
   const chooseTexture = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
+    importAbortRef.current?.abort();
     const request = ++fileIntent.current, session = activeSession.current;
     const source = historyRef.current.present, importMode = textureImportMode;
     const current = () => fileIntent.current === request && activeSession.current === session;
@@ -638,48 +644,79 @@ export function App() {
       setNotice("PNG texture download started. Native .3dmc source preserves your complete editable project.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not export PNG."); }
   };
-  const chooseProject = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-    const request = ++fileIntent.current, session = activeSession.current;
-    const current = () => fileIntent.current === request && activeSession.current === session;
-    setTextureReading(false); setPackInspecting(false);
-    try {
-      let imported: EditorDocument;
-      if (file.size > MAX_NATIVE_PACK_BYTES) throw new Error("File exceeds the 12 MB source pack import budget.");
-      const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      const nativeZip = signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04;
-      if (nativeZip || file.name.toLowerCase().endsWith(".3dmc")) {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        if (file.size > MAX_NATIVE_BYTES) {
-          const opened = await decodeNativePack(bytes);
-          if (current()) setPendingPackOpen(opened);
-          return;
-        }
-        // The v2 reader rejects pack.json before inspecting a v3 manifest.
-        let pack: NativePackProject | null = null;
-        try { pack = await decodeNativePack(bytes); }
-        catch { /* Fall back to the strict legacy source decoder. */ }
-        if (pack) { if (current()) setPendingPackOpen(pack); return; }
-        imported = await decodeNativeProject(bytes);
-      } else {
-        if (file.size > MAX_PROJECT_BYTES) throw new Error("Legacy JSON project exceeds the 1.5 MB import limit.");
-        imported = decodeProject(await file.text());
-      }
-      if (current()) setPendingOpen(imported);
-    } catch (error) { if (current()) setNotice(error instanceof Error ? error.message : "The project could not be opened."); }
+  const cancelImport = () => {
+    const controller = importAbortRef.current;
+    if (!controller) return;
+    controller.abort();
+    importAbortRef.current = null;
+    fileIntent.current++;
+    setImportProgress(null);
+    setPackInspecting(false);
+    setNotice("Import canceled. Your current project was not changed.");
   };
-  const choosePack = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
-    const request = ++fileIntent.current, session = activeSession.current;
-    const current = () => fileIntent.current === request && activeSession.current === session;
+
+  const inspectImportFile = async (file: File, kind: "source" | "java") => {
+    importAbortRef.current?.abort();
+    const controller = new AbortController();
+    importAbortRef.current = controller;
+    const request = ++fileIntent.current;
+    const session = activeSession.current;
+    const revision = activeRevision.current;
+    const source = historyRef.current.present;
+    const pack = packRef.current?.present;
+    const current = () => !controller.signal.aborted &&
+      importAbortRef.current === controller &&
+      fileIntent.current === request && activeSession.current === session;
     setTextureReading(false);
-    if (file.size > 2_000_000) { setPendingPack({ status: "blocked", problems: ["This ZIP exceeds the 2 MB pack-import limit."] }); return; }
-    setPackInspecting(true);
+    setPackInspecting(kind === "java");
+    setImportProgress({ name: file.name, stage: "reading", loaded: 0, total: file.size });
+    if (kind === "source") { setPendingOpen(null); setPendingPackOpen(null); }
+    else setPendingPack(null);
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      if (current()) setPendingPack(inspectJava1214Pack(bytes));
-    } catch (error) { if (current()) setPendingPack({ status: "blocked", problems: [error instanceof Error ? error.message : "Could not read the selected ZIP."] }); }
-    finally { if (current()) setPackInspecting(false); }
+      if (kind === "source" && file.size > MAX_NATIVE_PACK_BYTES)
+        throw new Error("File exceeds the 12 MB source pack import budget.");
+      if (kind === "java" && file.size > 2_000_000)
+        throw new Error("This ZIP exceeds the 2 MB pack-import limit.");
+      const bytes = await readImportFile(file, controller.signal, (loaded, total) => {
+        if (current()) setImportProgress({ name: file.name, stage: "reading", loaded, total });
+      });
+      if (!current()) return;
+      setImportProgress({ name: file.name, stage: "validating", loaded: file.size, total: file.size });
+      const result = await runImportJobInWorker(kind === "source"
+        ? { kind: "source", filename: file.name, bytes }
+        : { kind: "java", bytes }, controller.signal);
+      if (!current()) return;
+      if (activeRevision.current !== revision || historyRef.current.present !== source ||
+          packRef.current?.present !== pack) {
+        setNotice("The workspace changed during import. Choose the file again; no edits were replaced.");
+        return;
+      }
+      if (result.kind === "pack") setPendingPackOpen(result.project);
+      else if (result.kind === "document") setPendingOpen(result.document);
+      else if (result.kind === "java") setPendingPack(result.report);
+    } catch (error) {
+      if (!current()) return;
+      const message = error instanceof Error ? error.message : "The selected file could not be imported.";
+      if (kind === "java") setPendingPack({ status: "blocked", problems: [message] });
+      else setNotice(message);
+    } finally {
+      if (importAbortRef.current === controller) {
+        importAbortRef.current = null;
+        setImportProgress(null);
+        setPackInspecting(false);
+      }
+    }
+  };
+
+  const chooseProject = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void inspectImportFile(file, "source");
+  };
+  const choosePack = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void inspectImportFile(file, "java");
   };
   const acceptOpen = async (document: EditorDocument): Promise<boolean> => {
     const lease = writerRef.current;
@@ -839,6 +876,7 @@ export function App() {
         <button className="text-button primary" onClick={() => setExportOpen(true)} title="Experimental pack export; in-game validation is pending"><Download size={16}/>Minecraft export</button>
       </div>
     </header>
+    {importProgress && <ImportProgress progress={importProgress} onCancel={cancelImport}/>}
     <nav className="mode-bar" aria-label="Editor modes"><div className="mode-spacer">
       <IconButton label={sceneOpen ? "Collapse scene panel" : "Expand scene panel"} onClick={() => setSceneOpen(current => !current)} active={!sceneOpen}><PanelLeftClose size={16}/></IconButton>
       <IconButton label={inspectorOpen ? "Collapse inspector" : "Expand inspector"} onClick={() => setInspectorOpen(current => !current)} active={!inspectorOpen}><PanelRightClose size={16}/></IconButton>

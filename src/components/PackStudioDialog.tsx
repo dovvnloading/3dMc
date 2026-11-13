@@ -3,8 +3,11 @@ import { Download, FolderOpen, Layers3, Plus, Save, Search, Trash2, X } from "lu
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { renameProject } from "../editor/domain";
-import { decodeNativeProject, nativeFilename } from "../editor/nativeArchive";
-import { openNativePack, MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
+import { nativeFilename } from "../editor/nativeArchive";
+import { MAX_NATIVE_PACK_BYTES } from "../editor/nativePackArchive";
+import { readImportFile, runImportJobInWorker } from "../editor/importJobs";
+import { ImportProgress } from "./ImportProgress";
+import type { ImportProgressState } from "./ImportProgress";
 import { buildPackZipInWorker } from "../editor/packJobs";
 import { startBrowserDownload } from "../editor/exportJobs";
 import { indexLegacyProject, resourceKey } from "../pack/packDocument";
@@ -67,6 +70,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [openProgress, setOpenProgress] = useState<ImportProgressState | null>(null);
   const [message, setMessage] = useState("");
   const [modelQuery, setModelQuery] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
@@ -76,7 +80,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const jobAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => jobAbortRef.current?.abort(), []);
+  const openAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    jobAbortRef.current?.abort();
+    openAbortRef.current?.abort();
+  }, []);
 
   const pack = session.present.pack;
   const active = activePackModel(session);
@@ -107,24 +115,63 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     onClose();
   };
 
-  const choosePack = async (event: ChangeEvent<HTMLInputElement>) => {
+  const cancelOpen = () => {
+    if (!openAbortRef.current) return;
+    openAbortRef.current.abort();
+    openAbortRef.current = null;
+    setOpening(false);
+    setOpenProgress(null);
+    setMessage("Import canceled. The current pack and models were not changed.");
+  };
+
+  const prepareOpen = async (file: File, kind: "pack" | "single") => {
+    openAbortRef.current?.abort();
+    const controller = new AbortController();
+    openAbortRef.current = controller;
+    const captured = sessionRef.current;
+    const current = () => openAbortRef.current === controller && !controller.signal.aborted;
+    setOpening(true);
+    setPending(null);
+    setOpenProgress({ name: file.name, stage: "reading", loaded: 0, total: file.size });
+    setMessage("");
+    try {
+      if (kind === "pack" && file.size > MAX_NATIVE_PACK_BYTES)
+        throw new Error("The source pack exceeds the 12 MB limit. Nothing was replaced.");
+      if (kind === "single" && file.size > 3_000_000)
+        throw new Error("The single-model source exceeds the 3 MB import limit.");
+      const bytes = await readImportFile(file, controller.signal, (loaded, total) => {
+        if (current()) setOpenProgress({ name: file.name, stage: "reading", loaded, total });
+      });
+      if (!current()) return;
+      setOpenProgress({ name: file.name, stage: "validating", loaded: file.size, total: file.size });
+      const result = await runImportJobInWorker({ kind, bytes }, controller.signal);
+      if (!current()) return;
+      if (sessionRef.current !== captured) {
+        setMessage("The pack changed during import. Choose the file again; no newer edits were replaced.");
+        return;
+      }
+      if (kind === "pack" && result.kind === "pack") {
+        setPending(createPackSession(result.project.pack, result.project.sources));
+        setMessage("Review the pack before replacing the current Pack Studio session.");
+      } else if (kind === "single" && result.kind === "document") {
+        addSource(result.document);
+      } else {
+        throw new Error("The import worker returned an unexpected source type.");
+      }
+    } catch (error) {
+      if (current()) setMessage(error instanceof Error ? error.message : "The selected source could not be imported.");
+    } finally {
+      if (openAbortRef.current === controller) {
+        openAbortRef.current = null;
+        setOpening(false);
+        setOpenProgress(null);
+      }
+    }
+  };
+  const choosePack = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
-    if (file.size > MAX_NATIVE_PACK_BYTES) {
-      setMessage("The source pack exceeds the 12 MB limit. Nothing was replaced.");
-      return;
-    }
-    setOpening(true);
-    try {
-      const opened = await openNativePack(new Uint8Array(await file.arrayBuffer()));
-      setPending(createPackSession(opened.pack, opened.sources));
-      setMessage("Review the pack before replacing the current Pack Studio session.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The pack could not be opened.");
-    } finally {
-      setOpening(false);
-    }
+    if (file) void prepareOpen(file, "pack");
   };
 
   const loadPending = async () => {
@@ -179,23 +226,10 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     change(current => addPackModel(current, copy, model, textureAssets));
   };
 
-  const addFromFile = async (event: ChangeEvent<HTMLInputElement>) => {
+  const addFromFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
-    if (file.size > 3_000_000) {
-      setMessage("The single-model source exceeds the 3 MB import limit.");
-      return;
-    }
-    setOpening(true);
-    try {
-      const document = await decodeNativeProject(new Uint8Array(await file.arrayBuffer()));
-      addSource(document);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The source model could not be imported.");
-    } finally {
-      setOpening(false);
-    }
+    if (file) void prepareOpen(file, "single");
   };
 
   const save = async () => {
@@ -309,6 +343,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button type="button" disabled={!session.future.length}
         onClick={() => change(redoPackSession)} aria-label="Redo pack operation">Redo</button>
     </div>
+    {openProgress && <ImportProgress progress={openProgress} onCancel={cancelOpen} inline/>}
 
     {pending && <div className="pack-studio-confirm" role="group" aria-label="Confirm source pack replacement">
       <p>Replace this Pack Studio session with <strong>{pending.present.pack.name}</strong> ({pending.present.pack.models.length} models)? Download a source backup first if needed.</p>
