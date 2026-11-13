@@ -33,8 +33,9 @@ function unit(v: Vec3): Vec3 {
 export function isAetherheartShowcase(doc: EditorDocument): boolean {
   // Recognize renamed/saved copies while avoiding a misleading showcase card
   // for unrelated documents merely named "The Aetherheart".
-  return doc.groups?.some(g => g.id === "heart") === true &&
-    doc.groups.some(g => g.id === "gimbals") &&
+  const groups = doc.groups ?? [];
+  return groups.some(g => g.id === "heart") &&
+    groups.some(g => g.id === "gimbals") &&
     doc.textures.some(texture => texture.id === "aether");
 }
 
@@ -48,7 +49,8 @@ export function frameDocumentCamera(
 ): CameraFrame {
   const visible = doc.cuboids.filter(node => node.visible);
   if (visible.length === 0) return {
-    target: [0, 0.58, 0], position: directions[kind] as Vec3,
+    target: [0, 0.58, 0],
+    position: [directions[kind][0], 0.58 + directions[kind][1], directions[kind][2]],
     distance: Math.hypot(...directions[kind])
   };
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
