@@ -177,6 +177,12 @@ function AssetMesh(props: MeshProps) {
     const box = new THREE.BoxGeometry(...dimensions(node)); applyFaceUvs(box, node.faces); return box;
   }, [node.from, node.to, node.faces]);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  // One material renders the whole box in a single draw call when every face
+  // shares a sheet. The geometry still retains independently authored face UVs.
+  // This is particularly useful for detailed models with hundreds of pieces.
+  const firstFaceTexture = node.faces[BOX_FACE_ORDER[0]].textureId;
+  const sharedFaceTexture = node.material === "texture" &&
+    BOX_FACE_ORDER.every(direction => node.faces[direction].textureId === firstFaceTexture);
   const isSelected = props.selectedIds?.includes(node.id) ?? selectedId === node.id;
   const activeGizmo = !props.suppressGizmo && isSelected && mode === "model" && !node.locked &&
     (tool === "move" || tool === "resize") ? tool : null;
@@ -243,10 +249,14 @@ function AssetMesh(props: MeshProps) {
     }} onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={handleUp}
       onPointerCancel={() => props.onCancelPaint()}>
       <primitive object={geometry} attach="geometry" />
-      {BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial key={direction} attach={`material-${index}`}
-        color={node.color} map={node.material === "texture" ? props.textureMaps[node.faces[direction].textureId] ?? null : null}
-        transparent={node.material === "texture"} depthWrite={node.material !== "texture"}
-        roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0}/>)}
+      {node.material === "solid" || sharedFaceTexture ?
+        <meshStandardMaterial color={node.color}
+          map={sharedFaceTexture ? props.textureMaps[firstFaceTexture] ?? null : null}
+          transparent={node.material === "texture"} depthWrite={node.material !== "texture"}
+          roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0}/> :
+        BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial key={direction} attach={`material-${index}`}
+          color={node.color} map={props.textureMaps[node.faces[direction].textureId] ?? null}
+          transparent depthWrite={false} roughness={0.95} metalness={0}/>)}
       {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
     {selectedId === node.id && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
