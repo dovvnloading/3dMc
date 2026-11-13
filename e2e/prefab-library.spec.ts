@@ -48,6 +48,16 @@ test("furniture prefab is a real library item, grouped, textured, undoable and i
   else await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
   await page.screenshot({ path: "test-results/prefab-library-" + browserName + ".png" });
 
+  // The prefab is one real group: select and move all parts using existing
+  // batch tooling, then undo that movement without removing the cabinet.
+  await page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" }).click();
+  await expect(page.getByRole("heading", { name: added + " parts selected" })).toBeVisible();
+  await page.getByRole("button", { name: "Move selection +X" }).click();
+  const moved = await sourceJson(page);
+  expect(moved.cuboids[7]!.from[0]).toBe(first.cuboids[7]!.from[0] + 1);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
+  expect(await sourceJson(page)).toEqual(first);
+
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
   expect(await sourceJson(page)).toEqual(before);
   await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)", exact: true }).click();
@@ -68,7 +78,7 @@ test("furniture prefab is a real library item, grouped, textured, undoable and i
   expect(errors).toEqual([]);
 });
 
-test("cabinet prefab survives native archive save/reopen and exports actual Java model/PNG files", async ({ page }) => {
+test("cabinet prefab survives native archive save/reopen and exports actual Java model/PNG files", async ({ page, browserName }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await expect(page.locator(".boot-loader")).toHaveCount(0);
@@ -78,6 +88,9 @@ test("cabinet prefab survives native archive save/reopen and exports actual Java
   await dialog.getByRole("textbox", { name: "New project name" }).fill("Apothecary furniture project");
   await dialog.getByRole("button", { name: "Create project" }).click();
   await selectPrefab(page);
+  await page.getByRole("tab", { name: "Preview" }).click();
+  await page.screenshot({ path: "test-results/apothecary-cabinet-clean-" + browserName + ".png" });
+  await page.getByRole("tab", { name: "Model" }).click();
 
   const original = await sourceJson(page);
   expect(original.groups).toHaveLength(1);
