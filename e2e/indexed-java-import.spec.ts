@@ -94,7 +94,7 @@ test("Pack Studio imports an item-only Java ZIP after explicit resource review",
   await studio.locator('input[aria-label="Java pack ZIP file"]').setInputFiles(path);
   let confirm = studio.getByRole("group", { name: "Confirm source pack replacement" });
   await expect(confirm).toContainText("1 item(s)");
-  await expect(confirm).toContainText("item-only");
+  await expect(confirm).toContainText(/item-only/i);
   await expect(confirm).toContainText("minecraft:stick");
   await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(confirm).toHaveCount(0);
@@ -164,4 +164,27 @@ test("Cancel import terminates a stalled Java pack worker before any confirmatio
   await expect(activity).toHaveCount(0);
   await expect(name).toHaveValue(original);
   await expect(page.getByRole("dialog", { name: /Import editable|Pack cannot/ })).toHaveCount(0);
+});
+
+test("a changed Pack Studio workspace invalidates an older Java import preview", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pack Studio", exact: true }).click();
+  const studio = page.getByRole("dialog", { name: "Pack Studio" });
+  const download = page.waitForEvent("download");
+  await studio.getByRole("button", { name: "Export Java ZIP" }).click();
+  const path = await (await download).path();
+  if (!path) throw new Error("Java ZIP fixture is missing.");
+
+  await studio.locator('input[aria-label="Java pack ZIP file"]').setInputFiles(path);
+  const confirmation = studio.getByRole("group", { name: "Confirm source pack replacement" });
+  await expect(confirmation).toBeVisible();
+  const name = studio.getByRole("textbox", { name: "Pack name" });
+  await name.fill("Fresh edits after preflight");
+  await name.press("Enter");
+  await expect(name).toHaveValue("Fresh edits after preflight");
+
+  await confirmation.getByRole("button", { name: "Import verified Java pack" }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(name).toHaveValue("Fresh edits after preflight");
+  await expect(studio).toContainText("pack changed after import preflight");
 });

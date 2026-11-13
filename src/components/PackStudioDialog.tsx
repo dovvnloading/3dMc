@@ -75,6 +75,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const [modelQuery, setModelQuery] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const [pending, setPending] = useState<PackSession | null>(null);
+  const pendingSourceRef = useRef<PackSession | null>(null);
   const [pendingJavaDetails, setPendingJavaDetails] = useState<{
     paths: string[]; notices: string[];
   } | null>(null);
@@ -126,6 +127,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     setOpening(false);
     setOpenProgress(null);
     setPendingJavaDetails(null);
+    pendingSourceRef.current = null;
     setMessage("Import canceled. The current pack and models were not changed.");
   };
 
@@ -137,6 +139,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     const current = () => openAbortRef.current === controller && !controller.signal.aborted;
     setOpening(true);
     setPending(null);
+    pendingSourceRef.current = null;
     setPendingJavaDetails(null);
     setOpenProgress({ name: file.name, stage: "reading", loaded: 0, total: file.size });
     setMessage("");
@@ -159,6 +162,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         return;
       }
       if (kind === "pack" && result.kind === "pack") {
+        pendingSourceRef.current = captured;
         setPending(createPackSession(result.project.pack, result.project.sources));
         setMessage("Review the pack before replacing the current Pack Studio session.");
       } else if (kind === "single" && result.kind === "document") {
@@ -168,6 +172,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
           throw new Error(result.report.problems.join(" "));
         if (result.report.status !== "editable-pack")
           throw new Error("This ZIP does not contain a supported complete Java pack.");
+        pendingSourceRef.current = captured;
         setPending(createPackSession(result.report.project.pack, result.report.project.sources));
         setPendingJavaDetails({ paths: result.report.paths, notices: result.report.notices });
         setMessage("Review the Java ZIP resources before replacing the current Pack Studio session.");
@@ -197,11 +202,19 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
 
   const loadPending = async () => {
     if (!pending) return;
+    if (sessionRef.current !== pendingSourceRef.current) {
+      setPending(null);
+      pendingSourceRef.current = null;
+      setPendingJavaDetails(null);
+      setMessage("The pack changed after import preflight. Choose the file again; newer edits were preserved.");
+      return;
+    }
     if (onOpenPack && !(await onOpenPack(pending))) return;
     sessionRef.current = pending;
     if (!onOpenPack) setSession(pending);
     setLastSavedRevision(pending.revision);
     setPending(null);
+    pendingSourceRef.current = null;
     setMessage(pendingJavaDetails
       ? "Supported Java models, textures and item definitions are now editable. Save a .3dmc source copy."
       : "Source pack loaded. All models and textures were retained.");
@@ -399,7 +412,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         </div>
       </>}
       <button type="button" onClick={() => void loadPending()}>{pendingJavaDetails ? "Import verified Java pack" : "Load selected pack"}</button>
-      <button type="button" onClick={() => { setPending(null); setPendingJavaDetails(null); setMessage(""); }}>Cancel</button>
+      <button type="button" onClick={() => { setPending(null); pendingSourceRef.current = null; setPendingJavaDetails(null); setMessage(""); }}>Cancel</button>
     </div>}
 
     <div className="pack-studio-layout">
