@@ -8,6 +8,8 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
+**Prefab library (Furniture):** In the existing Scene **Add shape** menu, choose **Apothecary Cabinet** to insert a complete oak-and-brass furniture item with drawers, shelf, three potions, an open recipe book and a mortar. Each part is modeled, textured, editable and grouped as one insertable asset—not a new project template or UI showcase. [See the prefab source and usage notes](docs/delivery/PREFAB_APOTHECARY_CABINET.md).
+
 **Pack Studio (experimental):** One shared pack session now powers the live 3D Model/Paint editor and Pack Studio asset manager. Switch between models in the Scene panel, edit each model's geometry and textures, undo across pack operations, recover the whole pack locally, and save/reopen a multi-model `.3dmc` source archive. The initial Java 1.21.4 pack export remains limited to two compatible block replacements, and additional game validation is pending. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
 
 The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.
