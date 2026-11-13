@@ -8,7 +8,7 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
-**Featured showcase — The Aetherheart:** Choose **New → The Aetherheart** to open a fully editable celestial-relay block model with 236 sculpted parts, nine organized scene groups, ten pixel materials, layered rune and crystal paintings, and an orbitable Preview. [Explore the construction and compatibility notes](docs/delivery/AETHERHEART_SHOWCASE.md).
+**Example prefab — The Aetherheart:** In the existing **New Project** picker, choose **The Aetherheart** to load a complete, editable Minecraft block model. Its 236 cuboids, nine groups, ten painted texture assets, layered rune artwork, UVs, and material palette are real editor data, not a special showcase UI. [Prefab breakdown and export limitations](docs/delivery/AETHERHEART_SHOWCASE.md).
 
 **Pack Studio (experimental):** One shared pack session now powers the live 3D Model/Paint editor and Pack Studio asset manager. Switch between models in the Scene panel, edit each model's geometry and textures, undo across pack operations, recover the whole pack locally, and save/reopen a multi-model `.3dmc` source archive. The initial Java 1.21.4 pack export remains limited to two compatible block replacements, and additional game validation is pending. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
 
