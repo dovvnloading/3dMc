@@ -188,8 +188,8 @@ function parseModel(files: Map<string, Uint8Array>, record: ModelRecord,
           textureRecords[textureIndex]!.id } satisfies FaceUV;
     }
     const isSolid = references[0] === "#solid_" + i;
-    if (isSolid !== references.every(ref => ref === "#solid_" + i) &&
-        references.some(ref => ref === "#solid_" + i))
+    if (references.some(ref => ref === "#solid_" + i) &&
+        !references.every(ref => ref === "#solid_" + i))
       fail(path, "Mixed solid and painted face aliases cannot round-trip.");
     let color = "#ffffff";
     if (isSolid) {

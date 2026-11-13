@@ -65,7 +65,8 @@ function readView(bytes: Uint8Array): DataView {
 }
 
 function readName(bytes: Uint8Array, start: number, length: number, indexed: boolean): string {
-  if (length === 0 || length > 200 || start + length > bytes.length) reject("Invalid ZIP path length.");
+  if (length === 0 || length > (indexed ? 260 : 200) || start + length > bytes.length)
+    reject("Invalid ZIP path length.");
   const name = DECODER.decode(bytes.subarray(start, start + length));
   if (!(indexed ? isIndexedPathAllowed(name) : isLegacyPathAllowed(name))) {
     reject("Unsupported file in pack: " + name + ". This importer cannot preserve unrecognized resources.");

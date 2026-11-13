@@ -8,8 +8,6 @@ import { read3dMcStoredZip } from "./storedZip";
 
 export type PackImportReport =
   | { status: "editable"; document: EditorDocument; paths: string[]; notices: string[] }
-  | { status: "editable-pack"; project: import("../editor/nativePackArchive").NativePackProject;
-      paths: string[]; notices: string[] }
   | { status: "blocked"; problems: string[] };
 
 const DECODER = new TextDecoder("utf-8", { fatal: true });

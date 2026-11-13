@@ -66,7 +66,7 @@ import { ModalDialog } from "./components/ModalDialog";
 import { RecoveryDetailsDialog } from "./components/RecoveryDetailsDialog";
 import { recoveryStatusText } from "./editor/recoveryPresentation";
 import type { RecoveryAcknowledgement, RecoveryStatus, WriterStatus } from "./editor/recoveryPresentation";
-import type { PackImportReport } from "./import/javaPack";
+import type { JavaImportReport } from "./editor/importJobs";
 import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/javaBlock";
 import type { ExportIssue } from "./export/javaBlock";
 
@@ -205,7 +205,7 @@ export function App() {
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
   const [pendingPackOpen, setPendingPackOpen] = useState<NativePackProject | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false), [savingProject, setSavingProject] = useState(false);
-  const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
+  const [pendingPack, setPendingPack] = useState<JavaImportReport | null>(null);
   const [pendingTexture, setPendingTexture] = useState<DecodedTexture | null>(null);
   const [textureImportMode, setTextureImportMode] = useState<"replace" | "new">("replace");
   const [deletingTextureId, setDeletingTextureId] = useState<string | null>(null);

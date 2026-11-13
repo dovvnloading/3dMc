@@ -1,6 +1,11 @@
 import type { EditorDocument } from "./domain";
 import type { NativePackProject } from "./nativePackArchive";
 import type { PackImportReport } from "../import/javaPack";
+import type { NativePackProject } from "./nativePackArchive";
+
+/** Extends Java preflight without widening the original single-block contract. */
+export type JavaImportReport = PackImportReport |
+  { status: "editable-pack"; project: NativePackProject; paths: string[]; notices: string[] };
 
 /** Only validated, detached import previews cross the worker boundary. */
 export type ImportJobRequest =
@@ -13,7 +18,7 @@ export type ImportJobRequest =
 export type ImportJobResult =
   | { kind: "document"; document: EditorDocument }
   | { kind: "pack"; project: NativePackProject }
-  | { kind: "java"; report: PackImportReport };
+  | { kind: "java"; report: JavaImportReport };
 
 export type ImportJobReply =
   | { success: true; result: ImportJobResult }

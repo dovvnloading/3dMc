@@ -114,6 +114,24 @@ describe("strict indexed Java 1.21.4 pack import", () => {
     expect(JSON.stringify({ pack, sources })).toBe(before);
   });
 
+  it("preserves two model identities sharing one editable source and its texture resources", () => {
+    const source = createSampleDocument();
+    const pack = indexLegacyProject(source);
+    pack.models.push({
+      ...pack.models[0]!, id: "shared-source-second",
+      resource: { namespace: "my_studio", path: "block/linked_source" },
+      replaces: { namespace: "minecraft", path: "iron_block" }
+    });
+    const original = makeIndexedJava1214Pack(pack, [source]).zip;
+    const parsed = supported(original);
+    expect(parsed.project.pack.models).toHaveLength(2);
+    expect(parsed.project.sources).toHaveLength(1);
+    expect(parsed.project.pack.models[0]!.sourceDocumentId)
+      .toBe(parsed.project.pack.models[1]!.sourceDocumentId);
+    sameResources(original, makeIndexedJava1214Pack(
+      parsed.project.pack, parsed.project.sources).zip);
+  });
+
   it("round-trips a combined multi-model block and item pack with display transforms", () => {
     const { pack, sources } = fixture(true);
     const original = makeIndexedJava1214Pack(pack, sources).zip;
@@ -208,7 +226,7 @@ describe("strict indexed Java 1.21.4 pack import", () => {
     });
     const broken = new Uint8Array(original);
     const location = broken.indexOf(0x89);
-    if (location >= 0) broken[location] ^= 0x01;
+    if (location >= 0) broken[location] = broken[location]! ^ 0x01;
     for (const bytes of [unexpected, traversal, broken])
       expect(inspectIndexedJava1214Pack(bytes)).toMatchObject({ status: "blocked" });
   });
