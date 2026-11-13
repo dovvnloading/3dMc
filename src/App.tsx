@@ -32,6 +32,7 @@ import type { ImportProgressState } from "./components/ImportProgress";
 import { buildPackZipInWorker } from "./editor/packJobs";
 import type { NativePackProject } from "./editor/nativePackArchive";
 import { inspectIndexedJava1214Pack } from "./pack/exportPreflight";
+import { previewIndexedJava1214Paths } from "./pack/outputPreview";
 import { activePackDocument, createPackSession, redoPackSession, selectPackModel, undoPackSession } from "./pack/packSession";
 import type { PackSession } from "./pack/packSession";
 import { advancePackFromEditor, packHistoryView, upgradeEditorHistory } from "./pack/editorBridge";
@@ -148,6 +149,20 @@ export function App() {
   const exportIssues = useMemo(() => packSession
     ? inspectIndexedJava1214Pack(packSession.present.pack, packSession.present.sources)
     : inspectJava1214(doc), [doc, packSession]);
+  const exportFilePaths = useMemo(() => {
+    try {
+      if (packSession)
+        return previewIndexedJava1214Paths(packSession.present.pack, packSession.present.sources);
+      return [
+        JAVA_PACK_PATHS.metadata, JAVA_PACK_PATHS.blockstate, JAVA_PACK_PATHS.model,
+        JAVA_PACK_PATHS.mainTexture,
+        ...doc.textures.slice(1).map((_, index) =>
+          "assets/3dmc/textures/block/tex_" + (index + 1) + ".png"),
+        ...doc.cuboids.flatMap((node, index) => node.material === "solid"
+          ? ["assets/3dmc/textures/block/solid_" + index + ".png"] : [])
+      ];
+    } catch { return []; }
+  }, [doc, packSession]);
   const [selection, setSelection] = useState<Selection>(() => selectOnly("body"));
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   useEffect(() => setCollapsedGroups([]), [openSession, doc.id]);
@@ -1125,7 +1140,15 @@ export function App() {
       </> : <>replaces the visual model of <strong>minecraft:diamond_block</strong></>}. Gameplay, lighting, and collision do not change.</p>
       <label className="export-target-control" htmlFor="export-target"><span>Target profile</span><select id="export-target" className="select-control" value={doc.target.candidateRelease} disabled={!!packSession} onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
         <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option><option value="26.3">Java Edition 26.3 · Unsupported</option></select></label>
-      <div className="export-file-list" aria-label="Files in the export"><strong>Output files</strong><code>{JAVA_PACK_PATHS.metadata}</code><code>{JAVA_PACK_PATHS.blockstate}</code><code>{JAVA_PACK_PATHS.model}</code><code>{JAVA_PACK_PATHS.mainTexture}</code><span>Plus {doc.cuboids.filter(node => node.material === "solid").length} generated solid-color texture files.</span></div>
+      <div className="export-file-list" aria-label="Files in the export">
+        <strong>Output files · {exportFilePaths.length} planned resources</strong>
+        {exportFilePaths.slice(0, 12).map(path => <code key={path}>{path}</code>)}
+        {exportFilePaths.length > 12 && <details className="export-preview-files">
+          <summary>Show {exportFilePaths.length - 12} more resources</summary>
+          <div>{exportFilePaths.slice(12).map((path, index) => <code key={path + index}>{path}</code>)}</div>
+        </details>}
+        <span>Preview reflects the current source pack. Export validates the full resource graph before download; this is not a Minecraft in-game check.</span>
+      </div>
       <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture"><div><strong>Six-face orientation test</strong><p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces, upward arrows and asymmetric corner markers. It does not use or change your current project.</p></div><button className="text-button quiet" onClick={downloadDiagnosticPack}><Download size={15}/>Download six-face diagnostic ZIP</button></section>
       <ExportIssueList issues={exportIssues} onLocate={locateExportIssue}/>
       {lastExport && <p className="export-last">Last download started for revision {lastExport.revision} ({Math.round(lastExport.bytes / 1024)} KiB).{lastExport.revision !== history.revision ? " New changes have not been exported." : ""}</p>}

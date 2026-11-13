@@ -1049,3 +1049,7 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .import-resource-preview>div{display:grid;gap:6px;max-height:210px;overflow:auto;margin-top:10px}
 .import-resource-preview code{overflow-wrap:anywhere;font-size:10px;color:var(--secondary)}
 .import-resource-preview p{margin:0;font-size:11px;color:var(--muted)}
+
+.export-preview-files{padding:6px 0 0}
+.export-preview-files summary{color:var(--accent);font-size:11px;cursor:pointer}
+.export-preview-files>div{display:grid;gap:7px;max-height:210px;overflow:auto;padding:12px 8px 3px}
