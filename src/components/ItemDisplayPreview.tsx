@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { Component, useEffect, useMemo } from "react";
+import type { ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -74,15 +75,35 @@ function PreviewItem({ document, display }: {
   </>;
 }
 
+/**
+ * The secondary item viewer may exhaust WebGL contexts in some browsers.
+ * A preview failure must never unmount Pack Studio or discard editor state.
+ */
+class ItemPreviewFailureBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
+  componentDidCatch(error: Error): void {
+    console.warn("Item 3D preview unavailable; numeric item controls remain editable", error.message);
+  }
+  render() {
+    if (this.state.failed) return <div className="pack-item-preview-fallback" role="status">
+      3D item preview unavailable in this browser session. Item transforms remain editable and exportable.
+    </div>;
+    return this.props.children;
+  }
+}
+
 /** Approximate Java display transform viewer; no claims of game renderer parity. */
 export function ItemDisplayPreview({ document, display }: {
   document: EditorDocument; display: ItemDisplayTransform;
 }) {
   return <div className="pack-item-preview" role="group" aria-label="Item display preview">
+    <ItemPreviewFailureBoundary>
     <Canvas camera={{ position: [2.2, 1.7, 2.7], fov: 38, near: 0.02, far: 50 }}
       frameloop="demand" dpr={[1, 2]}
       fallback={<div className="pack-item-preview-fallback">3D preview unavailable; numeric item display controls remain editable.</div>}>
       <PreviewItem document={document} display={display}/>
     </Canvas>
+    </ItemPreviewFailureBoundary>
   </div>;
 }
