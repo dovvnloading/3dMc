@@ -84,20 +84,12 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
               setError(null);
             }}>
             <span className="template-card-art"><TemplateIcon id={item.id}/></span>
-            {item.id === "aetherheart" && <span className="template-featured-tag">✦ FEATURED MASTERPIECE · EXPLORE & EDIT</span>}
             <span className="template-card-heading">{item.title}</span>
             <span className="template-card-description">{item.detail}</span>
             <span className="template-card-meta">{item.elements} <span>·</span> {item.texture}</span>
             <span className="template-select-indicator" aria-hidden="true"/>
           </button>)}
         </div>
-        {template === "aetherheart" && <section className="template-showcase-guide" aria-label="Showcase contents">
-          <strong>What makes this scene different</strong>
-          <p>236 individually editable elements in 9 named assemblies, 10 hand-generated pixel materials,
-            layered crystal and rune artwork, per-face UVs and a curated color palette.
-            Opens in a clean, orbitable Preview; switch to Model or Paint to take it apart.</p>
-        </section>}
-
         <div className="new-project-settings">
           <div><strong>Texture resolution</strong>
             <span>{fixedResolution
