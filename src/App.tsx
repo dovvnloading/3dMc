@@ -11,7 +11,8 @@ import {
   addCuboid, createSampleDocument, renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease,
   setMaterialColor, setTexturePixels, toggleFlag
 } from "./editor/domain";
-import type { Cuboid, EditorDocument, EditorGroup, FaceDirection, Vec3 } from "./editor/domain";
+import type { Cuboid, EditorDocument, EditorGroup, FaceDirection, PixelTexture, Vec3 } from "./editor/domain";
+import { faceLabel } from "./editor/uv";
 import { commit, createHistory, redo, undo } from "./editor/history";
 import type { History } from "./editor/history";
 import { commitSelectionGesture, deleteSelection, duplicateSelection, repeatSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
@@ -135,6 +136,15 @@ function AxisRow({ title, selected, property, commitDocument }: {
 }
 function SectionHeading({ title, trailing }: { title: string; trailing?: ReactNode }) {
   return <div className="panel-section-heading"><h3>{title}</h3>{trailing}</div>;
+}
+function TextureSwatch({ asset }: { asset: PixelTexture }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const pixels = new ImageData(new Uint8ClampedArray(asset.pixels), asset.width, asset.height);
+    canvas.current?.getContext("2d")?.putImageData(pixels, 0, 0);
+  }, [asset.pixels, asset.width, asset.height]);
+  return <canvas ref={canvas} aria-hidden="true" className="texture-swatch"
+    style={{ imageRendering: "pixelated", background: "transparent" }} width={asset.width} height={asset.height}/>;
 }
 function getFilename(date: Date): string {
   return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -267,6 +277,14 @@ export function App() {
   const clearStroke = useCallback(() => {
     drag.current = null; setDraftPixels(null); setDraftTextureId(null); setCancelToken(current => current + 1);
   }, []);
+  const showTexture = (id: string) => {
+    clearStroke();
+    // Texture navigation is view state and does not create an undo step.
+    publishHistory(current => {
+      const next = selectTexture(current.present, id);
+      return next === current.present ? current : { ...current, present: next };
+    });
+  };
   const switchTool = (next: Tool) => { clearStroke(); setTool(next); };
   const selectNode = useCallback((id: string | null, modifiers: SelectionModifiers = {}) => {
     clearStroke();
@@ -299,12 +317,7 @@ export function App() {
     } else if (issue.textureId) {
       const textureId = issue.textureId;
       if (!textureById(source, textureId)) return;
-      clearStroke();
-      // Match asset-list selection: navigating is not a document edit or undo step.
-      publishHistory(current => {
-        const next = selectTexture(current.present, textureId);
-        return next === current.present ? current : { ...current, present: next };
-      });
+      showTexture(textureId);
       setMode("paint"); setTool("pencil");
     } else return;
 
@@ -852,13 +865,21 @@ export function App() {
     const id = crypto.randomUUID(); commitDocument(current => addPrimitive(current, id, primitive));
     setShapeMenuOpen(false); setSelectedId(id); setMode("model"); switchTool("select");
   };
+  const selectGroup = (group: EditorGroup) => {
+    clearStroke();
+    setSelection({ ids: group.memberIds, primary: group.memberIds.at(-1) ?? null,
+      anchor: group.memberIds[0] ?? null });
+  };
   const addLibraryItem = (prefabId: PrefabId) => {
     // Generate the instance ID before publishing history. All parts, texture
     // sheets and grouping are inserted by one undoable action.
     const id = crypto.randomUUID();
     if (!applyBatch(current => insertLibraryPrefab(current, prefabId, id))) return;
+    const group = historyRef.current.present.groups?.find(item => item.id === "prefab-" + id);
+    if (!group) return;
     setShapeMenuOpen(false); setSearch("");
-    setSelectedId(id + "-apc-part-001"); setMode("model"); switchTool("select");
+    setCollapsedGroups(current => [...current, group.id]);
+    selectGroup(group); setMode("model"); setTool("select");
   };
   const visibleTexture = textureById(doc, draftTextureId ?? doc.activeTextureId) ?? texture;
   const viewPixels = draftPixels ?? visibleTexture.pixels;
@@ -871,7 +892,7 @@ export function App() {
       node.name.toLowerCase().includes(query) || group.name.toLowerCase().includes(query));
     if (!displayed.length) continue;
     sceneEntries.push({ kind: "group", group });
-    if (!collapsedGroups.includes(group.id))
+    if (query || !collapsedGroups.includes(group.id))
       sceneEntries.push(...displayed.map(node => ({ kind: "part" as const, node })));
   }
   sceneEntries.push(...doc.cuboids.filter(node =>
@@ -958,9 +979,10 @@ export function App() {
           {sceneEntries.map(entry => {
             if (entry.kind === "group") {
               const group = entry.group;
-              const collapsed = collapsedGroups.includes(group.id);
+              const collapsed = !query && collapsedGroups.includes(group.id);
               return <div key={group.id} className="scene-group-row" role="presentation">
-                <button type="button" aria-expanded={!collapsed}
+                <button type="button" aria-expanded={!collapsed} disabled={!!query}
+                  title={query ? "Matching parts are expanded while filtering" : undefined}
                   aria-label={(collapsed ? "Expand group " : "Collapse group ") + group.name}
                   onClick={() => setCollapsedGroups(current => collapsed ?
                     current.filter(id => id !== group.id) : [...current, group.id])}>
@@ -970,10 +992,7 @@ export function App() {
                   className="scene-group-name" value={group.name}
                   onCommit={name => { applyBatch(current => renameGroup(current, group.id, name)); }}/>
                 <button type="button" aria-label={"Select group " + group.name}
-                  onClick={() => { clearStroke(); setSelection({
-                    ids: [...group.memberIds], primary: group.memberIds.at(-1) ?? null,
-                    anchor: group.memberIds[0] ?? null
-                  }); }}>Select</button>
+                  onClick={() => selectGroup(group)}>Select</button>
                 <button type="button" aria-label={"Ungroup " + group.name}
                   onClick={() => { applyBatch(current => ungroup(current, group.id)); }}>Ungroup</button>
               </div>;
@@ -1009,9 +1028,7 @@ export function App() {
         </div>
         <div className="scene-footer"><SectionHeading title="Assets" trailing={<span className="counter">{String(doc.textures.length).padStart(2, "0")}</span>}/>
           <div className="texture-slot-list" role="group" aria-label="Texture assets">{doc.textures.map(asset => <div key={asset.id} className={"texture-slot" + (doc.activeTextureId === asset.id ? " active" : "")}>
-            <button type="button" aria-label={"Select texture " + asset.name} aria-pressed={doc.activeTextureId === asset.id} className="texture-slot-select" onClick={() => {
-              clearStroke(); publishHistory(state => { const next = selectTexture(state.present, asset.id); return next === state.present ? state : { ...state, present: next }; });
-            }}><Paintbrush size={16}/><span><strong>{asset.name}</strong><small>{asset.width}×{asset.height} · {asset.id === "main" ? "Main" : asset.id.slice(-5)}</small></span></button>
+            <button type="button" aria-label={"Select texture " + asset.name} aria-pressed={doc.activeTextureId === asset.id} className="texture-slot-select" onClick={() => showTexture(asset.id)}><Paintbrush size={16}/><span><strong>{asset.name}</strong><small>{asset.width}×{asset.height} · {asset.id === "main" ? "Main" : asset.id.slice(-5)}</small></span></button>
             <button type="button" aria-label={"Delete texture " + asset.name} disabled={doc.textures.length <= 1} onClick={() => {
               setDeletingTextureId(asset.id); setDeleteReplacementId(doc.textures.find(t => t.id !== asset.id)?.id ?? null);
             }}><Trash2 size={14}/></button></div>)}</div>
@@ -1065,8 +1082,8 @@ export function App() {
           <div className="selection-heading"><div className="selection-glyph"><Box size={20}/></div><div><span>SELECTED ELEMENT</span><h2>{selected.name}</h2><p>Cuboid · {selected.material === "texture" ? "Textured surface" : "Solid material"}</p></div></div>
           <div className="inspector-scroll">
             {mode === "paint" && <FaceUVInspector selected={selected} face={selectedFace} setFace={direction => {
-              clearStroke(); setSelectedFace(direction);
-              publishHistory(state => { const next = selectTexture(state.present, selected.faces[direction].textureId); return next === state.present ? state : { ...state, present: next }; });
+              setSelectedFace(direction);
+              showTexture(selected.faces[direction].textureId);
             }} commitDocument={commitDocument} textures={doc.textures} textureWidth={faceAsset?.width ?? texture.width} textureHeight={faceAsset?.height ?? texture.height}
               copiedUV={uvClipboard}
               onCopyUV={() => setUVClipboard(copyFaceUV(selected.faces[selectedFace]))}
@@ -1081,8 +1098,11 @@ export function App() {
             <div className="inspector-group"><SectionHeading title="Appearance"/><div className="form-group"><div className="form-caption">Surface type</div>
               <div className="material-switch" role="group" aria-label="Element material"><button type="button" aria-pressed={selected.material === "solid"} disabled={selected.locked} onClick={() => commitDocument(current => setCuboidMaterial(current, selected.id, "solid"))}>Solid color</button>
                 <button type="button" aria-pressed={selected.material === "texture"} disabled={selected.locked} onClick={() => commitDocument(current => setCuboidMaterial(current, selected.id, "texture"))}>Painted</button></div></div>
-              {selected.material === "texture" ? <><div className="surface-summary"><div className="texture-swatch" style={{ background: "#d1a65d" }}/><div><strong>{texture.name}</strong><span>Shared texture · {texture.width} × {texture.height}</span></div></div>
-                <button className="inline-action" onClick={() => changeMode("paint")}><Paintbrush size={15}/>Edit texture <span>→</span></button></> : <><div className="form-caption">Material color</div>
+              {selected.material === "texture" && faceAsset ? <><div className="surface-summary"><TextureSwatch asset={faceAsset}/><div><strong>{faceAsset.name}</strong><span>{faceLabel(selectedFace)} face · {faceAsset.width} × {faceAsset.height}</span></div></div>
+                <button className="inline-action" onClick={() => {
+                  showTexture(faceAsset.id);
+                  changeMode("paint");
+                }}><Paintbrush size={15}/>Edit texture <span>→</span></button></> : <><div className="form-caption">Material color</div>
                 <div className="color-control"><input type="color" aria-label="Element color" value={selected.color} disabled={selected.locked} onChange={event => commitDocument(current => setMaterialColor(current, selected.id, event.target.value))}/><span>{selected.color.toUpperCase()}</span></div></>}
             </div>
             <div className="inspector-group"><SectionHeading title="Element actions"/><div className="element-actions">

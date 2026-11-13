@@ -1,5 +1,6 @@
-import { FACE_DIRECTIONS, copyFaces, parseDocument } from "../domain";
+import { FACE_DIRECTIONS, MAX_TEXTURE_SLOTS, copyFaces, parseDocument } from "../domain";
 import type { Cuboid, EditorDocument, PixelTexture, Vec3 } from "../domain";
+import { selectionBounds } from "../selection";
 import { APOTHECARY_ID, createApothecaryCabinet } from "./apothecaryCabinet";
 
 export type PrefabId = typeof APOTHECARY_ID;
@@ -21,10 +22,22 @@ export class PrefabInsertError extends Error {
   constructor(message: string) { super(message); this.name = "PrefabInsertError"; }
 }
 
-function samePixels(a: PixelTexture, b: PixelTexture): boolean {
-  return a.width === b.width && a.height === b.height &&
-    a.pixels.length === b.pixels.length &&
-    a.pixels.every((byte, i) => byte === b.pixels[i]);
+function samePixels(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
+}
+
+function matchesAuthoredSheet(existing: PixelTexture, authored: PixelTexture): boolean {
+  if (existing.width !== authored.width || existing.height !== authored.height ||
+      !samePixels(existing.pixels, authored.pixels)) return false;
+  // A flattened sheet or hidden paint can look identical today and behave
+  // differently on the next layer edit. The active layer is just a selection.
+  const first = existing.layers ?? [], second = authored.layers ?? [];
+  return first.length === second.length && first.every((layer, index) => {
+    const other = second[index]!;
+    return layer.id === other.id && layer.name === other.name &&
+      layer.visible === other.visible && layer.opacity === other.opacity &&
+      samePixels(layer.pixels, other.pixels);
+  });
 }
 
 /**
@@ -32,26 +45,25 @@ function samePixels(a: PixelTexture, b: PixelTexture): boolean {
  * This keeps the first insertion centered in an empty project and lets a
  * second copy sit beside it. It never overwrites existing cuboids.
  *
- * The Java experimental exporter supports -16..32 coordinates; favor those
- * three bays first. The editor permits additional bays for native projects.
+ * Nearest bays across the floor come first. The nine bays within Java's
+ * -16..32 bounds are all closer than any native-only bay.
  */
 function chooseOrigin(document: EditorDocument, parts: readonly Cuboid[]): Vec3 {
-  const minX = Math.min(...parts.map(node => node.from[0]));
-  const maxX = Math.max(...parts.map(node => node.to[0]));
-  const minY = Math.min(...parts.map(node => node.from[1]));
-  const maxY = Math.max(...parts.map(node => node.to[1]));
-  const minZ = Math.min(...parts.map(node => node.from[2]));
-  const maxZ = Math.max(...parts.map(node => node.to[2]));
-  const candidates = [0, 16, -16];
-  for (let step = 2; step <= 14; step++) candidates.push(step * 16, -step * 16);
-  for (const x of candidates) {
-    const fromX = x + minX, toX = x + maxX;
-    if (fromX < -256 || toX > 256) continue;
+  const { from, to } = selectionBounds(parts)!;
+  const offsets = [0];
+  for (let offset = 16; offset <= 256; offset += 16) offsets.push(offset, -offset);
+  const bays = offsets.flatMap(z => offsets.map(x => ({ x, z, distance: x * x + z * z })));
+  // Stable sorting keeps the original right / left preference on distance ties.
+  bays.sort((a, b) => a.distance - b.distance);
+  for (const { x, z } of bays) {
+    const fromX = x + from[0], toX = x + to[0];
+    const fromZ = z + from[2], toZ = z + to[2];
+    if (fromX < -256 || toX > 256 || fromZ < -256 || toZ > 256) continue;
     const overlaps = document.cuboids.some(node =>
       fromX < node.to[0] && toX > node.from[0] &&
-      minY < node.to[1] && maxY > node.from[1] &&
-      minZ < node.to[2] && maxZ > node.from[2]);
-    if (!overlaps) return [x, 0, 0];
+      from[1] < node.to[1] && to[1] > node.from[1] &&
+      fromZ < node.to[2] && toZ > node.from[2]);
+    if (!overlaps) return [x, 0, z];
   }
   throw new PrefabInsertError(
     "No clear placement bay is available for the cabinet. Move existing furniture or clear part of the scene."
@@ -72,7 +84,7 @@ function materialBindings(document: EditorDocument, requested: readonly PixelTex
   for (const material of requested) {
     const compatible = textures.find(texture =>
       (texture.id === material.id || texture.id.startsWith(material.id + "-copy-")) &&
-      samePixels(texture, material));
+      matchesAuthoredSheet(texture, material));
     if (compatible) { mapping.set(material.id, compatible.id); continue; }
 
     let id = material.id;
@@ -81,8 +93,8 @@ function materialBindings(document: EditorDocument, requested: readonly PixelTex
       while (textures.some(t => t.id === material.id + "-copy-" + suffix)) suffix++;
       id = material.id + "-copy-" + suffix;
     }
-    if (textures.length >= 16) throw new PrefabInsertError(
-      "The prefab needs additional painted materials, but the project already uses all 16 texture slots. No parts were inserted."
+    if (textures.length >= MAX_TEXTURE_SLOTS) throw new PrefabInsertError(
+      "The cabinet's materials would exceed the 16-texture limit. No parts were inserted."
     );
     textures.push({ ...material, id });
     mapping.set(material.id, id);
@@ -134,13 +146,16 @@ export function insertLibraryPrefab(
       faces
     };
   });
-  const count = (document.groups ?? []).filter(group =>
-    group.name.startsWith(asset.name + " · ")).length + 1;
+  const names = new Set(document.groups?.map(group => group.name));
+  let number = 1, name: string;
+  do {
+    name = asset.name + " · " + String(number++).padStart(2, "0");
+  } while (names.has(name));
   const next = {
     ...document,
     cuboids: [...document.cuboids, ...nodes],
     groups: [...(document.groups ?? []), {
-      id: groupId, name: asset.name + " · " + String(count).padStart(2, "0"),
+      id: groupId, name,
       memberIds: nodes.map(node => node.id)
     }],
     textures,

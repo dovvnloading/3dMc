@@ -122,7 +122,9 @@ jobs:
       - name: Install Firefox and WebKit engines
         run: npx playwright install --with-deps firefox webkit
       - name: Run non-Chromium creator smoke
-        run: npx playwright test --config playwright.matrix.config.ts
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a npx playwright test --config playwright.matrix.config.ts
       - name: Upload non-Chromium failure evidence
         if: always()
         uses: actions/upload-artifact@v4

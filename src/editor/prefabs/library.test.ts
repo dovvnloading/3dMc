@@ -4,6 +4,9 @@ import { PREFAB_LIBRARY, PrefabInsertError, insertLibraryPrefab } from "./librar
 import { createSampleDocument, parseDocument } from "../domain";
 import { makeNewProject } from "../templates";
 import { createHistory, commit, undo, redo } from "../history";
+import { flattenTextureLayers, setRasterLayerPixels } from "../layers";
+import { renameGroup } from "../groups";
+import { selectionBounds } from "../selection";
 import { encodeNativeProject, decodeNativeProject } from "../nativeArchive";
 import { inspectJava1214, makeJava1214Pack, buildJava1214Model } from "../../export/javaBlock";
 
@@ -58,6 +61,34 @@ describe("Apothecary Cabinet — authored furniture prefab", () => {
     }
     expect(fixture.textures.filter(texture => texture.layers)).toHaveLength(8);
     expect(fixture.parts.some(part => part.faces.up.textureId !== part.faces.south.textureId)).toBe(true);
+  });
+
+  it("maps individual ink drawings to the displayed face and leaves the narrow parchment edges blank", () => {
+    const fixture = source();
+    const sheet = fixture.textures.find(t => t.id === "apc-vellum")!;
+    const ink = sheet.layers!.find(layer => layer.id === "details")!;
+    const inkPattern = (uv: readonly number[]) => {
+      const [x0, y0, x1, y1] = uv.map(edge => Math.round(edge * sheet.width / 16)) as [number, number, number, number];
+      const rows: string[] = [];
+      for (let y = y0; y < y1; y++) {
+        let row = "";
+        for (let x = x0; x < x1; x++) row += ink.pixels[(y * sheet.width + x) * 4 + 3] ? "#" : ".";
+        rows.push(row);
+      }
+      return rows.join("\n");
+    };
+    const bottles = fixture.parts.filter(node => node.name.endsWith("handwritten paper seal"));
+    const pages = fixture.parts.filter(node => node.name.includes("open book") && node.name.endsWith("parchment"));
+    expect(bottles).toHaveLength(3);
+    expect(pages).toHaveLength(2);
+    const marks = [...bottles.map(node => node.faces.south), ...pages.map(node => node.faces.up)]
+      .map(face => inkPattern(face.uv));
+    expect(marks.every(pattern => pattern.includes("#"))).toBe(true);
+    expect(new Set(marks).size).toBe(5);
+    for (const node of [...bottles, ...pages]) {
+      expect(node.faces.east.textureId).toBe(sheet.id);
+      expect(inkPattern(node.faces.east.uv)).toMatch(/^\.+$/);
+    }
   });
 
   it("inserts once as an editor group; undo/redo is exactly one step", () => {
@@ -123,6 +154,52 @@ describe("Apothecary Cabinet — authored furniture prefab", () => {
     expect(() => insertLibraryPrefab(full, "apothecary-cabinet", "no-room"))
       .toThrow(PrefabInsertError);
     expect(full.cuboids).toHaveLength(0);
+  });
+
+  it("restores authored paint layers on new instances after flattening or painting beneath opaque detail", () => {
+    const first = insertLibraryPrefab(blank(), "apothecary-cabinet", "cab-a");
+    const [metal, potion] = first.textures.filter(t => t.layers).slice(0, 2);
+    const flattened = flattenTextureLayers(first, metal!.id);
+    const [ground, details] = potion!.layers!;
+    const covered = details!.pixels.findIndex((channel, index) => index % 4 === 3 && channel === 255) - 3;
+    expect(covered).toBeGreaterThanOrEqual(0);
+    const paint = [...ground!.pixels];
+    paint[covered] = 255 - paint[covered]!;
+    const edited = setRasterLayerPixels(flattened, potion!.id, ground!.id, paint);
+    expect(edited.textures.find(t => t.id === potion!.id)!.pixels).toEqual(potion!.pixels);
+
+    const second = insertLibraryPrefab(edited, "apothecary-cabinet", "cab-b");
+    const newIds = new Set(second.groups![1]!.memberIds);
+    const newer = second.cuboids.filter(part => newIds.has(part.id));
+    for (const original of [metal!, potion!]) {
+      const copyId = original.id + "-copy-2";
+      expect(second.textures.find(t => t.id === copyId)).toEqual({ ...original, id: copyId });
+      expect(second.textures.find(t => t.id === original.id)).toEqual(edited.textures.find(t => t.id === original.id));
+      expect(newer.some(part => Object.values(part.faces).some(face => face.textureId === copyId))).toBe(true);
+      expect(newer.some(part => Object.values(part.faces).some(face => face.textureId === original.id))).toBe(false);
+    }
+    const third = insertLibraryPrefab(second, "apothecary-cabinet", "cab-c");
+    expect(third.textures).toEqual(second.textures);
+  });
+
+  it("uses a free Java-exportable bay when all three X positions in the center row are occupied", () => {
+    const first = blank();
+    const blocker = { ...createSampleDocument().cuboids[0]!, from: [-16, 0, 0], to: [32, 16, 16] };
+    const project = parseDocument({ ...first, cuboids: [blocker] });
+    const inserted = insertLibraryPrefab(project, "apothecary-cabinet", "off-row");
+    const bounds = selectionBounds(inserted.cuboids.slice(1))!;
+    expect(bounds.from[2] >= 16 || bounds.to[2] <= 0).toBe(true);
+    expect(inspectJava1214(inserted).filter(issue => issue.severity === "error")).toEqual([]);
+  });
+
+  it("keeps group names unique after an earlier cabinet is renamed", () => {
+    const first = insertLibraryPrefab(blank(), "apothecary-cabinet", "cab-a");
+    const second = insertLibraryPrefab(first, "apothecary-cabinet", "cab-b");
+    const renamed = renameGroup(second, second.groups![0]!.id, "Workbench");
+    const third = insertLibraryPrefab(renamed, "apothecary-cabinet", "cab-c");
+    expect(third.groups!.map(group => group.name)).toEqual([
+      "Workbench", "Apothecary Cabinet · 02", "Apothecary Cabinet · 01"
+    ]);
   });
 
   it("can be appended to a busy starter scene with no content destruction", () => {

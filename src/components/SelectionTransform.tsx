@@ -3,9 +3,12 @@ import type { ReactNode } from "react";
 import { useThree } from "@react-three/fiber";
 import { TransformControls } from "@react-three/drei";
 import type { Group } from "three";
+import { Box3, Vector3 } from "three";
 import type { EditorDocument, Vec3 } from "../editor/domain";
 import { beginSelectionGesture, selectionBounds } from "../editor/selection";
 import type { SelectionGesture } from "../editor/selection";
+
+const unitBox = new Box3(new Vector3(-0.5, -0.5, -0.5), new Vector3(0.5, 0.5, 0.5));
 
 interface Props {
   document: EditorDocument;
@@ -13,6 +16,7 @@ interface Props {
   active: "move" | "resize" | null;
   snap: number;
   cancelToken: number;
+  outline: boolean;
   onCommit: (gesture: SelectionGesture, translation: Vec3, scale: Vec3) => void;
   children: (worldOrigin: Vec3) => ReactNode;
 }
@@ -70,7 +74,12 @@ export function SelectionTransform(props: Props) {
       delete gl.domElement.dataset.selectionPreview;
     };
   }, [gl]);
-  const content = <group ref={anchor} position={origin}>{props.children(origin)}</group>;
+  const content = <group ref={anchor} position={origin}>
+    {props.children(origin)}
+    {props.outline && <group scale={[bounds.size[0] / 16, bounds.size[1] / 16, bounds.size[2] / 16]}>
+      <box3Helper args={[unitBox, 0x80dbbf]} raycast={() => {}}/>
+    </group>}
+  </group>;
   if (!props.active) return content;
   return <TransformControls object={anchor} mode={props.active === "move" ? "translate" : "scale"}
     translationSnap={props.snap / 16} scaleSnap={0.125} size={0.85}
