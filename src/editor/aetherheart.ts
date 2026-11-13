@@ -244,8 +244,6 @@ export function createAetherheartDocument(): EditorDocument {
         [x - 0.34, 17.13, z - 0.34], [x + 0.34, 18.35, z + 0.34], "brass");
       add(label + " · opal finial",
         [x - 0.53, 18.35, z - 0.53], [x + 0.53, 19.15, z + 0.53], "ivory");
-      add(label + " · left rivet",
-        [x - 0.97, 8.1, z - 0.17], [x - 0.72, 8.52, z + 0.17], "gold");
       add(label + " · right rivet",
         [x + 0.72, 8.1, z - 0.17], [x + 0.97, 8.52, z + 0.17], "gold");
     }
