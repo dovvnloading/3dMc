@@ -21,8 +21,6 @@ export const PROJECT_TEMPLATES: Array<{
   image: string;
   texture: string;
 }> = [
-  { id: "aetherheart", title: "The Aetherheart", detail: "A complete celestial relay: a floating crystal, three gyroscopes, carved pylons and original pixel art.",
-    elements: "236 editable parts", image: "✶", texture: "10 painted materials · 32/64 px" },
   { id: "blank", title: "Empty canvas", detail: "An open scene for your own shapes and ideas.",
     elements: "0 elements", image: "◻", texture: "Choose 16–64 px" },
   { id: "cube", title: "Textured block", detail: "One full-block cuboid with an editable pixel surface.",
@@ -30,7 +28,9 @@ export const PROJECT_TEMPLATES: Array<{
   { id: "lantern", title: "Copper Lantern", detail: "Seven assembled parts and a painted reference texture.",
     elements: "7 elements", image: "✦", texture: "32 × 32 px" },
   { id: "diagnostic", title: "UV laboratory", detail: "Six labeled faces for learning UV orientation.",
-    elements: "1 element", image: "⌗", texture: "64 × 64 px" }
+    elements: "1 element", image: "⌗", texture: "64 × 64 px" },
+  { id: "aetherheart", title: "The Aetherheart", detail: "A complete celestial relay: a floating crystal, three gyroscopes, carved pylons and original pixel art.",
+    elements: "236 editable parts", image: "✶", texture: "10 painted materials · 32/64 px" },
 ];
 
 function starterPixels(resolution: TextureResolution): number[] {
