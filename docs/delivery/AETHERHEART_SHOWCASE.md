@@ -7,13 +7,16 @@ a functioning light source, or a claim of in-game visual parity.
 ## Open it
 
 1. Open 3dMc Studio and choose **New**.
-2. Select **The Aetherheart** (the featured template at the top).
-3. Create the project. It opens in **Preview**, with a clear orbitable silhouette.
-4. Switch to **Model** to select, move, reshape, duplicate or hide any part.
-5. Switch to **Paint** to edit any of the ten pixel materials. The Aetherheart,
-   Celestial chart and Astral inscriptions materials include editable raster layers.
-6. Use **Save project** to download the complete native `.3dmc` source, or
-   **Minecraft export** to generate an **experimental Java 1.21.4 diamond-block
+2. Select **The Aetherheart** from the normal project template list.
+3. Create the project. It opens in the **existing Model workspace** with the
+   first element selected, just like every other project.
+4. Use the existing Scene hierarchy and numeric inspector to select, move,
+   reshape, duplicate, group or hide any of its parts. Switch to **Preview**
+   for an unobstructed view or to **Paint** to edit the pixel-art materials.
+   The Aetherheart, Celestial chart and Astral inscriptions have editable
+   raster layers.
+5. Use **Save project** to download the complete native `.3dmc` source, or
+   **Minecraft export** for an **experimental Java 1.21.4 diamond-block
    visual replacement**.
 
 Starting this template replaces the current workspace. Download the current project
@@ -58,16 +61,6 @@ base pigments and editable transparent detail layers. Their flattened
 output is opaque, so the experimental Java pack export does not run into
 the current alpha restriction.
 
-## First-open gallery
-
-The initial Preview now uses model-aware framing and a slightly off-diagonal
-camera angle to reveal the crystal between its corner supports. The inspector
-offers working shortcuts to inspect the core, explore the gyroscopes and paint
-the star chart. Extra warm and cyan lights are purely **viewport atmosphere**
-and do not export as game lighting. For a detailed before/after audit and
-repeatable verification checklist, read the
-[visual and functional QA review](AETHERHEART_QA_REVIEW.md).
-
 ## Fidelity and performance
 
 - The scene uses **real native cuboids**, not a static screenshot or a GLTF
@@ -91,8 +84,6 @@ repeatable verification checklist, read the
 integrity, strict source validation, opaque/layered texture consistency,
 Java model preflight/build and native `.3dmc` save/open parity.
 
-`e2e/aetherheart.spec.ts` covers the featured New Project flow, Preview/Model/
-Paint switch, the full scene hierarchy and portable source download.
+`e2e/aetherheart.spec.ts` covers loading the prefab through the ordinary New Project flow, numeric editing and undo, Model/Paint/Preview modes, native project save/reopen, and a Java ZIP export.
 
-The legacy seven-part Copper Lantern remains the startup document so
-existing local recovery, onboarding and editor browser tests remain unchanged.
+The seven-part Copper Lantern remains the startup document, and the app's original layout, inspector, canvas controls, and camera behavior are unchanged. The new prefab is simply another native project source.
