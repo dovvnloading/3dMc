@@ -326,7 +326,7 @@ export function createAetherheartDocument(): EditorDocument {
     // pair was entirely buried inside the solid central tier.
     add("Crosswind filament X", [5.55, 11.73, 4.94], [10.45, 12.04, 5.15], "ivory");
     add("Crosswind filament Z", [10.85, 11.73, 5.55], [11.06, 12.04, 10.45], "ivory");
-    for (const [direction, a, b] of [
+    for (const [seamIndex, [direction, a, b]] of ([
       ["north", [6.25, 10.46, 4.96], [6.48, 13.25, 5.12]],
       ["north", [9.52, 10.46, 4.96], [9.75, 13.25, 5.12]],
       ["south", [6.25, 10.46, 10.88], [6.48, 13.25, 11.04]],
@@ -335,8 +335,8 @@ export function createAetherheartDocument(): EditorDocument {
       ["west", [4.96, 10.46, 9.52], [5.12, 13.25, 9.75]],
       ["east", [10.88, 10.46, 6.25], [11.04, 13.25, 6.48]],
       ["east", [10.88, 10.46, 9.52], [11.04, 13.25, 9.75]]
-    ] as const) {
-      add("Prismatic light seam · " + direction, a, b, "ivory");
+    ] as const).entries()) {
+      add("Prismatic light seam · " + direction + " " + (seamIndex % 2 ? "right" : "left"), a, b, "ivory");
     }
     add("Suspension bead above", [7.58, 16.4, 7.58], [8.42, 16.95, 8.42], "gold");
     add("Suspension bead below", [7.58, 6.6, 7.58], [8.42, 7.25, 8.42], "gold");
