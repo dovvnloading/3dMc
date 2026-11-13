@@ -36,7 +36,7 @@ the insertion is rejected without any partial changes.
 |---|---|
 | Frame | Four turned feet, enclosed walnut base, oak corner joinery, butcher-block countertop and brass inlay |
 | Drawers | Four distinct recessed drawer fronts, edge chamfers, handwritten label plates, iron sockets and brass pulls |
-| Hutch | Panelled walnut back, substantial side cheeks, turned uprights, visible pilasters, display shelf and decorated cornice |
+| Hutch | Panelled walnut back, open lattice sides, turned uprights, visible pilasters, display shelf and four-piece crown frame |
 | Apothecary stock | Three individually modeled square glass potions (green, blue and red), each with a glass foot, colored body, neck, collar, cork, label and glint |
 | Worktop | Open handwritten leather-bound recipe book, two ceramic ingredient jars and a hollow-looking porcelain mortar with visible crushed herbs and pestle |
 
@@ -46,7 +46,11 @@ ceramic, colored glass tonics, handwritten vellum and burgundy leather.
 Several contain two editable raster layers for the base pigments and detailed
 pixel painting. They use fully opaque output to satisfy the current exporter.
 
-The prefab uses only canonical editable cuboids and UV bindings. All visible
+The prefab uses only canonical editable cuboids and UV bindings. The
+renderer correctly depth-writes its fully opaque painted materials and draws
+single-sheet boxes with one material, so near woodwork doesn't show distant
+bottles through solid faces. Existing genuine transparent paint still uses
+the alpha blending path. All visible
 items are part of the model source; **no added UI overlays or renderer-only
 objects** are used. It is recognizable as freestanding furniture from the
 front, side and top, rather than an abstract arrangement of shapes.
