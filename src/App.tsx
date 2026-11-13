@@ -26,9 +26,9 @@ import { CreatorTools } from "./components/CreatorTools";
 import "./components/selection.css";
 import { decodeProject, MAX_PROJECT_BYTES } from "./editor/project";
 import { decodeNativeProject, MAX_NATIVE_BYTES, nativeFilename } from "./editor/nativeArchive";
-import { decodeNativePack, encodeNativePack, MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
+import { decodeNativePack, MAX_NATIVE_PACK_BYTES } from "./editor/nativePackArchive";
+import { buildPackZipInWorker } from "./editor/packJobs";
 import type { NativePackProject } from "./editor/nativePackArchive";
-import { makeIndexedJava1214Pack } from "./pack/javaPackBuilder";
 import { inspectIndexedJava1214Pack } from "./pack/exportPreflight";
 import { activePackDocument, createPackSession, redoPackSession, selectPackModel, undoPackSession } from "./pack/packSession";
 import type { PackSession } from "./pack/packSession";
@@ -201,6 +201,12 @@ export function App() {
   const sceneListRef = useRef<HTMLDivElement>(null);
   const activeRevision = useRef(history.revision); activeRevision.current = history.revision;
   const fileIntent = useRef(0), openingProject = useRef(false);
+  const saveAbortRef = useRef<AbortController | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    saveAbortRef.current?.abort();
+    exportAbortRef.current?.abort();
+  }, []);
   const textureSource = useRef<{ document: EditorDocument; mode: "replace" | "new" } | null>(null);
 
   // PackSession is authoritative in pack mode. The legacy History is only an
@@ -528,43 +534,62 @@ export function App() {
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare the JSON backup."); }
   };
   const saveProject = async () => {
-    if (savingProject) return; setSavingProject(true);
+    if (savingProject || saveAbortRef.current) return;
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+    setSavingProject(true);
     try {
       const pack = packRef.current;
       if (pack) {
-        const bytes = await encodeNativePack(pack.present.pack, pack.present.sources);
+        const bytes = await buildPackZipInWorker("native", pack.present.pack, pack.present.sources, controller.signal);
+        if (controller.signal.aborted) return;
         startBrowserDownload({ filename: nativeFilename(pack.present.pack.name),
           mimeType: "application/zip", content: bytes });
         setNotice("Complete pack-aware .3dmc backup download started. All models and textures are included.");
       } else {
         startBrowserDownload(await prepareNativeProjectDownload(doc));
+        if (controller.signal.aborted) return;
         setNotice("Native .3dmc project download started. Keep the archive as your portable backup.");
       }
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not prepare your native project archive."); }
-    finally { setSavingProject(false); }
+    } catch (error) {
+      if (!controller.signal.aborted) setNotice(error instanceof Error ? error.message : "Could not prepare your native project archive.");
+    } finally {
+      if (saveAbortRef.current === controller) saveAbortRef.current = null;
+      setSavingProject(false);
+    }
   };
   saveProjectRef.current = saveProject;
-  const downloadJavaPack = () => {
-    if (exportStatus === "building") return;
-    setExportStatus("building"); const capturedRevision = history.revision;
+  const downloadJavaPack = async () => {
+    if (exportAbortRef.current) return;
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+    setExportStatus("building");
+    const capturedRevision = historyRef.current.revision;
     try {
       const pack = packRef.current;
       if (pack) {
-        const result = makeIndexedJava1214Pack(pack.present.pack, pack.present.sources);
+        const bytes = await buildPackZipInWorker("java", pack.present.pack, pack.present.sources, controller.signal);
+        if (controller.signal.aborted) return;
         startBrowserDownload({ filename: "3dmc-multi-model-java-1.21.4-experimental.zip",
-          mimeType: "application/zip", content: result.zip });
-        setLastExport({ revision: capturedRevision, bytes: result.zip.length });
+          mimeType: "application/zip", content: bytes });
+        setLastExport({ revision: capturedRevision, bytes: bytes.length });
       } else {
         const prepared = prepareJavaPackDownload(doc);
+        if (controller.signal.aborted) return;
         startBrowserDownload(prepared.file);
         setLastExport({ revision: capturedRevision, bytes: prepared.bytes });
       }
       setExportStatus("started");
       setNotice("Experimental Java pack download started. This artifact still requires an in-game check.");
     } catch (error) {
-      setExportStatus("idle");
-      setNotice(error instanceof JavaExportBlocked ? error.issues.filter(issue => issue.severity === "error").map(issue => issue.message).join(" ") :
-        error instanceof Error ? error.message : "Could not prepare the resource pack.");
+      if (!controller.signal.aborted) {
+        setExportStatus("idle");
+        setNotice(error instanceof JavaExportBlocked ? error.issues.filter(issue => issue.severity === "error").map(issue => issue.message).join(" ") :
+          error instanceof Error ? error.message : "Could not prepare the resource pack.");
+      }
+    } finally {
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
+      if (controller.signal.aborted) setExportStatus("idle");
     }
   };
   const downloadDiagnosticPack = () => {
@@ -1032,7 +1057,7 @@ export function App() {
     {packStudioOpen && <PackStudioDialog source={doc} session={packSession ?? undefined}
       onChange={changePackStudioSession} onOpenPack={acceptPackOpen}
       onClose={() => setPackStudioOpen(false)}/>}
-    {exportOpen && <ModalDialog className="modal export-modal" labelledBy="pack-export-title" onCancel={() => setExportOpen(false)}>
+    {exportOpen && <ModalDialog className="modal export-modal" labelledBy="pack-export-title" onCancel={() => { exportAbortRef.current?.abort(); setExportOpen(false); }}>
       <div className="export-heading"><div className="modal-icon"><Download size={22}/></div><div><span className="export-kicker">JAVA EDITION · RESOURCE PACK</span><h2 id="pack-export-title">Experimental resource pack</h2></div></div>
       <p>Build a Java Edition <strong>1.21.4</strong> resource pack (format <strong>46</strong>) that {packSession ? <>
         contains <strong>{packSession.present.pack.models.length} model assets</strong> and replaces {packSession.present.pack.models.map(model => model.replaces.namespace + ":" + model.replaces.path).join(", ")}
@@ -1043,7 +1068,7 @@ export function App() {
       <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture"><div><strong>Six-face orientation test</strong><p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces, upward arrows and asymmetric corner markers. It does not use or change your current project.</p></div><button className="text-button quiet" onClick={downloadDiagnosticPack}><Download size={15}/>Download six-face diagnostic ZIP</button></section>
       <ExportIssueList issues={exportIssues} onLocate={locateExportIssue}/>
       {lastExport && <p className="export-last">Last download started for revision {lastExport.revision} ({Math.round(lastExport.bytes / 1024)} KiB).{lastExport.revision !== history.revision ? " New changes have not been exported." : ""}</p>}
-      <div className="modal-actions"><button className="text-button quiet" data-dialog-initial-focus onClick={() => setExportOpen(false)}>Close</button><button className="text-button primary" onClick={downloadJavaPack} disabled={exportStatus === "building" || exportIssues.some(issue => issue.severity === "error")}><Download size={15}/>{exportStatus === "building" ? "Building…" : "Download experimental ZIP"}</button></div>
+      <div className="modal-actions"><button className="text-button quiet" data-dialog-initial-focus onClick={() => { exportAbortRef.current?.abort(); setExportOpen(false); }}>{exportStatus === "building" ? "Cancel build" : "Close"}</button><button className="text-button primary" onClick={() => void downloadJavaPack()} disabled={exportStatus === "building" || exportIssues.some(issue => issue.severity === "error")}><Download size={15}/>{exportStatus === "building" ? "Building…" : "Download experimental ZIP"}</button></div>
     </ModalDialog>}
     {deletingTextureId && <ModalDialog className="modal import-modal" labelledBy="delete-texture-heading" onCancel={() => { setDeletingTextureId(null); setDeleteReplacementId(null); }}><h2 id="delete-texture-heading">Delete texture asset?</h2>
       <p>This will remove <strong>{textureById(doc, deletingTextureId)?.name}</strong>. Its {affectedFaces(doc, deletingTextureId).length} assigned faces must be remapped to an existing texture. The operation is one undoable change.</p>
