@@ -5,6 +5,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   retries: 0,
+  // Headless WebGL contexts are scarce in Actions. Serialize Firefox/WebKit
+  // tests to prevent independent editor instances exhausting GPU resources.
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",

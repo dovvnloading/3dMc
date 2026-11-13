@@ -103,8 +103,13 @@ describe("strict indexed Java 1.21.4 pack import", () => {
     expect(report.project.pack.models[1]!.resource)
       .toEqual({ namespace: "my_studio", path: "block/custom_lantern" });
     expect(report.project.sources[1]!.textures[1]!.pixels[0]).toBe(19);
-    expect(report.project.sources[1]!.cuboids[0]!.faces.north)
-      .toEqual(sources[1]!.cuboids[0]!.faces.north);
+    // Java ZIP preserves face UVs and texture pixels, not native texture IDs.
+    const importedFace = report.project.sources[1]!.cuboids[0]!.faces.north;
+    const originalFace = sources[1]!.cuboids[0]!.faces.north;
+    expect({ uv: importedFace.uv, rotation: importedFace.rotation })
+      .toEqual({ uv: originalFace.uv, rotation: originalFace.rotation });
+    expect(report.project.sources[1]!.textures.find(t => t.id === importedFace.textureId)?.pixels)
+      .toEqual(sources[1]!.textures.find(t => t.id === originalFace.textureId)?.pixels);
     expect(report.notices.join(" ")).toMatch(/names.*layers|layers.*names/i);
 
     sameResources(original, makeIndexedJava1214Pack(
@@ -151,7 +156,7 @@ describe("strict indexed Java 1.21.4 pack import", () => {
     const itemOnly = parsePackDocument({ ...pack,
       exportBlockVisuals: false,
       items: [{
-        ...pack.items![0]!, sourceModelId: pack.models[0]!.id,
+        ...pack.items![0]!, id: "item-other", sourceModelId: pack.models[0]!.id,
         resource: { namespace: "custom", path: "item/source_sword" },
         replaces: { namespace: "minecraft", path: "diamond_sword" }
       } satisfies PackItemAsset, pack.items![0]!] });

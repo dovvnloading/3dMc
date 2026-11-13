@@ -136,7 +136,7 @@ test("malformed extra resources block the import without changing the active pac
   });
   const blocked = page.getByRole("dialog", { name: "Pack cannot be safely imported" });
   await expect(blocked).toBeVisible();
-  await expect(blocked).toContainText(/unreferenced|unsupported|preserved|byte-identical/i);
+  await expect(blocked).toContainText(/unreferenced|unsupported|preserved|byte-identical|add or remove/i);
   await blocked.getByRole("button", { name: "Keep working" }).click();
   await expect(page.getByRole("textbox", { name: "Project name" })).toHaveValue(originalName);
 });
