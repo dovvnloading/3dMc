@@ -8,8 +8,6 @@ An open-source, browser-based studio for creating and modifying Minecraft assets
 
 **GitHub Pages:** [Open 3dMc Studio](https://dovvnloading.github.io/3dMc/).
 
-**Featured showcase — The Aetherheart:** Choose **New → The Aetherheart** to open a fully editable celestial-relay block model with 236 sculpted parts, nine organized scene groups, ten pixel materials, layered rune and crystal paintings, and an orbitable Preview. [Explore the construction and compatibility notes](docs/delivery/AETHERHEART_SHOWCASE.md).
-
 **Pack Studio (experimental):** One shared pack session now powers the live 3D Model/Paint editor and Pack Studio asset manager. Switch between models in the Scene panel, edit each model's geometry and textures, undo across pack operations, recover the whole pack locally, and save/reopen a multi-model `.3dmc` source archive. The initial Java 1.21.4 pack export remains limited to two compatible block replacements, and additional game validation is pending. See [native pack v3 and Pack Studio boundaries](docs/architecture/NATIVE_PACK_V3.md).
 
 The public site must publish Vite's compiled `dist/` files, **not** the raw repository `index.html` and TypeScript sources. The [Pages deployment guide](docs/delivery/PAGES_DEPLOYMENT.md) explains the automated release workflow and one-time Pages **Source: GitHub Actions** setting. Local development is still `npm ci && npm run dev`; GitHub Pages uses `npm run build -- --mode github-pages`.

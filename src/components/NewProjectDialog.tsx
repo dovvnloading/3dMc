@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Box, FilePlus2, FlaskConical, Layers3, Orbit, Save, Sparkles, X } from "lucide-react";
+import { Box, FilePlus2, FlaskConical, Layers3, Save, Sparkles, X } from "lucide-react";
 import type { ProjectTemplate, NewProjectOptions, TextureResolution } from "../editor/templates";
 import { PROJECT_TEMPLATES } from "../editor/templates";
-import { AETHERHEART_NAME } from "../editor/aetherheart";
 import { ModalDialog } from "./ModalDialog";
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 const PRESETS: readonly TextureResolution[] = [16, 32, 64];
 
 function TemplateIcon({ id }: { id: ProjectTemplate }) {
-  if (id === "aetherheart") return <Orbit size={30} strokeWidth={1.7}/>;
   if (id === "blank") return <FilePlus2 size={27} strokeWidth={1.6}/>;
   if (id === "cube") return <Box size={28} strokeWidth={1.6}/>;
   if (id === "lantern") return <Sparkles size={27} strokeWidth={1.6}/>;
@@ -28,9 +26,8 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fixedResolution = template === "aetherheart" || template === "lantern" || template === "diagnostic";
-  const actualResolution = template === "aetherheart" || template === "diagnostic" ? 64 :
-    template === "lantern" ? 32 : resolution;
+  const actualResolution = template === "lantern" ? 32 :
+    template === "diagnostic" ? 64 : resolution;
   const create = async () => {
     if (creating || !name.trim()) return;
     setCreating(true);
@@ -77,37 +74,25 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
             className={"template-card template-" + item.id +
               (template === item.id ? " chosen" : "")}
             aria-pressed={template === item.id}
-            onClick={() => {
-              setTemplate(item.id);
-              if (name === "Untitled Project" || name === AETHERHEART_NAME)
-                setName(item.id === "aetherheart" ? AETHERHEART_NAME : "Untitled Project");
-              setError(null);
-            }}>
+            onClick={() => { setTemplate(item.id); setError(null); }}>
             <span className="template-card-art"><TemplateIcon id={item.id}/></span>
-            {item.id === "aetherheart" && <span className="template-featured-tag">✦ FEATURED MASTERPIECE · EXPLORE & EDIT</span>}
             <span className="template-card-heading">{item.title}</span>
             <span className="template-card-description">{item.detail}</span>
             <span className="template-card-meta">{item.elements} <span>·</span> {item.texture}</span>
             <span className="template-select-indicator" aria-hidden="true"/>
           </button>)}
         </div>
-        {template === "aetherheart" && <section className="template-showcase-guide" aria-label="Showcase contents">
-          <strong>What makes this scene different</strong>
-          <p>236 individually editable elements in 9 named assemblies, 10 hand-generated pixel materials,
-            layered crystal and rune artwork, per-face UVs and a curated color palette.
-            Opens in a clean, orbitable Preview; switch to Model or Paint to take it apart.</p>
-        </section>}
 
         <div className="new-project-settings">
           <div><strong>Texture resolution</strong>
-            <span>{fixedResolution
-              ? "This authored template uses its original texture resolutions."
+            <span>{template === "lantern" || template === "diagnostic"
+              ? "This reference template uses a fixed texture."
               : "Choose a square pixel canvas to begin with."}</span></div>
           <div className="new-project-resolution" role="group" aria-label="Texture resolution">
             {PRESETS.map((size) => <button key={size}
               type="button" aria-label={size + " pixel texture"}
               aria-pressed={actualResolution === size}
-              disabled={creating || fixedResolution}
+              disabled={creating || template === "lantern" || template === "diagnostic"}
               onClick={() => setResolution(size)}>{size}</button>)}
           </div>
         </div>

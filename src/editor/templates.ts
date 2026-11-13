@@ -1,9 +1,8 @@
 import { createDefaultFaces, createSampleDocument, parseDocument } from "./domain";
 import type { EditorDocument, Cuboid } from "./domain";
 import { makeSixFaceDiagnosticDocument } from "../compatibility/diagnostic";
-import { createAetherheartDocument } from "./aetherheart";
 
-export type ProjectTemplate = "aetherheart" | "blank" | "cube" | "lantern" | "diagnostic";
+export type ProjectTemplate = "blank" | "cube" | "lantern" | "diagnostic";
 export type TextureResolution = 16 | 32 | 64;
 
 export interface NewProjectOptions {
@@ -21,8 +20,6 @@ export const PROJECT_TEMPLATES: Array<{
   image: string;
   texture: string;
 }> = [
-  { id: "aetherheart", title: "The Aetherheart", detail: "A complete celestial relay: a floating crystal, three gyroscopes, carved pylons and original pixel art.",
-    elements: "236 editable parts", image: "✶", texture: "10 painted materials · 32/64 px" },
   { id: "blank", title: "Empty canvas", detail: "An open scene for your own shapes and ideas.",
     elements: "0 elements", image: "◻", texture: "Choose 16–64 px" },
   { id: "cube", title: "Textured block", detail: "One full-block cuboid with an editable pixel surface.",
@@ -55,9 +52,9 @@ export function makeNewProject(options: NewProjectOptions): EditorDocument {
   const id = options.id || crypto.randomUUID();
   if (!id || id.length > 100) throw new Error("Invalid project ID.");
 
-  if (options.template === "aetherheart" || options.template === "lantern" || options.template === "diagnostic") {
-    const source = options.template === "aetherheart" ? createAetherheartDocument() :
-      options.template === "lantern" ? createSampleDocument() : makeSixFaceDiagnosticDocument();
+  if (options.template === "lantern" || options.template === "diagnostic") {
+    const source = options.template === "lantern"
+      ? createSampleDocument() : makeSixFaceDiagnosticDocument();
     return parseDocument({ ...source, id, name });
   }
   if (options.template !== "blank" && options.template !== "cube")
