@@ -68,3 +68,25 @@ test("cabinet renders from four camera presets with visible potion colors", asyn
     }
   }
 });
+
+test("selecting the whole cabinet costs one outline draw", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.goto("/?benchmark");
+  await page.getByRole("button", { name: "Add primitive" }).click();
+  await page.getByRole("menuitem", { name: /Apothecary Cabinet/ }).click();
+  await expect(page.getByRole("heading", { name: /parts selected/ })).toBeVisible();
+  const drawCalls = () => page.evaluate(() => {
+    const gpu = (window as Window & {
+      __3dmcDiagnostics?: { snapshot(): { drawCalls: number; triangles: number } };
+    }).__3dmcDiagnostics?.snapshot();
+    return gpu && gpu.triangles >= 1000 ? gpu.drawCalls : 0;
+  });
+  await expect.poll(drawCalls).toBeGreaterThan(0);
+  const selected = await drawCalls();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect.poll(drawCalls).toBe(selected - 1);
+  const cleared = await drawCalls();
+  await page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" }).click();
+  await expect.poll(drawCalls).toBe(cleared + 1);
+  await testInfo.attach("Cabinet draw calls", { body: JSON.stringify({ selected, cleared }), contentType: "application/json" });
+});

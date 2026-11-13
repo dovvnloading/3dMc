@@ -42,21 +42,38 @@ test("furniture prefab is a real library item, grouped, textured, undoable and i
   expect(first.groups![0]!.name).toBe("Apothecary Cabinet · 01");
   expect(first.cuboids.slice(0, 7)).toEqual(before.cuboids);
   await expect(page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Carcass \/ left back turned foot/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: added + " parts selected" })).toBeVisible();
+  const expand = page.getByRole("button", { name: "Expand group Apothecary Cabinet · 01" });
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
   const graphicsFallback = page.getByRole("status", { name: "3D preview unavailable" });
   if (await graphicsFallback.count()) await expect(graphicsFallback).toBeVisible();
   else await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
   await page.screenshot({ path: "test-results/prefab-library-" + browserName + ".png" });
 
-  // The prefab is one real group: select and move all parts using existing
-  // batch tooling, then undo that movement without removing the cabinet.
-  await page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" }).click();
-  await expect(page.getByRole("heading", { name: added + " parts selected" })).toBeVisible();
+  // The first edit after insertion must move the entire cabinet.
   await page.getByRole("button", { name: "Move selection +X" }).click();
   const moved = await sourceJson(page);
-  expect(moved.cuboids[7]!.from[0]).toBe(first.cuboids[7]!.from[0] + 1);
+  expect(moved.cuboids.slice(0, 7)).toEqual(before.cuboids);
+  first.cuboids.slice(7).forEach((part, index) => {
+    const shifted = moved.cuboids[7 + index]!;
+    expect(shifted.id).toBe(part.id);
+    expect(shifted.from[0]).toBeCloseTo(part.from[0] + 1, 4);
+    expect(shifted.to[0]).toBeCloseTo(part.to[0] + 1, 4);
+  });
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
   expect(await sourceJson(page)).toEqual(first);
+
+  // Find and select one part while its group is folded, then restore the full selection.
+  const filter = page.getByRole("textbox", { name: "Filter scene elements" });
+  await filter.fill(first.cuboids[7]!.name);
+  await page.getByRole("option").filter({ hasText: first.cuboids[7]!.name }).click();
+  await expect(page.getByRole("heading", { name: first.cuboids[7]!.name })).toBeVisible();
+  await filter.fill("");
+  await expand.click();
+  await expect(page.getByRole("option").filter({ hasText: first.cuboids[7]!.name }))
+    .toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" }).click();
+  await expect(page.getByRole("heading", { name: added + " parts selected" })).toBeVisible();
 
   await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
   expect(await sourceJson(page)).toEqual(before);
@@ -126,4 +143,36 @@ test("cabinet prefab survives native archive save/reopen and exports actual Java
   expect(model.textures).toBeDefined();
   expect(Object.keys(files).filter(path => path.endsWith(".png")).length).toBeGreaterThan(10);
   expect(files["pack.mcmeta"]).toBeDefined();
+});
+
+test("editing a cabinet face opens its bound sheet even when another asset is active", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".boot-loader")).toHaveCount(0);
+  await selectPrefab(page);
+  await page.getByRole("button", { name: "Expand group Apothecary Cabinet · 01" }).click();
+  await page.getByRole("option", { name: /^Drawers \/ lower left engraved brass label/ }).click();
+  const inspector = page.getByLabel("Properties inspector");
+  const active = page.getByRole("textbox", { name: "Texture name", exact: true });
+  const edit = inspector.getByRole("button", { name: /Edit texture/ });
+  const brass = "Apothecary · engraved brass.png";
+  const paper = "Apothecary · handwritten labels.png";
+
+  await expect(active).toHaveValue("Apothecary · warm oak grain.png");
+  await expect(inspector.getByText(brass, { exact: true })).toBeVisible();
+  await edit.click();
+  await expect(active).toHaveValue(brass);
+  await expect(inspector.getByLabel("Face texture asset")).toHaveValue("apc-brass");
+  await inspector.getByRole("button", { name: "South", exact: true }).click();
+  await expect(active).toHaveValue(paper);
+
+  await page.getByRole("tab", { name: "Model", exact: true }).click();
+  await page.getByRole("button", { name: "Select texture lantern.png", exact: true }).click();
+  await expect(active).toHaveValue("lantern.png");
+  await expect(inspector.getByText(paper, { exact: true })).toBeVisible();
+  await edit.click();
+  await expect(active).toHaveValue(paper);
+  await expect(inspector.getByLabel("Face texture asset")).toHaveValue("apc-vellum");
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
+  await expect(active).toHaveValue("lantern.png");
+  await expect(page.getByRole("button", { name: "Select group Apothecary Cabinet · 01" })).toHaveCount(0);
 });

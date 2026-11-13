@@ -145,7 +145,7 @@ type MeshProps = Pick<ViewportProps, "selectedId" | "selectedIds" | "selectedFac
   "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & {
     node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[];
     opaqueTextureIds: ReadonlySet<string>;
-    groupOrigin?: Vec3; suppressGizmo?: boolean;
+    groupOrigin?: Vec3; suppressGizmo?: boolean; groupOutline?: boolean;
   };
 
 function FaceHighlight({ node, face }: { node: Cuboid; face: FaceDirection }) {
@@ -194,6 +194,7 @@ function AssetMesh(props: MeshProps) {
   };
   useEffect(() => { rollbackGizmo(); }, [props.cancelToken, activeGizmo, node, props.groupOrigin]);
   useEffect(() => {
+    if (!activeGizmo) return;
     const abort = (event: KeyboardEvent) => { if (event.key === "Escape" && draggingGizmo.current) rollbackGizmo(); };
     const cancel = () => { if (draggingGizmo.current) rollbackGizmo(); };
     const lostCapture = () => queueMicrotask(cancel);
@@ -203,7 +204,7 @@ function AssetMesh(props: MeshProps) {
       window.removeEventListener("keydown", abort, true); window.removeEventListener("blur", cancel);
       window.removeEventListener("pointercancel", cancel); window.removeEventListener("lostpointercapture", lostCapture, true);
     };
-  }, [node, props.groupOrigin]);
+  }, [activeGizmo, node, props.groupOrigin]);
 
   const onHit = (event: ThreeEvent<PointerEvent>): { texel: Texel; face: string; textureId: string } | null => {
     const direction = faceFromTriangle(event.faceIndex ?? -1);
@@ -263,9 +264,9 @@ function AssetMesh(props: MeshProps) {
           transparent={!props.opaqueTextureIds.has(node.faces[direction].textureId)}
           depthWrite={props.opaqueTextureIds.has(node.faces[direction].textureId)}
           roughness={0.95} metalness={0}/> )}
-      {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
+      {isSelected && !props.groupOutline && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
-    {selectedId === node.id && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
+    {selectedId === node.id && !props.groupOutline && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
   </group>;
   if (!activeGizmo) return mesh;
   return <TransformControls object={anchor} mode={activeGizmo === "move" ? "translate" : "scale"}
@@ -297,9 +298,11 @@ function Scene(props: ViewportProps) {
   const selected = new Set(ids), multiple = ids.length > 1;
   const members = props.document.cuboids.filter(node => selected.has(node.id));
   const grouped = multiple && members.length === ids.length && members.every(node => node.visible && !node.locked);
+  const groupOutline = grouped && props.mode === "model" && !!props.document.groups?.some(group =>
+    group.memberIds.length === selected.size && group.memberIds.every(id => selected.has(id)));
   const renderNode = (node: Cuboid, groupOrigin?: Vec3) => <AssetMesh key={node.id} {...props}
     selectedIds={ids} node={node} textureMaps={textureMaps} textures={props.document.textures}
-    opaqueTextureIds={opaqueTextureIds} suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
+    opaqueTextureIds={opaqueTextureIds} suppressGizmo={multiple} groupOrigin={groupOrigin} groupOutline={groupOutline}/>;
   return <>
     <color attach="background" args={["#141619"]}/>
     <ambientLight intensity={1.35}/>
@@ -309,6 +312,7 @@ function Scene(props: ViewportProps) {
     {props.mode !== "preview" && <gridHelper args={[10, 20, "#33483f", "#242c2b"]} position={[0, 0, 0]}/>}
     {props.document.cuboids.filter(node => node.visible && (!grouped || !selected.has(node.id))).map(node => renderNode(node))}
     {grouped && <SelectionTransform document={props.document} ids={ids} snap={props.snap} cancelToken={props.cancelToken}
+      outline={groupOutline}
       active={props.mode === "model" && props.onBatchTransform && (props.tool === "move" || props.tool === "resize") ? props.tool : null}
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
