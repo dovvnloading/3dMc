@@ -380,6 +380,8 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         {pending.present.pack.items?.length ?? 0} item(s))? Download a .3dmc source backup first if needed.</p>
       {pendingJavaDetails && <>
         <p>This Java ZIP was validated for the supported 1.21.4 subset. Native-only project names, groups, layers and history are not included in Java resource packs.</p>
+        {pending.present.pack.exportBlockVisuals === false &&
+          <p>Item-only resource pack: no vanilla blockstate replacements will be introduced.</p>}
         <div className="pack-studio-import-resources" aria-label="Java ZIP resource preview">
           <strong>Supported replacement targets</strong>
           {pending.present.pack.exportBlockVisuals !== false &&
