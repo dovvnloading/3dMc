@@ -349,7 +349,7 @@ export function createAetherheartDocument(): EditorDocument {
         i % 3 === 0 ? "violet" : i % 2 ? "ivory" : "aether", { fullUv: true });
       if (i % 2 === 0) add("Spark beneath shard " + (i + 1),
         [x - 0.15, y - 0.5, z - 0.15], [x + 0.15, y - 0.15, z + 0.15], "gold");
-    }
+    });
   });
 
   section("clockwork", "09 · Clockwork accents and signed details", () => {
