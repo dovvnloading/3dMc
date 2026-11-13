@@ -840,7 +840,18 @@ export function App() {
     setPackStudioOpen(true);
   };
   const createNewProject = async (options: NewProjectOptions): Promise<boolean> => {
-    const opened = await acceptOpen(makeNewProject(options)); if (opened) setNewProjectOpen(false); return opened;
+    const opened = await acceptOpen(makeNewProject(options));
+    if (opened) {
+      setNewProjectOpen(false);
+      if (options.template === "aetherheart") {
+        // Start the authored demo without selection outlines or the modeling grid.
+        // Model and Paint remain one click away; no geometry is hidden or locked.
+        setSelectedId(null);
+        setMode("preview");
+        setView(current => ({ kind: "iso", count: current.count + 1 }));
+      }
+    }
+    return opened;
   };
   const addElement = () => {
     const id = crypto.randomUUID(); commitDocument(current => addCuboid(current, id));

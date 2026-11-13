@@ -144,6 +144,7 @@ type MeshProps = Pick<ViewportProps, "selectedId" | "selectedIds" | "selectedFac
   "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
   "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & {
     node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[];
+    opaqueTextures: ReadonlySet<string>;
     groupOrigin?: Vec3; suppressGizmo?: boolean;
   };
 
@@ -177,6 +178,13 @@ function AssetMesh(props: MeshProps) {
     const box = new THREE.BoxGeometry(...dimensions(node)); applyFaceUvs(box, node.faces); return box;
   }, [node.from, node.to, node.faces]);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  // One material renders the whole box in a single draw call when every face
+  // shares a sheet. The geometry still retains independently authored face UVs.
+  // This is particularly useful for detailed models with hundreds of pieces.
+  const firstFaceTexture = node.faces[BOX_FACE_ORDER[0]].textureId;
+  const sharedFaceTexture = node.material === "texture" &&
+    BOX_FACE_ORDER.every(direction => node.faces[direction].textureId === firstFaceTexture);
+  const opaque = node.material === "solid" || (sharedFaceTexture && props.opaqueTextures.has(firstFaceTexture));
   const isSelected = props.selectedIds?.includes(node.id) ?? selectedId === node.id;
   const activeGizmo = !props.suppressGizmo && isSelected && mode === "model" && !node.locked &&
     (tool === "move" || tool === "resize") ? tool : null;
@@ -243,10 +251,16 @@ function AssetMesh(props: MeshProps) {
     }} onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={handleUp}
       onPointerCancel={() => props.onCancelPaint()}>
       <primitive object={geometry} attach="geometry" />
-      {BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial key={direction} attach={`material-${index}`}
-        color={node.color} map={node.material === "texture" ? props.textureMaps[node.faces[direction].textureId] ?? null : null}
-        transparent={node.material === "texture"} depthWrite={node.material !== "texture"}
-        roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0}/>)}
+      {node.material === "solid" || sharedFaceTexture ?
+        <meshStandardMaterial color={node.color}
+          map={sharedFaceTexture ? props.textureMaps[firstFaceTexture] ?? null : null}
+          transparent={!opaque} depthWrite={opaque}
+          roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0}/> :
+        BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial key={direction} attach={`material-${index}`}
+          color={node.color} map={props.textureMaps[node.faces[direction].textureId] ?? null}
+          transparent={!props.opaqueTextures.has(node.faces[direction].textureId)}
+          depthWrite={props.opaqueTextures.has(node.faces[direction].textureId)}
+          roughness={0.95} metalness={0}/>)}
       {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
     {selectedId === node.id && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
@@ -265,13 +279,24 @@ function AssetMesh(props: MeshProps) {
 
 function Scene(props: ViewportProps) {
   const textureMaps = useTextureMaps(props.document.textures, props.pixels, props.draftTextureId, props.document.activeTextureId);
+  // Opaque painted sheets belong in the depth-writing pass. Previously every
+  // painted cuboid was blended as transparent, even with alpha=255 everywhere;
+  // that made overlapping detail render out of order in large assemblies.
+  const opaqueTextures = useMemo(() => {
+    const liveTexture = props.draftTextureId ?? props.document.activeTextureId;
+    return new Set(props.document.textures.filter(texture => {
+      const pixels = texture.id === liveTexture ? props.pixels : texture.pixels;
+      return pixels.length === texture.width * texture.height * 4 &&
+        pixels.every((part, index) => index % 4 !== 3 || part === 255);
+    }).map(texture => texture.id));
+  }, [props.document.textures, props.document.activeTextureId, props.draftTextureId, props.pixels]);
   const ids = props.selectedIds ?? (props.selectedId ? [props.selectedId] : []);
   const selected = new Set(ids), multiple = ids.length > 1;
   const members = props.document.cuboids.filter(node => selected.has(node.id));
   const grouped = multiple && members.length === ids.length && members.every(node => node.visible && !node.locked);
   const renderNode = (node: Cuboid, groupOrigin?: Vec3) => <AssetMesh key={node.id} {...props}
     selectedIds={ids} node={node} textureMaps={textureMaps} textures={props.document.textures}
-    suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
+    opaqueTextures={opaqueTextures} suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
   return <>
     <color attach="background" args={["#141619"]}/>
     <ambientLight intensity={1.35}/>

@@ -1053,3 +1053,73 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .export-preview-files{padding:6px 0 0}
 .export-preview-files summary{color:var(--accent);font-size:11px;cursor:pointer}
 .export-preview-files>div{display:grid;gap:7px;max-height:210px;overflow:auto;padding:12px 8px 3px}
+
+
+/* Aetherheart: a deliberately featured, first-class editable demo project. */
+.template-card.template-aetherheart {
+  grid-column: 1 / -1;
+  min-height: 176px;
+  padding: 19px 22px;
+  overflow: hidden;
+  border-color: #726858;
+  background:
+    radial-gradient(ellipse at 83% 52%, rgba(85, 201, 199, .21) 0, rgba(62, 70, 118, .13) 35%, transparent 68%),
+    linear-gradient(112deg, #312e37, #282f3c 65%, #223b40);
+}
+.template-card.template-aetherheart:hover {
+  border-color: #d0af79;
+  background:
+    radial-gradient(ellipse at 83% 52%, rgba(102, 231, 220, .24), transparent 69%),
+    linear-gradient(112deg, #37323c, #293440 65%, #23474a);
+}
+.template-card.template-aetherheart::after {
+  content: "✧";
+  position: absolute;
+  top: 0; right: 36px;
+  font-size: 145px;
+  line-height: 1;
+  color: #9ee8d9;
+  opacity: .13;
+  pointer-events: none;
+  transform: rotate(12deg);
+}
+.template-aetherheart .template-card-art {
+  width: 51px;
+  height: 51px;
+  margin-bottom: 8px;
+  border-color: #967c5c;
+  color: #f2db9a;
+  background: linear-gradient(135deg, #5c4947, #3f4561);
+  box-shadow: 0 0 24px rgba(134, 224, 211, .11);
+}
+.template-featured-tag {
+  color: #dfbf82;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  margin-bottom: 4px;
+}
+.template-aetherheart .template-card-heading {
+  font-size: 17px;
+  letter-spacing: -.24px;
+  color: #fff4d7;
+}
+.template-aetherheart .template-card-description { max-width: 560px; color: #d9e2e8; }
+.template-aetherheart .template-card-meta { color: #b6d6cb; }
+.template-showcase-guide {
+  margin-top: 12px;
+  padding: 13px 15px;
+  border: 1px solid #435d63;
+  border-radius: 8px;
+  background: linear-gradient(110deg, #24353c, #252b35);
+}
+.template-showcase-guide strong { display: block; font-size: 12px; color: #b9f6e4; }
+.template-showcase-guide p { margin: 6px 0 0; color: #c9d9df; font-size: 11px; line-height: 1.65; }
+@media (max-width: 760px) {
+  .template-card.template-aetherheart { padding: 15px; min-height: 174px; }
+  .template-card.template-aetherheart::after { right: 8px; top: 17px; font-size: 108px; }
+}
+@media (max-width: 420px) {
+  .template-card.template-aetherheart { min-height: 165px; }
+  .template-card.template-aetherheart::after { opacity: .075; }
+}
