@@ -56,8 +56,8 @@ export function frameDocumentCamera(
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   visible.forEach(node => {
     for (let axis = 0; axis < 3; axis++) {
-      min[axis] = Math.min(min[axis]!, node.from[axis]);
-      max[axis] = Math.max(max[axis]!, node.to[axis]);
+      min[axis] = Math.min(min[axis]!, node.from[axis]!);
+      max[axis] = Math.max(max[axis]!, node.to[axis]!);
     }
   });
   const target: Vec3 = [
