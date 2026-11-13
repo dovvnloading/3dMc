@@ -883,8 +883,10 @@ export function App() {
       <span className="workspace-dot"/><span>WORKSPACE</span></div>
       <div className="mode-tabs" role="tablist" aria-label="Authoring mode">{(["model", "paint", "preview"] as const).map(item =>
         <button key={item} role="tab" aria-selected={mode === item} className={"mode-tab" + (mode === item ? " current" : "")} onClick={() => changeMode(item)}>{item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</div>
-      <div className="mode-options creator-options"><CreatorTools key={openSession} document={doc} revision={history.revision} mode={mode}
-        selectedId={selectedId} face={selectedFace} onApply={applyBatch} onOpen={acceptOpen} onBackup={saveProject} onCancelGesture={clearStroke}
+      <div className="mode-options creator-options"><CreatorTools key={openSession} document={doc} revision={history.revision} pack={packSession?.present} mode={mode}
+        selectedId={selectedId} face={selectedFace} onApply={applyBatch} onOpen={acceptOpen}
+        onOpenPack={project => acceptPackOpen(createPackSession(project.pack, project.sources))}
+        onBackup={saveProject} onCancelGesture={clearStroke}
         onLayout={layout => { clearStroke(); setSceneOpen(layout === "balanced"); setInspectorOpen(layout !== "canvas"); if (layout === "paint") changeMode("paint"); }}/></div>
     </nav>
     <div className="editor-grid">

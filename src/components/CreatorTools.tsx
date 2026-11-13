@@ -4,6 +4,8 @@ import type { EditorDocument, FaceDirection } from "../editor/domain";
 import { activeTexture } from "../editor/domain";
 import type { PixelClipboard } from "../editor/regions";
 import type { Mode } from "./EditorViewport";
+import type { PackSnapshot } from "../pack/packSession";
+import type { NativePackProject } from "../editor/nativePackArchive";
 import { CreatorDialog } from "./CreatorDialog";
 import { TextureRegionDialog } from "./TextureRegionDialog";
 import { FaceToolsDialog } from "./FaceToolsDialog";
@@ -12,16 +14,25 @@ import { ProjectLibraryDialog } from "./ProjectLibraryDialog";
 import "./creator-tools.css";
 
 type Panel = "region" | "face" | "import" | "library" | "workspace" | null;
-export function CreatorTools({ document, revision, mode, selectedId, face, onApply, onOpen, onBackup, onLayout, onCancelGesture }: {
-  document: EditorDocument; revision: number; mode: Mode; selectedId: string | null; face: FaceDirection;
+export function CreatorTools({ document, revision, pack, mode, selectedId, face, onApply, onOpen, onOpenPack, onBackup, onLayout, onCancelGesture }: {
+  document: EditorDocument; revision: number; pack?: PackSnapshot | null; mode: Mode; selectedId: string | null; face: FaceDirection;
   onApply: (operation: (document: EditorDocument) => EditorDocument) => boolean;
-  onOpen: (document: EditorDocument) => Promise<boolean>; onBackup: () => Promise<void>;
+  onOpen: (document: EditorDocument) => Promise<boolean>;
+  onOpenPack: (pack: NativePackProject) => Promise<boolean>; onBackup: () => Promise<void>;
   onLayout: (layout: "balanced" | "canvas" | "paint") => void; onCancelGesture: () => void;
 }) {
   const [panel, setPanel] = useState<Panel>(null), [source, setSource] = useState<EditorDocument | null>(null);
   const [clipboard, setClipboard] = useState<PixelClipboard | null>(null);
-  const open = (next: Panel) => { onCancelGesture(); setSource(document); setPanel(next); };
-  const close = () => { setPanel(null); setSource(null); };
+  // A snapshot and its revision must come from the same render, including in pack mode.
+  const [librarySource, setLibrarySource] = useState<{
+    source: EditorDocument; revision: number; pack?: PackSnapshot | null;
+  } | null>(null);
+  const open = (next: Panel) => {
+    onCancelGesture(); setSource(document);
+    if (next === "library") setLibrarySource({ source: document, revision, pack });
+    setPanel(next);
+  };
+  const close = () => { setPanel(null); setSource(null); setLibrarySource(null); };
   const node = document.cuboids.find(item => item.id === selectedId);
   return <div className="creator-tools" aria-label="Creator workflow tools">
     {mode === "paint" && <>
@@ -35,7 +46,8 @@ export function CreatorTools({ document, revision, mode, selectedId, face, onApp
       clipboard={clipboard} onCopy={setClipboard} onApply={onApply} onClose={close}/>}
     {panel === "face" && selectedId && <FaceToolsDialog document={document} nodeId={selectedId} face={face} onApply={onApply} onClose={close}/>}
     {panel === "import" && <ExternalModelDialog currentName={document.name} onOpen={onOpen} onBackup={onBackup} onClose={close}/>}
-    {panel === "library" && source && <ProjectLibraryDialog source={source} revision={revision} onOpen={onOpen} onBackup={onBackup} onClose={close}/>}
+    {panel === "library" && librarySource && <ProjectLibraryDialog source={librarySource.source} revision={librarySource.revision}
+      pack={librarySource.pack} onOpen={onOpen} onOpenPack={onOpenPack} onBackup={onBackup} onClose={close}/>}
     {panel === "workspace" && <CreatorDialog title="Workspace guide and layouts" kicker="ONE PROJECT · MODEL, PAINT AND PREVIEW" onClose={close}>
       <h3>Workspace layouts</h3><div className="creator-button-grid">{(["balanced", "canvas", "paint"] as const).map(layout =>
         <button type="button" key={layout} onClick={() => { onLayout(layout); close(); }}><LayoutPanelTop size={15}/>{layout === "balanced" ? "Reset balanced layout" : layout === "canvas" ? "Focus canvas" : "Paint workspace"}</button>)}</div>
