@@ -857,6 +857,7 @@ export function App() {
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
+    {bootChecked && <>
     <header className="app-bar">
       <div className="brand" aria-label="3dMc Studio"><span className="brand-mark"><Box size={19} strokeWidth={2.3}/></span>
         <span>3dMc</span><span className="brand-divider"/><span className="brand-subtitle">Studio</span></div>
@@ -1096,6 +1097,7 @@ export function App() {
       <button onClick={() => setRecoveryDetailsOpen(true)}>Recovery details <Info size={12}/></button>
       <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
+    </>}
     {recoveryDetailsOpen && <RecoveryDetailsDialog
       writer={writerStatus} status={recoveryStatus} session={openSession} revision={history.revision}
       acknowledgement={lastAcknowledgedRecovery} modelCount={packSession?.present.pack.models.length ?? 1}
