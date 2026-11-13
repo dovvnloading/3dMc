@@ -61,8 +61,10 @@ test("furniture prefab is a real library item, grouped, textured, undoable and i
   expect(second.groups![1]!.name).toBe("Apothecary Cabinet · 02");
   const bounds = second.groups!.map(group => second.cuboids.filter(node =>
     group.memberIds.includes(node.id)));
-  expect(Math.max(...bounds[0]!.map(n => n.to[0]))).toBeLessThanOrEqual(
-    Math.min(...bounds[1]!.map(n => n.from[0])) + 32);
+  const separateBays =
+    Math.max(...bounds[0]!.map(n => n.to[0])) <= Math.min(...bounds[1]!.map(n => n.from[0])) ||
+    Math.max(...bounds[1]!.map(n => n.to[0])) <= Math.min(...bounds[0]!.map(n => n.from[0]));
+  expect(separateBays).toBe(true);
   expect(errors).toEqual([]);
 });
 
