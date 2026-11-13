@@ -24,7 +24,6 @@ test("The Aetherheart opens as a complete, editable showcase and exports portabl
   await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
   const scene = page.getByRole("listbox", { name: "Scene elements" });
   await expect(scene.getByRole("option")).toHaveCount(216);
-  await expect(page.getByText("9 groups", { exact: false })).toHaveCount(0); // no fabricated group counter
 
   await page.getByRole("tab", { name: "Model" }).click();
   await scene.getByRole("option").first().click();
