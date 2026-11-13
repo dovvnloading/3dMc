@@ -144,6 +144,7 @@ type MeshProps = Pick<ViewportProps, "selectedId" | "selectedIds" | "selectedFac
   "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
   "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & {
     node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[];
+    opaqueTextureIds: ReadonlySet<string>;
     groupOrigin?: Vec3; suppressGizmo?: boolean;
   };
 
@@ -177,6 +178,13 @@ function AssetMesh(props: MeshProps) {
     const box = new THREE.BoxGeometry(...dimensions(node)); applyFaceUvs(box, node.faces); return box;
   }, [node.from, node.to, node.faces]);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  // Most furniture parts use one material on all six independently UV-mapped
+  // faces. A single material avoids six draw calls for each small cuboid.
+  const firstTextureId = node.faces[BOX_FACE_ORDER[0]].textureId;
+  const sharedTexture = node.material === "texture" &&
+    BOX_FACE_ORDER.every(direction => node.faces[direction].textureId === firstTextureId);
+  const sharedOpaque = node.material === "solid" ||
+    (sharedTexture && props.opaqueTextureIds.has(firstTextureId));
   const isSelected = props.selectedIds?.includes(node.id) ?? selectedId === node.id;
   const activeGizmo = !props.suppressGizmo && isSelected && mode === "model" && !node.locked &&
     (tool === "move" || tool === "resize") ? tool : null;
@@ -243,10 +251,18 @@ function AssetMesh(props: MeshProps) {
     }} onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={handleUp}
       onPointerCancel={() => props.onCancelPaint()}>
       <primitive object={geometry} attach="geometry" />
-      {BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial key={direction} attach={`material-${index}`}
-        color={node.color} map={node.material === "texture" ? props.textureMaps[node.faces[direction].textureId] ?? null : null}
-        transparent={node.material === "texture"} depthWrite={node.material !== "texture"}
-        roughness={node.material === "solid" ? 0.48 : 0.95} metalness={node.material === "solid" ? 0.18 : 0}/>)}
+      {node.material === "solid" || sharedTexture ?
+        <meshStandardMaterial color={node.color}
+          map={sharedTexture ? props.textureMaps[firstTextureId] ?? null : null}
+          transparent={!sharedOpaque} depthWrite={sharedOpaque}
+          roughness={node.material === "solid" ? 0.48 : 0.95}
+          metalness={node.material === "solid" ? 0.18 : 0}/> :
+        BOX_FACE_ORDER.map((direction, index) => <meshStandardMaterial
+          key={direction} attach={`material-${index}`} color={node.color}
+          map={props.textureMaps[node.faces[direction].textureId] ?? null}
+          transparent={!props.opaqueTextureIds.has(node.faces[direction].textureId)}
+          depthWrite={props.opaqueTextureIds.has(node.faces[direction].textureId)}
+          roughness={0.95} metalness={0}/> )}
       {isSelected && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
     {selectedId === node.id && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
@@ -265,13 +281,25 @@ function AssetMesh(props: MeshProps) {
 
 function Scene(props: ViewportProps) {
   const textureMaps = useTextureMaps(props.document.textures, props.pixels, props.draftTextureId, props.document.activeTextureId);
+  // Opaque painted sheets must write depth. The old transparent pass rendered
+  // distant corks, bottle faces and drawer labels THROUGH nearer solid wood.
+  // Test the current paint draft too, so erasing into alpha stays supported.
+  const opaqueTextureIds = useMemo(() => {
+    const draftId = props.draftTextureId ?? props.document.activeTextureId;
+    return new Set(props.document.textures.filter(texture => {
+      const pixels = texture.id === draftId ? props.pixels : texture.pixels;
+      return pixels.length === texture.width * texture.height * 4 &&
+        pixels.every((value, i) => i % 4 !== 3 || value === 255);
+    }).map(texture => texture.id));
+  }, [props.document.textures, props.document.activeTextureId,
+    props.draftTextureId, props.pixels]);
   const ids = props.selectedIds ?? (props.selectedId ? [props.selectedId] : []);
   const selected = new Set(ids), multiple = ids.length > 1;
   const members = props.document.cuboids.filter(node => selected.has(node.id));
   const grouped = multiple && members.length === ids.length && members.every(node => node.visible && !node.locked);
   const renderNode = (node: Cuboid, groupOrigin?: Vec3) => <AssetMesh key={node.id} {...props}
     selectedIds={ids} node={node} textureMaps={textureMaps} textures={props.document.textures}
-    suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
+    opaqueTextureIds={opaqueTextureIds} suppressGizmo={multiple} groupOrigin={groupOrigin}/>;
   return <>
     <color attach="background" args={["#141619"]}/>
     <ambientLight intensity={1.35}/>
