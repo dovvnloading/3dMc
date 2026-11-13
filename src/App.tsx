@@ -1102,7 +1102,10 @@ export function App() {
       savingBackup={savingProject} onClose={() => setRecoveryDetailsOpen(false)}
       onBackup={() => { void saveProject(); }}
       onLibrary={() => { setRecoveryDetailsOpen(false); setLibraryRequest(value => value + 1); }}/>}
-    {!bootChecked && <div className="boot-loader" aria-live="polite">Checking local recovery ownership…</div>}
+    {!bootChecked && <ModalDialog className="modal writer-modal" labelledBy="recovery-boot-title">
+      <h2 id="recovery-boot-title">Checking local recovery ownership…</h2>
+      <p>Editing begins after this tab verifies its recovery writer. No project data is changed during this check.</p>
+    </ModalDialog>}
     {bootChecked && writerStatus !== "owned" && <ModalDialog className="writer-modal" labelledBy="writer-title"><div className="modal-icon"><Lock size={22}/></div>
       <h2 id="writer-title">{writerStatus === "blocked" ? "Another tab controls local recovery" : "Local recovery isn't available"}</h2><p>{writerStatus === "blocked" ? "This editor is read-only here to protect the other tab's saved work. You can download the current project, or explicitly take over editing. A suspended older tab will no longer be able to overwrite this tab's checkpoints." : "You can still download the current project as a portable backup. Retry ownership only when you're ready to edit."}</p>
       <div className="modal-actions"><button className="text-button quiet" onClick={saveProject}><Save size={15}/>Download backup</button><button className="text-button primary" disabled={takingOver} onClick={takeOverWriter}>{takingOver ? "Taking over…" : "Take over editing"}</button></div>
