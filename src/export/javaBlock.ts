@@ -1,17 +1,18 @@
 import { strToU8, zipSync } from "fflate";
+import { JAVA_1214_PROFILE } from "../compatibility/profileRegistry";
 import { parseDocument } from "../editor/domain";
 import { FACE_DIRECTIONS } from "../editor/domain";
 import type { Cuboid, EditorDocument } from "../editor/domain";
 import { hexToRGB } from "../editor/pixels";
 import { encodeRgbaPng } from "./png";
 
-export const JAVA_RELEASE = "1.21.4" as const;
-export const RESOURCE_PACK_FORMAT = 46 as const;
+export const JAVA_RELEASE = JAVA_1214_PROFILE.release;
+export const RESOURCE_PACK_FORMAT = JAVA_1214_PROFILE.resourcePackFormat;
 export const REPLACEMENT_BLOCK = "minecraft:diamond_block" as const;
 export const REPLACEMENT_NAME = "diamond_block" as const;
 export const GAME_EXPORT_VERIFIED = false as const;
 // Java 1.21.4's default four mip levels need at least 16 pixels per side.
-export const MIN_JAVA_TEXTURE_SIZE = 16 as const;
+export const MIN_JAVA_TEXTURE_SIZE = JAVA_1214_PROFILE.limits.minExportTexturePixels;
 
 export const JAVA_PACK_PATHS = {
   metadata: "pack.mcmeta",

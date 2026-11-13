@@ -1,4 +1,5 @@
 import { strToU8, zipSync } from "fflate";
+import { JAVA_1214_PROFILE } from "../compatibility/profileRegistry";
 import { parseDocument } from "../editor/domain";
 import type { EditorDocument } from "../editor/domain";
 import { hexToRGB } from "../editor/pixels";
@@ -16,12 +17,9 @@ import { javaItemDisplay } from "./itemProfile";
  * variant. The existing diamond-block fixture is the only in-game check here;
  * iron-block output still needs its own real-game verification.
  */
-export const JAVA_1214_REPLACEMENTS = [
-  "diamond_block", "iron_block", "gold_block", "emerald_block",
-  "lapis_block", "redstone_block", "netherite_block", "obsidian"
-] as const;
-export const MAX_INDEXED_EXPORT_MODELS = 8 as const;
-export const MAX_INDEXED_EXPORT_BYTES = 12_000_000 as const;
+export const JAVA_1214_REPLACEMENTS = JAVA_1214_PROFILE.blockReplacements;
+export const MAX_INDEXED_EXPORT_MODELS = JAVA_1214_PROFILE.limits.maxModelsPerPack;
+export const MAX_INDEXED_EXPORT_BYTES = JAVA_1214_PROFILE.limits.maxIndexedZipBytes;
 
 export interface IndexedJavaPackResult {
   zip: Uint8Array;

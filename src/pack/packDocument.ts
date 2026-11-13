@@ -1,4 +1,5 @@
 import { parseDocument } from "../editor/domain";
+import { JAVA_1214_PROFILE } from "../compatibility/profileRegistry";
 import type { EditorDocument } from "../editor/domain";
 import { JAVA_1214_ITEM_TARGETS, parseItemDisplay } from "./itemProfile";
 import type { ItemDisplay } from "./itemProfile";
@@ -9,7 +10,7 @@ import type { ItemDisplay } from "./itemProfile";
  * Pack schema numbers are NOT Minecraft format or .3dmc container versions.
  */
 export const PACK_INDEX_VERSION = 1 as const;
-export const PACK_TARGET_PROFILE = "java-1.21.4-static-block" as const;
+export const PACK_TARGET_PROFILE = JAVA_1214_PROFILE.id;
 export const MAX_PACK_MODELS = 32 as const;
 export const MAX_PACK_TEXTURES = 512 as const;
 export const MAX_PACK_ITEMS = 8 as const;
