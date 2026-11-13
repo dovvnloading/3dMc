@@ -2,17 +2,22 @@ import type { EditorDocument } from "./domain";
 import type { NativePackProject } from "./nativePackArchive";
 import type { PackImportReport } from "../import/javaPack";
 
+/** Extends Java preflight without widening the original single-block contract. */
+export type JavaImportReport = PackImportReport |
+  { status: "editable-pack"; project: NativePackProject; paths: string[]; notices: string[] };
+
 /** Only validated, detached import previews cross the worker boundary. */
 export type ImportJobRequest =
   | { kind: "source"; filename: string; bytes: Uint8Array }
   | { kind: "pack"; bytes: Uint8Array }
   | { kind: "single"; bytes: Uint8Array }
-  | { kind: "java"; bytes: Uint8Array };
+  | { kind: "java"; bytes: Uint8Array }
+  | { kind: "java-pack"; bytes: Uint8Array };
 
 export type ImportJobResult =
   | { kind: "document"; document: EditorDocument }
   | { kind: "pack"; project: NativePackProject }
-  | { kind: "java"; report: PackImportReport };
+  | { kind: "java"; report: JavaImportReport };
 
 export type ImportJobReply =
   | { success: true; result: ImportJobResult }
@@ -36,11 +41,15 @@ function validResult(request: ImportJobRequest, value: unknown): value is Import
   }
   if (result.kind === "java") {
     const report = result.report;
-    return request.kind === "java" && !!report && typeof report === "object" &&
+    return (request.kind === "java" || request.kind === "java-pack") &&
+      !!report && typeof report === "object" &&
       (report.status === "blocked"
         ? Array.isArray(report.problems) && report.problems.every(item => typeof item === "string")
-        : report.status === "editable" && !!report.document &&
-          Array.isArray(report.paths) && Array.isArray(report.notices));
+        : report.status === "editable"
+          ? !!report.document && Array.isArray(report.paths) && Array.isArray(report.notices)
+          : report.status === "editable-pack" && !!report.project?.pack &&
+            Array.isArray(report.project.sources) &&
+            Array.isArray(report.paths) && Array.isArray(report.notices));
   }
   return false;
 }

@@ -32,6 +32,7 @@ import type { ImportProgressState } from "./components/ImportProgress";
 import { buildPackZipInWorker } from "./editor/packJobs";
 import type { NativePackProject } from "./editor/nativePackArchive";
 import { inspectIndexedJava1214Pack } from "./pack/exportPreflight";
+import { previewIndexedJava1214Paths } from "./pack/outputPreview";
 import { activePackDocument, createPackSession, redoPackSession, selectPackModel, undoPackSession } from "./pack/packSession";
 import type { PackSession } from "./pack/packSession";
 import { advancePackFromEditor, packHistoryView, upgradeEditorHistory } from "./pack/editorBridge";
@@ -65,7 +66,7 @@ import { ModalDialog } from "./components/ModalDialog";
 import { RecoveryDetailsDialog } from "./components/RecoveryDetailsDialog";
 import { recoveryStatusText } from "./editor/recoveryPresentation";
 import type { RecoveryAcknowledgement, RecoveryStatus, WriterStatus } from "./editor/recoveryPresentation";
-import type { PackImportReport } from "./import/javaPack";
+import type { JavaImportReport } from "./editor/importJobs";
 import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/javaBlock";
 import type { ExportIssue } from "./export/javaBlock";
 
@@ -148,6 +149,20 @@ export function App() {
   const exportIssues = useMemo(() => packSession
     ? inspectIndexedJava1214Pack(packSession.present.pack, packSession.present.sources)
     : inspectJava1214(doc), [doc, packSession]);
+  const exportFilePaths = useMemo(() => {
+    try {
+      if (packSession)
+        return previewIndexedJava1214Paths(packSession.present.pack, packSession.present.sources);
+      return [
+        JAVA_PACK_PATHS.metadata, JAVA_PACK_PATHS.blockstate, JAVA_PACK_PATHS.model,
+        JAVA_PACK_PATHS.mainTexture,
+        ...doc.textures.slice(1).map((_, index) =>
+          "assets/3dmc/textures/block/tex_" + (index + 1) + ".png"),
+        ...doc.cuboids.flatMap((node, index) => node.material === "solid"
+          ? ["assets/3dmc/textures/block/solid_" + index + ".png"] : [])
+      ];
+    } catch { return []; }
+  }, [doc, packSession]);
   const [selection, setSelection] = useState<Selection>(() => selectOnly("body"));
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   useEffect(() => setCollapsedGroups([]), [openSession, doc.id]);
@@ -190,7 +205,7 @@ export function App() {
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
   const [pendingPackOpen, setPendingPackOpen] = useState<NativePackProject | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false), [savingProject, setSavingProject] = useState(false);
-  const [pendingPack, setPendingPack] = useState<PackImportReport | null>(null);
+  const [pendingPack, setPendingPack] = useState<JavaImportReport | null>(null);
   const [pendingTexture, setPendingTexture] = useState<DecodedTexture | null>(null);
   const [textureImportMode, setTextureImportMode] = useState<"replace" | "new">("replace");
   const [deletingTextureId, setDeletingTextureId] = useState<string | null>(null);
@@ -685,8 +700,8 @@ export function App() {
     try {
       if (kind === "source" && file.size > MAX_NATIVE_PACK_BYTES)
         throw new Error("File exceeds the 12 MB source pack import budget.");
-      if (kind === "java" && file.size > 2_000_000)
-        throw new Error("This ZIP exceeds the 2 MB pack-import limit.");
+      if (kind === "java" && file.size > MAX_NATIVE_PACK_BYTES)
+        throw new Error("This ZIP exceeds the 12 MB supported Java pack-import limit.");
       const bytes = await readImportFile(file, controller.signal, (loaded, total) => {
         if (current()) setImportProgress({ name: file.name, stage: "reading", loaded, total });
       });
@@ -1125,7 +1140,15 @@ export function App() {
       </> : <>replaces the visual model of <strong>minecraft:diamond_block</strong></>}. Gameplay, lighting, and collision do not change.</p>
       <label className="export-target-control" htmlFor="export-target"><span>Target profile</span><select id="export-target" className="select-control" value={doc.target.candidateRelease} disabled={!!packSession} onChange={event => commitDocument(current => setJavaCandidateRelease(current, event.target.value === "26.3" ? "26.3" : "1.21.4"))}>
         <option value="1.21.4">Java Edition 1.21.4 · Export experiment</option><option value="26.3">Java Edition 26.3 · Unsupported</option></select></label>
-      <div className="export-file-list" aria-label="Files in the export"><strong>Output files</strong><code>{JAVA_PACK_PATHS.metadata}</code><code>{JAVA_PACK_PATHS.blockstate}</code><code>{JAVA_PACK_PATHS.model}</code><code>{JAVA_PACK_PATHS.mainTexture}</code><span>Plus {doc.cuboids.filter(node => node.material === "solid").length} generated solid-color texture files.</span></div>
+      <div className="export-file-list" aria-label="Files in the export">
+        <strong>Output files · {exportFilePaths.length} planned resources</strong>
+        {exportFilePaths.slice(0, 12).map(path => <code key={path}>{path}</code>)}
+        {exportFilePaths.length > 12 && <details className="export-preview-files">
+          <summary>Show {exportFilePaths.length - 12} more resources</summary>
+          <div>{exportFilePaths.slice(12).map((path, index) => <code key={path + index}>{path}</code>)}</div>
+        </details>}
+        <span>Preview reflects the current source pack. Export validates the full resource graph before download; this is not a Minecraft in-game check.</span>
+      </div>
       <section className="diagnostic-fixture" aria-label="Six-face compatibility fixture"><div><strong>Six-face orientation test</strong><p>Download a separate, reproducible 64×64 diagnostic cube with labeled faces, upward arrows and asymmetric corner markers. It does not use or change your current project.</p></div><button className="text-button quiet" onClick={downloadDiagnosticPack}><Download size={15}/>Download six-face diagnostic ZIP</button></section>
       <ExportIssueList issues={exportIssues} onLocate={locateExportIssue}/>
       {lastExport && <p className="export-last">Last download started for revision {lastExport.revision} ({Math.round(lastExport.bytes / 1024)} KiB).{lastExport.revision !== history.revision ? " New changes have not been exported." : ""}</p>}
@@ -1145,13 +1168,41 @@ export function App() {
       paintedFaces={doc.cuboids.filter(node => node.material === "texture").length}
       hasLayers={!!texture.layers && textureSource.current?.mode === "replace"} onClose={() => { setPendingTexture(null); textureSource.current = null; }} onConfirm={applyImportedTexture}/>}
     {pendingPack && <ModalDialog className="modal import-modal" labelledBy="pack-import-title" onCancel={() => setPendingPack(null)}>
-      <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" : "Pack cannot be safely imported"}</h2></div></div>
+      <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" :
+        pendingPack.status === "editable-pack" ? "Import editable Java pack?" :
+        "Pack cannot be safely imported"}</h2></div></div>
       {pendingPack.status === "editable" ? <><p>This pack matches the supported 3dMc experimental export format. Import it as a <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
         <div className="import-summary"><div><span>ELEMENTS</span><strong>{pendingPack.document.cuboids.length}</strong></div><div><span>TEXTURE</span><strong>{activeTexture(pendingPack.document).width} × {activeTexture(pendingPack.document).height}</strong></div><div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div></div>
         <div className="import-notices"><h3>What to know before importing</h3>{pendingPack.notices.map(message => <p key={message}><Info size={15}/>{message}</p>)}</div>
         <p className="import-consequence">Your current workspace will be replaced. Download your current native project first if you need an independent copy. The original ZIP is never modified.</p>
         <div className="modal-actions"><button className="text-button quiet" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Cancel</button><button className="text-button primary" onClick={() => void acceptOpen(pendingPack.document)}><PackageOpen size={15}/>Import as editable project</button></div>
-      </> : <><p>No changes were made to your project. This importer accepts only the exact structure produced by the 3dMc experimental Java 1.21.4 exporter.</p><div className="import-blockers">{pendingPack.problems.map(message => <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}</div>
+      </> : pendingPack.status === "editable-pack" ? <>
+        <p>This Java Edition 1.21.4 ZIP matches the supported 3dMc multi-asset format. Import every source model and texture into one editable Pack Studio session.</p>
+        <div className="import-summary">
+          <div><span>MODELS</span><strong>{pendingPack.project.pack.models.length}</strong></div>
+          <div><span>TEXTURES</span><strong>{pendingPack.project.pack.textures.length}</strong></div>
+          <div><span>ITEMS</span><strong>{pendingPack.project.pack.items?.length ?? 0}</strong></div>
+          <div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div>
+        </div>
+        <div className="import-notices"><h3>Verified resources</h3>
+          <p><Info size={15}/>All referenced resources were checked against an equivalent re-export.</p>
+          {pendingPack.project.pack.models.map(model => <p key={model.id}><Info size={15}/>
+            {model.resource.namespace + ":" + model.resource.path} · {pendingPack.project.pack.exportBlockVisuals === false
+              ? "item-only source" : model.replaces.namespace + ":" + model.replaces.path}</p>)}
+          {(pendingPack.project.pack.items ?? []).map(item => <p key={item.id}><Info size={15}/>
+            Item {item.replaces.namespace + ":" + item.replaces.path} → {item.resource.namespace + ":" + item.resource.path}</p>)}
+          {pendingPack.notices.map(message => <p key={message}><Info size={15}/>{message}</p>)}
+        </div>
+        <details className="import-resource-preview"><summary>Inspect ZIP resource files ({pendingPack.paths.length})</summary>
+          <div>{pendingPack.paths.slice(0, 80).map(path => <code key={path}>{path}</code>)}
+          {pendingPack.paths.length > 80 && <p>And {pendingPack.paths.length - 80} additional validated files.</p>}</div>
+        </details>
+        <p className="import-consequence">This replaces the current workspace only after confirmation. Download your current .3dmc source first if needed. Minecraft ZIP files do not contain native editor names, history or layers.</p>
+        <div className="modal-actions">
+          <button className="text-button quiet" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Cancel</button>
+          <button className="text-button primary" onClick={() => void acceptPackOpen(createPackSession(pendingPack.project.pack, pendingPack.project.sources))}><PackageOpen size={15}/>Import complete pack</button>
+        </div>
+      </> : <><p>No changes were made to your project. This importer accepts only the supported 3dMc Java 1.21.4 export subset.</p><div className="import-blockers">{pendingPack.problems.map(message => <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}</div>
         <p className="import-consequence">Other resource packs may use valid Minecraft features that this editor cannot yet preserve. They are blocked rather than partially converted.</p><div className="modal-actions"><button className="text-button primary" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Keep working</button></div></>}
     </ModalDialog>}
     {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={createNewProject} onBackup={saveProject}/>}

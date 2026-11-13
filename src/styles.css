@@ -1042,3 +1042,14 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .recovery-details-modal .recovery-details-warning{color:#f5c2ae}
 .recovery-details-note{display:flex;align-items:center;gap:8px;color:var(--secondary);font-size:11px;line-height:1.5}
 .recovery-details-note svg{flex-shrink:0}
+
+/* Inspectable read-only resource preview for supported Java pack imports. */
+.import-resource-preview{border:1px solid var(--divider);background:var(--panel);border-radius:7px;padding:10px;margin:12px 0}
+.import-resource-preview summary{font-size:12px;font-weight:650;cursor:pointer;color:var(--accent)}
+.import-resource-preview>div{display:grid;gap:6px;max-height:210px;overflow:auto;margin-top:10px}
+.import-resource-preview code{overflow-wrap:anywhere;font-size:10px;color:var(--secondary)}
+.import-resource-preview p{margin:0;font-size:11px;color:var(--muted)}
+
+.export-preview-files{padding:6px 0 0}
+.export-preview-files summary{color:var(--accent);font-size:11px;cursor:pointer}
+.export-preview-files>div{display:grid;gap:7px;max-height:210px;overflow:auto;padding:12px 8px 3px}
