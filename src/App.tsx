@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
-  FolderOpen, FilePlus2, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2, Minus, Square
 } from "lucide-react";
@@ -40,6 +40,8 @@ import { prepareJavaPackDownload, prepareLegacyJsonDownload, prepareNativeProjec
   prepareSixFaceDiagnosticDownload, prepareTexturePngDownload, startBrowserDownload } from "./editor/exportJobs";
 import { makeNewProject } from "./editor/templates";
 import { PRIMITIVE_PRESETS, addPrimitive, moveCuboid, setCuboidMaterial } from "./editor/primitives";
+import { PREFAB_LIBRARY, insertLibraryPrefab } from "./editor/prefabs/library";
+import type { PrefabId } from "./editor/prefabs/library";
 import type { PrimitiveId } from "./editor/primitives";
 import type { NewProjectOptions } from "./editor/templates";
 import { claimRecoveryWriter, readAnyRecovery, renewRecoveryWriter, rotateRecoveryWriter, saveRecovery, savePackRecovery, RecoveryOwnershipLost, RecoverySnapshotTooLarge } from "./editor/recovery";
@@ -850,6 +852,14 @@ export function App() {
     const id = crypto.randomUUID(); commitDocument(current => addPrimitive(current, id, primitive));
     setShapeMenuOpen(false); setSelectedId(id); setMode("model"); switchTool("select");
   };
+  const addLibraryItem = (prefabId: PrefabId) => {
+    // Generate the instance ID before publishing history. All parts, texture
+    // sheets and grouping are inserted by one undoable action.
+    const id = crypto.randomUUID();
+    if (!applyBatch(current => insertLibraryPrefab(current, prefabId, id))) return;
+    setShapeMenuOpen(false); setSearch("");
+    setSelectedId(id + "-apc-part-001"); setMode("model"); switchTool("select");
+  };
   const visibleTexture = textureById(doc, draftTextureId ?? doc.activeTextureId) ?? texture;
   const viewPixels = draftPixels ?? visibleTexture.pixels;
   const groupedMembers = new Set((doc.groups ?? []).flatMap(group => group.memberIds));
@@ -930,7 +940,11 @@ export function App() {
         <SectionHeading title="Scene" trailing={<button type="button" className="shape-trigger" aria-label="Add primitive" aria-expanded={shapeMenuOpen} aria-controls="shape-creation-menu"
           onClick={() => setShapeMenuOpen(value => !value)}><Plus size={15}/><span>Add shape</span><ChevronDown size={13}/></button>}/>
         {shapeMenuOpen && <div id="shape-creation-menu" className="shape-creation-menu" role="menu" aria-label="Choose a primitive"><div className="shape-menu-title">ADD A CUBOID PRIMITIVE</div>
-          {PRIMITIVE_PRESETS.map(shape => <button type="button" role="menuitem" key={shape.id} onClick={() => addShape(shape.id)}><Box size={16}/><span><strong>{shape.label}</strong><small>{shape.description}</small></span></button>)}</div>}
+          {PRIMITIVE_PRESETS.map(shape => <button type="button" role="menuitem" key={shape.id} onClick={() => addShape(shape.id)}><Box size={16}/><span><strong>{shape.label}</strong><small>{shape.description}</small></span></button>)}
+          <div className="shape-menu-title">PREFAB LIBRARY · FURNITURE</div>
+          {PREFAB_LIBRARY.map(prefab => <button type="button" role="menuitem" key={prefab.id} onClick={() => addLibraryItem(prefab.id)}>
+            <FlaskConical size={16}/><span><strong>{prefab.name}</strong><small>{prefab.description}</small></span>
+          </button>)}</div>}
         <div className="scene-search"><Search size={15}/><input value={search} aria-label="Filter scene elements" onChange={event => setSearch(event.target.value)} placeholder="Find an element…"/></div>
         <div className="scene-selection-tools"><button type="button" onClick={selectEditable} title="Select visible, unlocked matches (Ctrl/Cmd+A)">Select editable</button>
           <button type="button" onClick={() => selectNode(null)}>Clear</button>
