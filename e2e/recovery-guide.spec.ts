@@ -1,3 +1,12 @@
+test("an immediate edit waits for recovery ownership instead of being silently dropped", async ({ page }) => {
+  await page.goto("/");
+  const size = page.getByRole("textbox", { name: "X size" });
+  await size.fill("12"); await size.press("Enter");
+  await expect(page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true })).toBeEnabled();
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+  await expect(size).toHaveValue("12");
+});
+
 import { expect, test } from "@playwright/test";
 
 test("recovery details only acknowledge a committed revision and offer independent backup paths", async ({ page }) => {
