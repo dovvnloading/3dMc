@@ -14,7 +14,7 @@ test("The Aetherheart opens as a complete, editable showcase and exports portabl
   await expect(featured).toBeVisible();
   await featured.click();
   await expect(featured).toHaveAttribute("aria-pressed", "true");
-  await expect(dialog.getByRole("region", { name: "Showcase contents" })).toContainText("216");
+  await expect(dialog.getByRole("region", { name: "Showcase contents" })).toContainText("236");
   await expect(dialog.getByRole("textbox", { name: "New project name" }))
     .toHaveValue("The Aetherheart · Celestial Relay");
   await dialog.getByRole("button", { name: "Create project" }).click();
@@ -26,7 +26,7 @@ test("The Aetherheart opens as a complete, editable showcase and exports portabl
   else await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
   await page.screenshot({ path: "test-results/aetherheart-" + browserName + ".png" });
   const scene = page.getByRole("listbox", { name: "Scene elements" });
-  await expect(scene.getByRole("option")).toHaveCount(216);
+  await expect(scene.getByRole("option")).toHaveCount(236);
 
   await page.getByRole("tab", { name: "Model" }).click();
   await scene.getByRole("option").first().click();
@@ -40,7 +40,7 @@ test("The Aetherheart opens as a complete, editable showcase and exports portabl
   const path = await download.path();
   if (!path) throw new Error("Aetherheart source download missing");
   const source = JSON.parse(await readFile(path, "utf8")) as EditorDocument;
-  expect(source.cuboids).toHaveLength(216);
+  expect(source.cuboids).toHaveLength(236);
   expect(source.groups).toHaveLength(9);
   expect(source.textures).toHaveLength(10);
   expect(source.textures.some(texture => texture.layers?.length === 2)).toBe(true);
