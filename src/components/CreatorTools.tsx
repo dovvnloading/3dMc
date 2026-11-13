@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, FolderArchive, LayoutPanelTop, Scan, Shapes, UnfoldHorizontal } from "lucide-react";
 import type { EditorDocument, FaceDirection } from "../editor/domain";
 import { activeTexture } from "../editor/domain";
@@ -14,12 +14,15 @@ import { ProjectLibraryDialog } from "./ProjectLibraryDialog";
 import "./creator-tools.css";
 
 type Panel = "region" | "face" | "import" | "library" | "workspace" | null;
-export function CreatorTools({ document, revision, pack, mode, selectedId, face, onApply, onOpen, onOpenPack, onBackup, onLayout, onCancelGesture }: {
+export function CreatorTools({ document, revision, pack, mode, selectedId, face, onApply, onOpen, onOpenPack,
+  onBackup, onLayout, onCancelGesture, onNewProject, onModeChange, onExport, libraryRequest = 0 }: {
   document: EditorDocument; revision: number; pack?: PackSnapshot | null; mode: Mode; selectedId: string | null; face: FaceDirection;
   onApply: (operation: (document: EditorDocument) => EditorDocument) => boolean;
   onOpen: (document: EditorDocument) => Promise<boolean>;
   onOpenPack: (pack: NativePackProject) => Promise<boolean>; onBackup: () => Promise<void>;
   onLayout: (layout: "balanced" | "canvas" | "paint") => void; onCancelGesture: () => void;
+  onNewProject: () => void; onModeChange: (mode: Mode) => void; onExport: () => void;
+  libraryRequest?: number;
 }) {
   const [panel, setPanel] = useState<Panel>(null), [source, setSource] = useState<EditorDocument | null>(null);
   const [clipboard, setClipboard] = useState<PixelClipboard | null>(null);
@@ -33,6 +36,21 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
     setPanel(next);
   };
   const close = () => { setPanel(null); setSource(null); setLibrarySource(null); };
+  // A user may enter the same library directly from Recovery details.
+  const lastLibraryRequest = useRef(libraryRequest);
+  useEffect(() => {
+    if (lastLibraryRequest.current !== libraryRequest) {
+      lastLibraryRequest.current = libraryRequest;
+      open("library");
+    }
+  }, [libraryRequest]);
+  const startTask = (task: "new" | "model" | "paint" | "save" | "export") => {
+    close();
+    if (task === "new") onNewProject();
+    else if (task === "model" || task === "paint") onModeChange(task);
+    else if (task === "save") void onBackup();
+    else onExport();
+  };
   const node = document.cuboids.find(item => item.id === selectedId);
   return <div className="creator-tools" aria-label="Creator workflow tools">
     {mode === "paint" && <>
@@ -41,14 +59,28 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
     </>}
     <button type="button" onClick={() => open("import")} title="Preflight a supported external Java block model with local PNG dependencies"><Shapes size={14}/><span>Import model</span></button>
     <button type="button" onClick={() => open("library")} title="Explicit, verified local native snapshots"><FolderArchive size={14}/><span>Library</span></button>
-    <button type="button" onClick={() => open("workspace")} aria-label="Workspace guide and layouts" title="Workspace layouts, commands and save semantics"><BookOpen size={15}/></button>
+    <button type="button" onClick={() => open("workspace")} aria-label="Workspace guide and layouts" title="Start here: create, model, paint, save and export"><BookOpen size={15}/><span>Guide</span></button>
     {panel === "region" && source && <TextureRegionDialog source={source} current={document} texture={activeTexture(source)}
       clipboard={clipboard} onCopy={setClipboard} onApply={onApply} onClose={close}/>}
     {panel === "face" && selectedId && <FaceToolsDialog document={document} nodeId={selectedId} face={face} onApply={onApply} onClose={close}/>}
     {panel === "import" && <ExternalModelDialog currentName={document.name} onOpen={onOpen} onBackup={onBackup} onClose={close}/>}
     {panel === "library" && librarySource && <ProjectLibraryDialog source={librarySource.source} revision={librarySource.revision}
       pack={librarySource.pack} onOpen={onOpen} onOpenPack={onOpenPack} onBackup={onBackup} onClose={close}/>}
-    {panel === "workspace" && <CreatorDialog title="Workspace guide and layouts" kicker="ONE PROJECT · MODEL, PAINT AND PREVIEW" onClose={close}>
+    {panel === "workspace" && <CreatorDialog title="Workspace guide and layouts" kicker="FIRST PROJECT · CREATE TO EXPORT" onClose={close}>
+      <h3>Make your first editable resource pack</h3>
+      <p className="creator-description">Follow these tasks in order. Each action opens the real editor tool; this guide does not mark a task complete until you do it.</p>
+      <ol className="creator-starter-steps">
+        <li><div><strong>Start with a template</strong><p>Choose a block or lantern to edit. Creating a project replaces the current workspace only after confirmation.</p></div>
+          <button type="button" onClick={() => startTask("new")}>Choose a template</button></li>
+        <li><div><strong>Model your shape</strong><p>Use the Scene panel, drag handles and numeric inspector to edit cuboids. Undo remains available.</p></div>
+          <button type="button" onClick={() => startTask("model")}>Model mode</button></li>
+        <li><div><strong>Paint and map faces</strong><p>Paint textures, select face UVs and review which texture each face uses.</p></div>
+          <button type="button" onClick={() => startTask("paint")}>Paint mode</button></li>
+        <li><div><strong>Keep an editable backup</strong><p>Save a .3dmc source file for your own storage. Local recovery and Library snapshots are separate.</p></div>
+          <button type="button" onClick={() => startTask("save")}>Download .3dmc</button></li>
+        <li><div><strong>Review and export</strong><p>Check target-specific blockers and export the supported Java 1.21.4 pack. Test visual results in Minecraft.</p></div>
+          <button type="button" onClick={() => startTask("export")}>Review export</button></li>
+      </ol>
       <h3>Workspace layouts</h3><div className="creator-button-grid">{(["balanced", "canvas", "paint"] as const).map(layout =>
         <button type="button" key={layout} onClick={() => { onLayout(layout); close(); }}><LayoutPanelTop size={15}/>{layout === "balanced" ? "Reset balanced layout" : layout === "canvas" ? "Focus canvas" : "Paint workspace"}</button>)}</div>
       <p className="creator-help">Layouts change panels and authoring mode only; geometry, pixels, selection history and saved source are not edited.</p>
