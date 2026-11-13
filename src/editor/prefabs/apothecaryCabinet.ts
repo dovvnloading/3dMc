@@ -286,7 +286,7 @@ export function createApothecaryCabinet(): AuthoredPrefab {
     brass, { front: paper, decal: "crest" });
 
   // Broad shouldered tonic, tall narrow moonwater vial and squat red elixir.
-  // Every heel sits on the shelf and each stopper enters its own neck.
+  // Every heel sits on the shelf and each stopper seats on its brass collar.
   const shelfY = 11.8;
   const potions = [
     { name: "Verdant tonic", x: 3.78, z: 5.58, width: 2.82, depth: 1.96, shoulder: 13.45,

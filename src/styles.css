@@ -259,6 +259,11 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .empty-inspector p { font-size:12px; margin:0 0 18px; }
 .paint-options { padding:5px 15px 18px; border-top:1px solid var(--divider); }
 .paint-options .panel-section-heading { padding:0; }
+/* Long texture-layer lists and palettes share one scroll area with face UVs.
+   A separate flex-height inspector can collapse to zero between these sections. */
+.inspector-panel:has(> .paint-options) { overflow-y:auto; }
+.inspector-panel:has(> .paint-options) > * { flex:none; }
+.inspector-panel:has(> .paint-options) > .inspector-scroll { overflow:visible; }
 .palette { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:5px; margin-bottom:12px; }
 .palette button { height:25px; border-radius:4px; border:2px solid transparent; display:grid; place-items:center; color:#141619; padding:0; }
 .palette button.chosen { border-color:#f0f2f6; outline:1px solid #141619; }
