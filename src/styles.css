@@ -1010,3 +1010,23 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 .raster-opacity input[aria-invalid=true]{border-color:#e0988c}
 .raster-opacity small{color:#e0988c}
 .raster-layer-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Import validation runs off-thread. Only file-read progress is determinate. */
+.import-progress {
+  position: fixed; z-index: 25; top: 64px; right: 12px;
+  width: min(430px, calc(100vw - 24px)); box-sizing: border-box;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 9px;
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--raised); border: 1px solid var(--interactive-border);
+  box-shadow: 0 10px 32px #0007; color: var(--text); font-size: 12px;
+}
+.import-progress.inline { position: static; width: 100%; margin: 0 0 12px; box-shadow: none; }
+.import-progress-label { flex: 1 1 190px; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.import-progress progress { order: 3; width: 100%; height: 6px; accent-color: var(--accent); }
+.import-progress button {
+  flex: 0 0 auto; border: 1px solid var(--interactive-border); border-radius: 5px;
+  color: var(--text); background: var(--control); padding: 7px 10px;
+  font: inherit; cursor: pointer;
+}
+.import-progress button:hover, .import-progress button:focus-visible { border-color: var(--accent); }
+@media (max-width: 760px) { .import-progress:not(.inline) { top: 108px; left: 10px; right: 10px; width: auto; } }
