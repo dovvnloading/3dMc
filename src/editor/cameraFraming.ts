@@ -65,7 +65,11 @@ export function frameDocumentCamera(
     (min[1]! + max[1]!) / 32,
     (min[2]! + max[2]! - 16) / 32
   ];
-  const direction = unit(directions[kind]);
+  // The usual 45° ISO aligns the near corner pylon directly over the
+  // Aetherheart. A slightly more frontal gallery angle reveals the floating
+  // crystal between its supporting columns without changing other projects.
+  const direction = unit(kind === "iso" && isAetherheartShowcase(doc)
+    ? [1.65, 1.85, 3.55] : directions[kind]);
   const right = unit(cross([0, 1, 0], direction));
   const up = cross(direction, right);
   // Use a smaller margin on the designed showcase, not on ordinary assets.
