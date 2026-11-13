@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, FolderOpen, Layers3, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { Download, FolderOpen, Layers3, PackageOpen, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { renameProject } from "../editor/domain";
@@ -75,7 +75,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
   const [modelQuery, setModelQuery] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const [pending, setPending] = useState<PackSession | null>(null);
+  const [pendingJavaDetails, setPendingJavaDetails] = useState<{
+    paths: string[]; notices: string[];
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const javaFileRef = useRef<HTMLInputElement>(null);
   const addFileRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -121,10 +125,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     openAbortRef.current = null;
     setOpening(false);
     setOpenProgress(null);
+    setPendingJavaDetails(null);
     setMessage("Import canceled. The current pack and models were not changed.");
   };
 
-  const prepareOpen = async (file: File, kind: "pack" | "single") => {
+  const prepareOpen = async (file: File, kind: "pack" | "single" | "java-pack") => {
     openAbortRef.current?.abort();
     const controller = new AbortController();
     openAbortRef.current = controller;
@@ -132,6 +137,7 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     const current = () => openAbortRef.current === controller && !controller.signal.aborted;
     setOpening(true);
     setPending(null);
+    setPendingJavaDetails(null);
     setOpenProgress({ name: file.name, stage: "reading", loaded: 0, total: file.size });
     setMessage("");
     try {
@@ -139,6 +145,8 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         throw new Error("The source pack exceeds the 12 MB limit. Nothing was replaced.");
       if (kind === "single" && file.size > 3_000_000)
         throw new Error("The single-model source exceeds the 3 MB import limit.");
+      if (kind === "java-pack" && file.size > MAX_NATIVE_PACK_BYTES)
+        throw new Error("Java resource-pack ZIP exceeds the 12 MB supported import limit.");
       const bytes = await readImportFile(file, controller.signal, (loaded, total) => {
         if (current()) setOpenProgress({ name: file.name, stage: "reading", loaded, total });
       });
@@ -155,6 +163,14 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
         setMessage("Review the pack before replacing the current Pack Studio session.");
       } else if (kind === "single" && result.kind === "document") {
         addSource(result.document);
+      } else if (kind === "java-pack" && result.kind === "java") {
+        if (result.report.status === "blocked")
+          throw new Error(result.report.problems.join(" "));
+        if (result.report.status !== "editable-pack")
+          throw new Error("This ZIP does not contain a supported complete Java pack.");
+        setPending(createPackSession(result.report.project.pack, result.report.project.sources));
+        setPendingJavaDetails({ paths: result.report.paths, notices: result.report.notices });
+        setMessage("Review the Java ZIP resources before replacing the current Pack Studio session.");
       } else {
         throw new Error("The import worker returned an unexpected source type.");
       }
@@ -173,6 +189,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     event.target.value = "";
     if (file) void prepareOpen(file, "pack");
   };
+  const chooseJavaZip = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void prepareOpen(file, "java-pack");
+  };
 
   const loadPending = async () => {
     if (!pending) return;
@@ -181,7 +202,10 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     if (!onOpenPack) setSession(pending);
     setLastSavedRevision(pending.revision);
     setPending(null);
-    setMessage("Source pack loaded. All models and textures were retained.");
+    setMessage(pendingJavaDetails
+      ? "Supported Java models, textures and item definitions are now editable. Save a .3dmc source copy."
+      : "Source pack loaded. All models and textures were retained.");
+    setPendingJavaDetails(null);
     setConfirmClose(false);
   };
 
@@ -331,6 +355,11 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
       <button type="button" disabled={opening} onClick={() => fileRef.current?.click()}>
         <FolderOpen size={15}/>Open source pack
       </button>
+      <input ref={javaFileRef} type="file" hidden accept=".zip,application/zip"
+        aria-label="Java pack ZIP file" onChange={event => void chooseJavaZip(event)}/>
+      <button type="button" disabled={opening} onClick={() => javaFileRef.current?.click()}>
+        <PackageOpen size={15}/>Import Java ZIP
+      </button>
       <button type="button" disabled={saving || exporting} onClick={() => void save()}>
         <Save size={15}/>{saving ? "Preparing source…" : "Save pack .3dmc"}
       </button>
@@ -346,9 +375,29 @@ export function PackStudioDialog({ source, onClose, session: external, onChange,
     {openProgress && <ImportProgress progress={openProgress} onCancel={cancelOpen} inline/>}
 
     {pending && <div className="pack-studio-confirm" role="group" aria-label="Confirm source pack replacement">
-      <p>Replace this Pack Studio session with <strong>{pending.present.pack.name}</strong> ({pending.present.pack.models.length} models)? Download a source backup first if needed.</p>
-      <button type="button" onClick={() => void loadPending()}>Load selected pack</button>
-      <button type="button" onClick={() => { setPending(null); setMessage(""); }}>Cancel</button>
+      <p>Replace this Pack Studio session with <strong>{pending.present.pack.name}</strong>
+        ({pending.present.pack.models.length} editable model(s), {pending.present.pack.textures.length} texture(s),
+        {pending.present.pack.items?.length ?? 0} item(s))? Download a .3dmc source backup first if needed.</p>
+      {pendingJavaDetails && <>
+        <p>This Java ZIP was validated for the supported 1.21.4 subset. Native-only project names, groups, layers and history are not included in Java resource packs.</p>
+        <div className="pack-studio-import-resources" aria-label="Java ZIP resource preview">
+          <strong>Supported replacement targets</strong>
+          {pending.present.pack.exportBlockVisuals !== false &&
+            pending.present.pack.models.map(model => <code key={model.id}>
+              {model.replaces.namespace + ":" + model.replaces.path} → {model.resource.namespace + ":" + model.resource.path}
+            </code>)}
+          {(pending.present.pack.items ?? []).map(item => <code key={item.id}>
+            {item.replaces.namespace + ":" + item.replaces.path} → {item.resource.namespace + ":" + item.resource.path}
+          </code>)}
+          <details><summary>Validated files ({pendingJavaDetails.paths.length})</summary>
+            {pendingJavaDetails.paths.slice(0, 80).map(path => <code key={path}>{path}</code>)}
+            {pendingJavaDetails.paths.length > 80 && <p>And {pendingJavaDetails.paths.length - 80} more validated files.</p>}
+          </details>
+          {pendingJavaDetails.notices.map(notice => <p key={notice}>{notice}</p>)}
+        </div>
+      </>}
+      <button type="button" onClick={() => void loadPending()}>{pendingJavaDetails ? "Import verified Java pack" : "Load selected pack"}</button>
+      <button type="button" onClick={() => { setPending(null); setPendingJavaDetails(null); setMessage(""); }}>Cancel</button>
     </div>}
 
     <div className="pack-studio-layout">

@@ -2,6 +2,8 @@ import { decodeProject, MAX_PROJECT_BYTES } from "./project";
 import { decodeNativeProject, MAX_NATIVE_BYTES } from "./nativeArchive";
 import { decodeNativePack, MAX_NATIVE_PACK_BYTES, openNativePack } from "./nativePackArchive";
 import { inspectJava1214Pack } from "../import/javaPack";
+import { inspectIndexedJava1214Pack } from "../import/indexedJavaPack";
+import { MAX_INDEXED_EXPORT_BYTES } from "../pack/javaPackBuilder";
 import type { ImportJobRequest, ImportJobResult } from "./importJobs";
 
 /** Pure codec boundary: all import preflight runs without React or live project state. */
@@ -41,9 +43,21 @@ export async function prepareImport(request: ImportJobRequest): Promise<ImportJo
         throw new Error("The single-model source exceeds the 3 MB import limit.");
       return { kind: "document", document: await decodeNativeProject(bytes) };
     case "java":
-      if (bytes.length > 2_000_000)
-        throw new Error("This ZIP exceeds the 2 MB pack-import limit.");
-      return { kind: "java", report: inspectJava1214Pack(bytes) };
+    case "java-pack": {
+      if (bytes.length > MAX_INDEXED_EXPORT_BYTES)
+        throw new Error("This ZIP exceeds the 12 MB Java pack-import limit.");
+      // Preserve the legacy single-diamond-block behavior from the main
+      // editor's Import pack action. Pack Studio always opens a full pack.
+      if (request.kind === "java" && bytes.length <= 2_000_000) {
+        const legacy = inspectJava1214Pack(bytes);
+        if (legacy.status === "editable") return { kind: "java", report: legacy };
+      }
+      const indexed = inspectIndexedJava1214Pack(bytes);
+      return { kind: "java", report: indexed.status === "editable"
+        ? { status: "editable-pack", project: indexed.project,
+            paths: indexed.paths, notices: indexed.notices }
+        : { status: "blocked", problems: indexed.problems } };
+    }
     default:
       throw new Error("Unsupported import job.");
   }

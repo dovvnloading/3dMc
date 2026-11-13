@@ -685,8 +685,8 @@ export function App() {
     try {
       if (kind === "source" && file.size > MAX_NATIVE_PACK_BYTES)
         throw new Error("File exceeds the 12 MB source pack import budget.");
-      if (kind === "java" && file.size > 2_000_000)
-        throw new Error("This ZIP exceeds the 2 MB pack-import limit.");
+      if (kind === "java" && file.size > MAX_NATIVE_PACK_BYTES)
+        throw new Error("This ZIP exceeds the 12 MB supported Java pack-import limit.");
       const bytes = await readImportFile(file, controller.signal, (loaded, total) => {
         if (current()) setImportProgress({ name: file.name, stage: "reading", loaded, total });
       });
@@ -1145,13 +1145,41 @@ export function App() {
       paintedFaces={doc.cuboids.filter(node => node.material === "texture").length}
       hasLayers={!!texture.layers && textureSource.current?.mode === "replace"} onClose={() => { setPendingTexture(null); textureSource.current = null; }} onConfirm={applyImportedTexture}/>}
     {pendingPack && <ModalDialog className="modal import-modal" labelledBy="pack-import-title" onCancel={() => setPendingPack(null)}>
-      <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" : "Pack cannot be safely imported"}</h2></div></div>
+      <div className="import-header"><div className="modal-icon"><PackageOpen size={22}/></div><div><span className="export-kicker">IMPORT PREFLIGHT · JAVA 1.21.4</span><h2 id="pack-import-title">{pendingPack.status === "editable" ? "Import editable block pack?" :
+        pendingPack.status === "editable-pack" ? "Import editable Java pack?" :
+        "Pack cannot be safely imported"}</h2></div></div>
       {pendingPack.status === "editable" ? <><p>This pack matches the supported 3dMc experimental export format. Import it as a <strong> new editable project</strong> with its geometry and opaque texture pixels.</p>
         <div className="import-summary"><div><span>ELEMENTS</span><strong>{pendingPack.document.cuboids.length}</strong></div><div><span>TEXTURE</span><strong>{activeTexture(pendingPack.document).width} × {activeTexture(pendingPack.document).height}</strong></div><div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div></div>
         <div className="import-notices"><h3>What to know before importing</h3>{pendingPack.notices.map(message => <p key={message}><Info size={15}/>{message}</p>)}</div>
         <p className="import-consequence">Your current workspace will be replaced. Download your current native project first if you need an independent copy. The original ZIP is never modified.</p>
         <div className="modal-actions"><button className="text-button quiet" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Cancel</button><button className="text-button primary" onClick={() => void acceptOpen(pendingPack.document)}><PackageOpen size={15}/>Import as editable project</button></div>
-      </> : <><p>No changes were made to your project. This importer accepts only the exact structure produced by the 3dMc experimental Java 1.21.4 exporter.</p><div className="import-blockers">{pendingPack.problems.map(message => <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}</div>
+      </> : pendingPack.status === "editable-pack" ? <>
+        <p>This Java Edition 1.21.4 ZIP matches the supported 3dMc multi-asset format. Import every source model and texture into one editable Pack Studio session.</p>
+        <div className="import-summary">
+          <div><span>MODELS</span><strong>{pendingPack.project.pack.models.length}</strong></div>
+          <div><span>TEXTURES</span><strong>{pendingPack.project.pack.textures.length}</strong></div>
+          <div><span>ITEMS</span><strong>{pendingPack.project.pack.items?.length ?? 0}</strong></div>
+          <div><span>FILES</span><strong>{pendingPack.paths.length}</strong></div>
+        </div>
+        <div className="import-notices"><h3>Verified resources</h3>
+          <p><Info size={15}/>All referenced resources were checked against an equivalent re-export.</p>
+          {pendingPack.project.pack.models.map(model => <p key={model.id}><Info size={15}/>
+            {model.resource.namespace + ":" + model.resource.path} · {pendingPack.project.pack.exportBlockVisuals === false
+              ? "item-only source" : model.replaces.namespace + ":" + model.replaces.path}</p>)}
+          {(pendingPack.project.pack.items ?? []).map(item => <p key={item.id}><Info size={15}/>
+            Item {item.replaces.namespace + ":" + item.replaces.path} → {item.resource.namespace + ":" + item.resource.path}</p>)}
+          {pendingPack.notices.map(message => <p key={message}><Info size={15}/>{message}</p>)}
+        </div>
+        <details className="import-resource-preview"><summary>Inspect ZIP resource files ({pendingPack.paths.length})</summary>
+          <div>{pendingPack.paths.slice(0, 80).map(path => <code key={path}>{path}</code>)}
+          {pendingPack.paths.length > 80 && <p>And {pendingPack.paths.length - 80} additional validated files.</p>}</div>
+        </details>
+        <p className="import-consequence">This replaces the current workspace only after confirmation. Download your current .3dmc source first if needed. Minecraft ZIP files do not contain native editor names, history or layers.</p>
+        <div className="modal-actions">
+          <button className="text-button quiet" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Cancel</button>
+          <button className="text-button primary" onClick={() => void acceptPackOpen(createPackSession(pendingPack.project.pack, pendingPack.project.sources))}><PackageOpen size={15}/>Import complete pack</button>
+        </div>
+      </> : <><p>No changes were made to your project. This importer accepts only the supported 3dMc Java 1.21.4 export subset.</p><div className="import-blockers">{pendingPack.problems.map(message => <p key={message}><AlertCircle size={16}/><span>{message}</span></p>)}</div>
         <p className="import-consequence">Other resource packs may use valid Minecraft features that this editor cannot yet preserve. They are blocked rather than partially converted.</p><div className="modal-actions"><button className="text-button primary" data-dialog-initial-focus onClick={() => setPendingPack(null)}>Keep working</button></div></>}
     </ModalDialog>}
     {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={createNewProject} onBackup={saveProject}/>}

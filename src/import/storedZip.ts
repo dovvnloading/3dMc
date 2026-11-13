@@ -6,11 +6,17 @@ import { crc32 } from "../export/png";
  * Only STORED entries are accepted: no decompression is performed on untrusted
  * archives. All byte counts, paths and checksums are checked before decoding.
  */
-const LIMITS = {
+const LEGACY_LIMITS = {
   archive: 2_000_000,
   total: 1_800_000,
   file: 250_000,
   entries: 260
+} as const;
+const INDEXED_LIMITS = {
+  archive: 12_000_000,
+  total: 12_000_000,
+  file: 250_000,
+  entries: 2600
 } as const;
 
 const DECODER = new TextDecoder("utf-8", { fatal: true });
@@ -40,27 +46,39 @@ function reject(message: string): never {
   throw new InvalidPackArchive(message);
 }
 
-const isPathAllowed = (path: string): boolean =>
+const isLegacyPathAllowed = (path: string): boolean =>
   EXPECTED.has(path) ||
   /^assets\/3dmc\/textures\/block\/solid_(0|[1-9][0-9]*)\.png$/.test(path) ||
   /^assets\/3dmc\/textures\/block\/tex_([1-9][0-9]*)\.png$/.test(path);
+
+/** The indexed reader allows only bounded resource categories; the importer
+ * then requires EVERY permitted path to be referenced by a supported asset. */
+const isIndexedPathAllowed = (path: string): boolean => {
+  if (path === "pack.mcmeta") return true;
+  if (path.split("/").some(part => part === "." || part === "..")) return false;
+  return /^assets\/[a-z0-9_.-]{1,64}\/(?:models|blockstates|items)\/[a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*\.json$/.test(path) ||
+    /^assets\/[a-z0-9_.-]{1,64}\/textures\/[a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*\.png$/.test(path);
+};
 
 function readView(bytes: Uint8Array): DataView {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
-function readName(bytes: Uint8Array, start: number, length: number): string {
+function readName(bytes: Uint8Array, start: number, length: number, indexed: boolean): string {
   if (length === 0 || length > 200 || start + length > bytes.length) reject("Invalid ZIP path length.");
   const name = DECODER.decode(bytes.subarray(start, start + length));
-  if (!isPathAllowed(name)) {
-    reject("Unsupported file in pack: " + name + ". Only 3dMc's experimental block-pack file set is editable.");
+  if (!(indexed ? isIndexedPathAllowed(name) : isLegacyPathAllowed(name))) {
+    reject("Unsupported file in pack: " + name + ". This importer cannot preserve unrecognized resources.");
   }
   return name;
 }
 
-export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
-  if (bytes.byteLength > LIMITS.archive || bytes.byteLength < 22)
-    reject("The ZIP is empty, invalid, or exceeds the 2 MB experimental import limit.");
+function readStoredZip(bytes: Uint8Array, indexed: boolean): Map<string, Uint8Array> {
+  const limits = indexed ? INDEXED_LIMITS : LEGACY_LIMITS;
+  const required = indexed ? ["pack.mcmeta"] : [...EXPECTED];
+  if (bytes.byteLength > limits.archive || bytes.byteLength < 22)
+    reject("The ZIP is empty, invalid, or exceeds the " +
+      (indexed ? "12 MB indexed" : "2 MB experimental") + " import limit.");
 
   const view = readView(bytes);
   // EOCD must be complete and at the end; reject multi-disk, ZIP64 and comments.
@@ -76,7 +94,7 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
   if (view.getUint16(end + 4, true) !== 0 || view.getUint16(end + 6, true) !== 0)
     reject("Multi-disk ZIPs are not supported.");
   const count = view.getUint16(end + 10, true);
-  if (count > LIMITS.entries || count < EXPECTED.size ||
+  if (count > limits.entries || count < required.length ||
       count !== view.getUint16(end + 8, true)) reject("ZIP file count exceeds the supported format.");
   const centralSize = view.getUint32(end + 12, true);
   const centralStart = view.getUint32(end + 16, true);
@@ -105,20 +123,20 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     const localOffset = view.getUint32(pos + 42, true);
     if (extraLength !== 0 || commentLength !== 0)
       reject("ZIP entry extras or comments are outside the generated-pack contract.");
-    if (size > LIMITS.file || compressed !== size || size === 0xffffffff ||
+    if (size > limits.file || compressed !== size || size === 0xffffffff ||
         localOffset === 0xffffffff) reject("ZIP entry is oversized or uses unsupported compression.");
     const next = pos + 46 + nameLength + extraLength + commentLength;
     if (next > end) reject("ZIP directory entry exceeds the directory.");
-    const path = readName(bytes, pos + 46, nameLength);
+    const path = readName(bytes, pos + 46, nameLength, indexed);
     if (names.has(path)) reject("Duplicate resource path in ZIP: " + path);
     names.add(path);
     entries.push({ path, localOffset, centralCrc: crc, size, flags });
     total += size;
-    if (total > LIMITS.total) reject("ZIP contents exceed the experimental 1.8 MB limit.");
+    if (total > limits.total) reject("ZIP contents exceed the experimental 1.8 MB limit.");
     pos = next;
   }
   if (pos !== end) reject("ZIP directory has unrecognized trailing bytes.");
-  for (const path of EXPECTED) {
+  for (const path of required) {
     if (!names.has(path)) reject("The generated-pack resource is missing: " + path);
   }
 
@@ -138,7 +156,7 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
     if (flags !== entry.flags || method !== 0 || crc !== entry.centralCrc ||
         compressed !== entry.size || size !== entry.size || extraLength !== 0)
       reject("Local ZIP header disagrees with the directory.");
-    const name = readName(bytes, start + 30, nameLength);
+    const name = readName(bytes, start + 30, nameLength, indexed);
     if (name !== entry.path) reject("ZIP local file name disagrees with directory.");
     const dataStart = start + 30 + nameLength;
     const dataEnd = dataStart + size;
@@ -156,4 +174,14 @@ export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
   }
   if (cursor !== centralStart) reject("ZIP contains untracked data before its directory.");
   return files;
+}
+
+/** Keep the exact single-block importer contract unchanged for legacy callers. */
+export function read3dMcStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
+  return readStoredZip(bytes, false);
+}
+
+/** Bounded STORED/CRC-checked reader for multi-model 3dMc Java ZIPs. */
+export function readIndexedJavaStoredZip(bytes: Uint8Array): Map<string, Uint8Array> {
+  return readStoredZip(bytes, true);
 }

@@ -7,7 +7,8 @@ export type ImportJobRequest =
   | { kind: "source"; filename: string; bytes: Uint8Array }
   | { kind: "pack"; bytes: Uint8Array }
   | { kind: "single"; bytes: Uint8Array }
-  | { kind: "java"; bytes: Uint8Array };
+  | { kind: "java"; bytes: Uint8Array }
+  | { kind: "java-pack"; bytes: Uint8Array };
 
 export type ImportJobResult =
   | { kind: "document"; document: EditorDocument }
@@ -36,11 +37,15 @@ function validResult(request: ImportJobRequest, value: unknown): value is Import
   }
   if (result.kind === "java") {
     const report = result.report;
-    return request.kind === "java" && !!report && typeof report === "object" &&
+    return (request.kind === "java" || request.kind === "java-pack") &&
+      !!report && typeof report === "object" &&
       (report.status === "blocked"
         ? Array.isArray(report.problems) && report.problems.every(item => typeof item === "string")
-        : report.status === "editable" && !!report.document &&
-          Array.isArray(report.paths) && Array.isArray(report.notices));
+        : report.status === "editable"
+          ? !!report.document && Array.isArray(report.paths) && Array.isArray(report.notices)
+          : report.status === "editable-pack" && !!report.project?.pack &&
+            Array.isArray(report.project.sources) &&
+            Array.isArray(report.paths) && Array.isArray(report.notices));
   }
   return false;
 }

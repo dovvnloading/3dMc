@@ -5,6 +5,7 @@ import { encodeNativeProject } from "./nativeArchive";
 import { encodeNativePack } from "./nativePackArchive";
 import { indexLegacyProject } from "../pack/packDocument";
 import { makeJava1214Pack } from "../export/javaBlock";
+import { makeIndexedJava1214Pack } from "../pack/javaPackBuilder";
 import { prepareImport } from "./importPreparation";
 
 describe("worker import codec boundary", () => {
@@ -53,6 +54,43 @@ describe("worker import codec boundary", () => {
     expect(result.report.paths).toContain("pack.mcmeta");
   });
 
+  it("routes multi-model Java ZIPs into a complete editable Pack Studio preview", async () => {
+    const first = createSampleDocument();
+    const second = { ...createSampleDocument(), id: "import-preparation-second" };
+    const pack = indexLegacyProject(first);
+    pack.models.push({
+      id: "second", sourceDocumentId: second.id,
+      resource: { namespace: "custom", path: "block/second" },
+      replaces: { namespace: "minecraft", path: "iron_block" },
+      provenance: "editor",
+      textures: [{ sourceTextureId: "main", textureAssetId: "second-texture" }]
+    });
+    pack.textures.push({
+      id: "second-texture", sourceDocumentId: second.id, sourceTextureId: "main",
+      resource: { namespace: "custom", path: "block/second_sheet" }
+    });
+    const bytes = makeIndexedJava1214Pack(pack, [first, second]).zip;
+    for (const kind of ["java", "java-pack"] as const) {
+      const result = await prepareImport({ kind, bytes: new Uint8Array(bytes) });
+      expect(result.kind).toBe("java");
+      if (result.kind !== "java") throw new Error("Missing Java import report.");
+      expect(result.report.status).toBe("editable-pack");
+      if (result.report.status !== "editable-pack")
+        throw new Error("Expected a complete editable resource pack.");
+      expect(result.report.project.pack.models).toHaveLength(2);
+      expect(result.report.project.sources).toHaveLength(2);
+    }
+  });
+
+  it("keeps legacy Java Import pack behavior while Pack Studio can load one source pack", async () => {
+    const source = createSampleDocument();
+    const bytes = makeJava1214Pack(source).zip;
+    const legacy = await prepareImport({ kind: "java", bytes: new Uint8Array(bytes) });
+    const studio = await prepareImport({ kind: "java-pack", bytes: new Uint8Array(bytes) });
+    expect(legacy).toMatchObject({ kind: "java", report: { status: "editable" } });
+    expect(studio).toMatchObject({ kind: "java", report: { status: "editable-pack" } });
+  });
+
   it("reports invalid Java archives as blocked and rejects malformed native files", async () => {
     const bytes = new TextEncoder().encode("This is not a ZIP");
     expect(await prepareImport({ kind: "java", bytes }))
@@ -62,9 +100,11 @@ describe("worker import codec boundary", () => {
   });
 
   it("enforces archive budgets before decoding and refuses unsupported kinds", async () => {
-    const tooLarge = new Uint8Array(2_000_001);
+    const tooLarge = new Uint8Array(12_000_001);
     await expect(prepareImport({ kind: "java", bytes: tooLarge }))
-      .rejects.toThrow("2 MB");
+      .rejects.toThrow("12 MB");
+    await expect(prepareImport({ kind: "java-pack", bytes: tooLarge }))
+      .rejects.toThrow("12 MB");
     await expect(prepareImport({ kind: "single", bytes: new Uint8Array(3_000_001) }))
       .rejects.toThrow("3 MB");
     await expect(prepareImport({ kind: "other" as "pack", bytes: new Uint8Array() }))
