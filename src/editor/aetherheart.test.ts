@@ -10,14 +10,14 @@ describe("The Aetherheart showcase", () => {
     const source = createAetherheartDocument();
     expect(source).toEqual(createAetherheartDocument());
     expect(source.name).toBe(AETHERHEART_NAME);
-    expect(source.cuboids).toHaveLength(216);
+    expect(source.cuboids).toHaveLength(236);
     expect(source.groups).toHaveLength(9);
     expect(source.textures).toHaveLength(10);
     expect(source.palette).toHaveLength(16);
     expect(source.cuboids.every(node =>
       node.visible && !node.locked && node.material === "texture" && node.color === "#ffffff"
     )).toBe(true);
-    expect(new Set(source.cuboids.map(node => node.id)).size).toBe(216);
+    expect(new Set(source.cuboids.map(node => node.id)).size).toBe(236);
     expect(source.groups!.flatMap(group => group.memberIds).sort())
       .toEqual(source.cuboids.map(node => node.id).sort());
     expect(source.textures.some(texture => texture.layers?.length === 2)).toBe(true);
@@ -26,13 +26,32 @@ describe("The Aetherheart showcase", () => {
     expect(parseDocument(source)).toEqual(source);
   });
 
+  it("keeps 60 distinct, open gyroscope segments and an exposed cyan centerpiece", () => {
+    const source = createAetherheartDocument();
+    const names = source.cuboids.map(node => node.name);
+    expect(new Set(names).size).toBe(names.length);
+    const rings = source.cuboids.filter(node => /^(Meridian I|Meridian II|Equatorial orbit) · segment/.test(node.name));
+    expect(rings).toHaveLength(60);
+    expect(rings.every(node => node.to.every((coordinate, axis) =>
+      coordinate > node.from[axis]!))).toBe(true);
+    const heart = source.cuboids.find(node => node.name === "Crystal facet · ascending tier 4")!;
+    expect(heart.faces.north.textureId).toBe("aether");
+    const frontBar = source.cuboids.find(node => node.name === "Crosswind filament X")!;
+    expect(frontBar.to[2]).toBeLessThan(heart.from[2]);
+    const seams = source.cuboids.filter(node => node.name.startsWith("Prismatic light seam"));
+    expect(seams).toHaveLength(8);
+    expect(seams.every(node => node.material === "texture" && node.faces.north.textureId === "ivory"))
+      .toBe(true);
+    expect(source.textures.filter(texture => texture.layers?.length === 2)).toHaveLength(3);
+  });
+
   it("uses the normal project creation flow with an independent ID and custom name", () => {
     const document = makeNewProject({
       template: "aetherheart", name: "My star engine", resolution: 64, id: "my-custom-demo"
     });
     expect(document.id).toBe("my-custom-demo");
     expect(document.name).toBe("My star engine");
-    expect(document.cuboids).toHaveLength(216);
+    expect(document.cuboids).toHaveLength(236);
     expect(document.activeTextureId).toBe("aether");
     expect(document.groups![0]!.name).toContain("foundation");
   });
@@ -45,7 +64,7 @@ describe("The Aetherheart showcase", () => {
       Object.values(node.faces).map(face => face.textureId))).size).toBeGreaterThan(5);
     expect(source.cuboids.some(node => node.faces.up.rotation === 90)).toBe(true);
     const built = buildJava1214Model(source);
-    expect(built.elements).toHaveLength(216);
+    expect(built.elements).toHaveLength(236);
     const pack = makeJava1214Pack(source);
     expect(pack.zip.length).toBeGreaterThan(2000);
     expect(pack.paths.some(path => path.endsWith("tex_9.png"))).toBe(true);

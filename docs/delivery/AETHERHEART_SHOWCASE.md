@@ -27,15 +27,15 @@ first if you want an independent copy; local recovery is not a portable backup.
 | Compass and inscriptions | Individual rune scale markers and cardinal enamel plaques |
 | Four pylons | Copper boots, basalt spines, dual inset conduits, collars, eyes, finials and rivets |
 | Clockwork canopy | Open-frame trusses, bright pinstripes, a suspended crown and tiny upper anchors |
-| Three gyroscopes | Two perpendicular meridians and a broad horizontal orbit, built from 48 individually editable segments |
+| Three gyroscopes | Two perpendicular meridians and a broad horizontal orbit, built from 60 individually editable segments |
 | Suspended Aetherheart | Seven prism tiers, painted crystal face facets, intersecting filaments and suspension beads |
 | Focusing lenses | Four luminous optical assemblies surrounding the gyroscope |
 | Orbiting fragments | Eight star-shards and four little floating gold sparks |
 | Finishing accents | Engraved floor bosses, moonstones and crown detailing |
 
-**Document stats:** 216 cuboids across 9 scene groups, 10 distinct 32/64-pixel
+**Document stats:** 236 cuboids across 9 scene groups, 10 distinct 32/64-pixel
 textures, editable pigment/etching layers on 3 of those textures, a 16-color
-palette, per-face UV coordinates and quarter-turn UV rotations. All 216 cuboids
+palette, per-face UV coordinates and quarter-turn UV rotations. All 236 cuboids
 remain visible and unlocked. Every element uses a real painted texture rather
 than a renderer-only material or a generated solid-color export PNG.
 
@@ -57,6 +57,16 @@ downloads or third-party assets. Pixel sheets deliberately use both
 base pigments and editable transparent detail layers. Their flattened
 output is opaque, so the experimental Java pack export does not run into
 the current alpha restriction.
+
+## First-open gallery
+
+The initial Preview now uses model-aware framing and a slightly off-diagonal
+camera angle to reveal the crystal between its corner supports. The inspector
+offers working shortcuts to inspect the core, explore the gyroscopes and paint
+the star chart. Extra warm and cyan lights are purely **viewport atmosphere**
+and do not export as game lighting. For a detailed before/after audit and
+repeatable verification checklist, read the
+[visual and functional QA review](AETHERHEART_QA_REVIEW.md).
 
 ## Fidelity and performance
 

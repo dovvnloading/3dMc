@@ -93,7 +93,7 @@ export function NewProjectDialog({ onClose, onCreate, onBackup }: Props) {
         </div>
         {template === "aetherheart" && <section className="template-showcase-guide" aria-label="Showcase contents">
           <strong>What makes this scene different</strong>
-          <p>216 individually editable elements in 9 named assemblies, 10 hand-generated pixel materials,
+          <p>236 individually editable elements in 9 named assemblies, 10 hand-generated pixel materials,
             layered crystal and rune artwork, per-face UVs and a curated color palette.
             Opens in a clean, orbitable Preview; switch to Model or Paint to take it apart.</p>
         </section>}

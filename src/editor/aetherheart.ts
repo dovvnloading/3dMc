@@ -78,10 +78,13 @@ function makeMaterials(): PixelTexture[] {
       return tint(patina ? [66, 137, 126] : [119, 85, 76], grain(x, y, 5) / 2);
     }),
     paintSheet("aether", "06 · Aetherheart crystal.png", 64, (x, y) => {
-      const radius = Math.max(Math.abs(x - 31.5), Math.abs(y - 31.5)) / 32;
-      const pulse = Math.max(0, 1 - radius);
-      return rgb(35 + pulse * 91 + grain(x, y, 6) / 2,
-        72 + pulse * 169, 149 + pulse * 102);
+      const dx = Math.abs(x - 31.5), dy = Math.abs(y - 31.5);
+      const depth = Math.max(0, 1 - Math.max(dx, dy) / 33);
+      const facet = (x < 32 ? -12 : 14) + (y < 32 ? 12 : -5);
+      const edge = Math.abs(dx - dy) <= 1 ? 20 : 0;
+      return rgb(29 + depth * 67 + facet * 0.55 + edge,
+        110 + depth * 121 + facet + edge,
+        164 + depth * 83 + facet * 0.5 + edge);
     }, (x, y) => {
       if (star(x, y, 32, 32, 12) && (x === 32 || y === 32)) return [218, 255, 246];
       if (Math.abs(x - 32) === Math.abs(y - 32) && Math.abs(x - 32) < 12) return [112, 240, 239];
@@ -274,21 +277,32 @@ export function createAetherheartDocument(): EditorDocument {
   });
 
   section("gimbals", "05 · Three celestial gyroscope rings", () => {
-    const count = 16, centerY = 11.5;
+    // Each piece follows the local tangent instead of using the previous,
+    // uniformly oversized rectangles. This leaves genuinely open negative
+    // space through the rings, so the heart remains the visual focal point.
+    const count = 20, centerY = 11.5, step = Math.PI * 2 / count;
+    const radius = 4.55, equatorialRadius = 4.83;
     for (let i = 0; i < count; i++) {
-      const angle = i * Math.PI * 2 / count, s = Math.sin(angle), c = Math.cos(angle);
-      const material: Surface = i % 4 === 0 ? "ivory" : i % 2 === 0 ? "gold" : "brass";
-      const gx = 8 + 4.6 * c, gy = centerY + 4.5 * s;
-      const gz = 8 + 4.6 * s;
+      const angle = i * step, s = Math.sin(angle), c = Math.cos(angle);
+      const halfHorizontal = Math.abs(s) * radius * step / 2 + 0.24;
+      const halfVertical = Math.abs(c) * radius * step / 2 + 0.24;
+      const gx = 8 + radius * c, gy = centerY + radius * s;
+      const gz = 8 + radius * s;
+      const material: Surface = i % 5 === 0 ? "ivory" : i % 2 === 0 ? "gold" : "brass";
       add("Meridian I · segment " + String(i + 1).padStart(2, "0"),
-        [gx - 0.81, gy - 0.77, 7.55], [gx + 0.81, gy + 0.77, 8.08], material);
+        [gx - halfHorizontal, gy - halfVertical, 7.56],
+        [gx + halfHorizontal, gy + halfVertical, 8.07], material);
       add("Meridian II · segment " + String(i + 1).padStart(2, "0"),
-        [7.96, gy - 0.77, gz - 0.81], [8.49, gy + 0.77, gz + 0.81],
-        i % 4 === 0 ? "aether" : material);
+        [7.93, gy - halfVertical, gz - halfHorizontal],
+        [8.44, gy + halfVertical, gz + halfHorizontal],
+        i % 5 === 0 ? "aether" : material);
+      const ex = 8 + equatorialRadius * c, ez = 8 + equatorialRadius * s;
+      const halfX = Math.abs(s) * equatorialRadius * step / 2 + 0.21;
+      const halfZ = Math.abs(c) * equatorialRadius * step / 2 + 0.21;
       add("Equatorial orbit · segment " + String(i + 1).padStart(2, "0"),
-        [gx - 0.82, centerY - 0.3, gz - 0.82],
-        [gx + 0.82, centerY + 0.3, gz + 0.82],
-        i % 4 === 0 ? "violet" : "copper");
+        [ex - halfX, centerY - 0.22, ez - halfZ],
+        [ex + halfX, centerY + 0.22, ez + halfZ],
+        i % 5 === 0 ? "violet" : "copper");
     }
   });
 
@@ -301,37 +315,51 @@ export function createAetherheartDocument(): EditorDocument {
     slices.forEach(([fromY, toY, radius], index) => {
       add("Crystal facet · ascending tier " + (index + 1),
         [8 - radius, fromY, 8 - radius], [8 + radius, toY, 8 + radius],
-        index === 0 || index === 6 ? "ivory" : index % 2 ? "violet" : "aether",
+        index === 0 || index === 6 ? "ivory" : index === 1 || index === 5 ? "violet" : "aether",
         { fullUv: true });
     });
     add("Visible north crystal facet", [6.55, 10.56, 5.11], [9.45, 12.92, 5.39], "aether", { fullUv: true });
     add("Visible south crystal facet", [6.55, 10.56, 10.61], [9.45, 12.92, 10.89], "aether", { fullUv: true });
     add("Visible east crystal facet", [10.61, 10.56, 6.55], [10.89, 12.92, 9.45], "aether", { fullUv: true });
     add("Visible west crystal facet", [5.11, 10.56, 6.55], [5.39, 12.92, 9.45], "aether", { fullUv: true });
-    add("Crosswind filament X", [5.9, 11.73, 7.72], [10.1, 12.07, 8.28], "ivory");
-    add("Crosswind filament Z", [7.72, 11.73, 5.9], [8.28, 12.07, 10.1], "ivory");
+    // Move the crossed light-bars onto the visible crystal faces; the previous
+    // pair was entirely buried inside the solid central tier.
+    add("Crosswind filament X", [5.55, 11.73, 4.94], [10.45, 12.04, 5.15], "ivory");
+    add("Crosswind filament Z", [10.85, 11.73, 5.55], [11.06, 12.04, 10.45], "ivory");
+    for (const [seamIndex, [direction, a, b]] of ([
+      ["north", [6.25, 10.46, 4.96], [6.48, 13.25, 5.12]],
+      ["north", [9.52, 10.46, 4.96], [9.75, 13.25, 5.12]],
+      ["south", [6.25, 10.46, 10.88], [6.48, 13.25, 11.04]],
+      ["south", [9.52, 10.46, 10.88], [9.75, 13.25, 11.04]],
+      ["west", [4.96, 10.46, 6.25], [5.12, 13.25, 6.48]],
+      ["west", [4.96, 10.46, 9.52], [5.12, 13.25, 9.75]],
+      ["east", [10.88, 10.46, 6.25], [11.04, 13.25, 6.48]],
+      ["east", [10.88, 10.46, 9.52], [11.04, 13.25, 9.75]]
+    ] as const).entries()) {
+      add("Prismatic light seam · " + direction + " " + (seamIndex % 2 ? "right" : "left"), a, b, "ivory");
+    }
     add("Suspension bead above", [7.58, 16.4, 7.58], [8.42, 16.95, 8.42], "gold");
     add("Suspension bead below", [7.58, 6.6, 7.58], [8.42, 7.25, 8.42], "gold");
   });
 
   section("lenses", "07 · Four arcane focusing instruments", () => {
     const lenses = [
-      { label: "North", x: 8, z: 3.3, axis: "z" },
-      { label: "South", x: 8, z: 12.7, axis: "z" },
-      { label: "West", x: 3.3, z: 8, axis: "x" },
-      { label: "East", x: 12.7, z: 8, axis: "x" }
+      { label: "North", x: 8, z: 2.6, axis: "z" },
+      { label: "South", x: 8, z: 13.4, axis: "z" },
+      { label: "West", x: 2.6, z: 8, axis: "x" },
+      { label: "East", x: 13.4, z: 8, axis: "x" }
     ] as const;
     for (const lens of lenses) {
       const { label, x, z, axis } = lens;
-      const halfX = axis === "x" ? 0.36 : 1.02, halfZ = axis === "z" ? 0.36 : 1.02;
+      const halfX = axis === "x" ? 0.3 : 0.79, halfZ = axis === "z" ? 0.3 : 0.79;
       add(label + " · copper optical carriage",
-        [x - halfX, 10.63, z - halfZ], [x + halfX, 12.46, z + halfZ], "copper");
+        [x - halfX, 10.83, z - halfZ], [x + halfX, 12.38, z + halfZ], "copper");
       add(label + " · luminous aether lens",
-        [x - halfX - 0.15, 10.97, z - halfZ - 0.15],
-        [x + halfX + 0.15, 12.12, z + halfZ + 0.15], "aether", { fullUv: true });
+        [x - halfX - 0.11, 11.09, z - halfZ - 0.11],
+        [x + halfX + 0.11, 12.02, z + halfZ + 0.11], "aether", { fullUv: true });
       add(label + " · royal gold lens brow",
-        [x - halfX - 0.18, 12.25, z - halfZ - 0.18],
-        [x + halfX + 0.18, 12.62, z + halfZ + 0.18], "gold");
+        [x - halfX - 0.16, 12.17, z - halfZ - 0.16],
+        [x + halfX + 0.16, 12.47, z + halfZ + 0.16], "gold");
     }
   });
 

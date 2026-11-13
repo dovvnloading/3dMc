@@ -51,6 +51,8 @@ import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePa
 import type { PaintGesture } from "./editor/gestures";
 import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
+import { isAetherheartShowcase } from "./editor/cameraFraming";
+import { ShowcaseGuide, ShowcaseStageSignature } from "./components/ShowcaseGuide";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
 import { TextureLayersPanel } from "./components/TextureLayersPanel";
@@ -881,6 +883,32 @@ export function App() {
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
+  const featuredShowcase = isAetherheartShowcase(doc);
+  const openShowcaseDetail = (kind: "core" | "gimbals" | "stars") => {
+    const chapterId = kind === "core" ? "heart" : kind === "gimbals" ? "gimbals" : "foundation";
+    const desiredName = kind === "core" ? "Crystal facet · ascending tier 4"
+      : kind === "gimbals" ? "Meridian I · segment 01"
+      : "Celestial inlay · full star map";
+    const group = doc.groups?.find(item => item.id === chapterId);
+    const node = doc.cuboids.find(part => part.name === desiredName) ??
+      (kind === "stars" ? undefined : doc.cuboids.find(part => group?.memberIds.includes(part.id)));
+    if (!node) {
+      setNotice("That showcase detail was removed. Select a remaining element from the Scene.");
+      return;
+    }
+    clearStroke();
+    setSelectedId(node.id);
+    setSelectedFace(kind === "stars" ? "up" : "north");
+    setCollapsedGroups([]);
+    setSearch("");
+    setSceneOpen(true);
+    setMode(kind === "stars" ? "paint" : "model");
+    setTool(kind === "stars" ? "pencil" : "select");
+    if (kind === "stars") publishHistory(current => {
+      const next = selectTexture(current.present, node.faces.up.textureId);
+      return next === current.present ? current : { ...current, present: next };
+    });
+  };
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
     {bootChecked && <>
@@ -1028,6 +1056,7 @@ export function App() {
           selectedFace={selectedFace} onSelectFace={setSelectedFace} mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
           cancelToken={cancelToken} draftTextureId={draftTextureId} onSelect={selectNode} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
           onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint} onFill={fillPaint} onTransform={transform} onBatchTransform={transformBatch}/>
+        {featuredShowcase && mode === "preview" && <ShowcaseStageSignature parts={doc.cuboids.length}/>}
         {mode !== "preview" && <div className="tool-rail" aria-label="Editor tools">{mode === "model" ? <>
           <IconButton active={tool === "select"} label="Select (V)" onClick={() => switchTool("select")}><MousePointer2 size={18}/></IconButton>
           <IconButton active={tool === "move"} label="Move (W)" onClick={() => switchTool("move")}><Move3D size={18}/></IconButton>
@@ -1095,7 +1124,11 @@ export function App() {
                 disabled={selected.locked || !selected.visible} onCreate={repeatCurrentSelection}/>
             </div>}
           </div>
-        </> : <div className="empty-inspector"><Box size={28}/><h2>Nothing selected</h2><p>Choose an element in the scene or click a visible part in the viewport.</p><button className="text-button quiet" onClick={addElement}><Plus size={15}/>Add cuboid</button></div>}
+        </> : featuredShowcase && mode === "preview" ?
+          <ShowcaseGuide document={doc} onInspectCore={() => openShowcaseDetail("core")}
+            onInspectGimbals={() => openShowcaseDetail("gimbals")}
+            onPaintStarChart={() => openShowcaseDetail("stars")}/> :
+          <div className="empty-inspector"><Box size={28}/><h2>Nothing selected</h2><p>Choose an element in the scene or click a visible part in the viewport.</p><button className="text-button quiet" onClick={addElement}><Plus size={15}/>Add cuboid</button></div>}
         {mode === "paint" && <div className="paint-options"><SectionHeading title="Paint controls"/>
           <TextureLayersPanel key={texture.id} texture={texture} commit={commitDocument}/>
           <div className="paint-import-actions">
