@@ -22,7 +22,7 @@ export const PROJECT_TEMPLATES: Array<{
   texture: string;
 }> = [
   { id: "aetherheart", title: "The Aetherheart", detail: "A complete celestial relay: a floating crystal, three gyroscopes, carved pylons and original pixel art.",
-    elements: "216 editable parts", image: "✶", texture: "10 painted materials · 32/64 px" },
+    elements: "236 editable parts", image: "✶", texture: "10 painted materials · 32/64 px" },
   { id: "blank", title: "Empty canvas", detail: "An open scene for your own shapes and ideas.",
     elements: "0 elements", image: "◻", texture: "Choose 16–64 px" },
   { id: "cube", title: "Textured block", detail: "One full-block cuboid with an editable pixel surface.",
