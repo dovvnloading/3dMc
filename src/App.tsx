@@ -885,11 +885,17 @@ export function App() {
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
   const featuredShowcase = isAetherheartShowcase(doc);
   const openShowcaseDetail = (kind: "core" | "gimbals" | "stars") => {
-    const node = doc.cuboids.find(part => kind === "core"
-      ? part.name === "Crystal facet · ascending tier 4"
-      : kind === "gimbals" ? part.name === "Meridian I · segment 01"
-      : part.name === "Celestial inlay · full star map");
-    if (!node) return;
+    const chapterId = kind === "core" ? "heart" : kind === "gimbals" ? "gimbals" : "foundation";
+    const desiredName = kind === "core" ? "Crystal facet · ascending tier 4"
+      : kind === "gimbals" ? "Meridian I · segment 01"
+      : "Celestial inlay · full star map";
+    const group = doc.groups?.find(item => item.id === chapterId);
+    const node = doc.cuboids.find(part => part.name === desiredName) ??
+      (kind === "stars" ? undefined : doc.cuboids.find(part => group?.memberIds.includes(part.id)));
+    if (!node) {
+      setNotice("That showcase detail was removed. Select a remaining element from the Scene.");
+      return;
+    }
     clearStroke();
     setSelectedId(node.id);
     setSelectedFace(kind === "stars" ? "up" : "north");
@@ -899,7 +905,7 @@ export function App() {
     setMode(kind === "stars" ? "paint" : "model");
     setTool(kind === "stars" ? "pencil" : "select");
     if (kind === "stars") publishHistory(current => {
-      const next = selectTexture(current.present, "stars");
+      const next = selectTexture(current.present, node.faces.up.textureId);
       return next === current.present ? current : { ...current, present: next };
     });
   };
