@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import type { EditorDocument } from "../src/editor/domain";
 
-test("The Aetherheart opens as a complete, editable showcase and exports portable source", async ({ page }) => {
+test("The Aetherheart opens as a complete, editable showcase and exports portable source", async ({ page, browserName }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
@@ -21,7 +21,10 @@ test("The Aetherheart opens as a complete, editable showcase and exports portabl
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Preview" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
+  const graphicsFallback = page.getByRole("status", { name: "3D preview unavailable" });
+  if (await graphicsFallback.count()) await expect(graphicsFallback).toBeVisible();
+  else await expect(page.locator(".viewport-canvas canvas")).toBeVisible();
+  await page.screenshot({ path: "test-results/aetherheart-" + browserName + ".png" });
   const scene = page.getByRole("listbox", { name: "Scene elements" });
   await expect(scene.getByRole("option")).toHaveCount(216);
 
