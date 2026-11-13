@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditorDocument } from "../editor/domain";
 import { deleteLibrarySnapshot, downloadLibraryBytes, listLibrarySnapshots, openLibrarySnapshot,
-  renameLibrarySnapshot, saveLibrarySnapshot } from "../editor/library";
+  renameLibrarySnapshot, saveLibrarySnapshot, savePackLibrarySnapshot } from "../editor/library";
 import type { LibraryEntry } from "../editor/library";
+import type { NativePackProject } from "../editor/nativePackArchive";
+import type { PackSnapshot } from "../pack/packSession";
+import { startBrowserDownload } from "../editor/exportJobs";
 import { CreatorDialog } from "./CreatorDialog";
 
-export function ProjectLibraryDialog({ source, revision, onOpen, onBackup, onClose }: {
-  source: EditorDocument; revision: number; onOpen: (document: EditorDocument) => Promise<boolean>;
+export function ProjectLibraryDialog({ source, revision, pack, onOpen, onOpenPack, onBackup, onClose }: {
+  source: EditorDocument; revision: number; pack?: PackSnapshot | null;
+  onOpen: (document: EditorDocument) => Promise<boolean>;
+  onOpenPack: (project: NativePackProject) => Promise<boolean>;
   onBackup: () => Promise<void>; onClose: () => void;
 }) {
   const [entries, setEntries] = useState<LibraryEntry[]>([]), [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [status, setStatus] = useState("");
-  const [label, setLabel] = useState(source.name), [confirm, setConfirm] = useState<{ entry: LibraryEntry; action: "open" | "delete" } | null>(null);
+  const [label, setLabel] = useState(pack?.pack.name ?? source.name), [confirm, setConfirm] = useState<{ entry: LibraryEntry; action: "open" | "delete" } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null), [rename, setRename] = useState("");
   const alive = useRef(true);
   const refresh = async () => {
@@ -33,10 +38,13 @@ export function ProjectLibraryDialog({ source, revision, onOpen, onBackup, onClo
     finally { if (alive.current) setBusy(false); }
   };
   return <CreatorDialog title="Local project library" kicker="EXPLICIT SNAPSHOTS · NOT CLOUD STORAGE" onClose={onClose} busy={busy} wide>
-    <p className="creator-description">Keep up to 12 independent native snapshots on this device. Saving adds a new snapshot; it never overwrites recovery or an older backup. Browser data can be removed, so a downloaded .3dmc file remains the portable backup.</p>
+    <p className="creator-description">Keep up to 12 independently verified native snapshots on this device. Each snapshot is a new copy, never an overwrite of recovery or an earlier backup. Snapshots remain in browser storage; download .3dmc files to keep portable backups.</p>
+    {pack && <p className="creator-help" role="status">Pack mode: a snapshot includes all {pack.pack.models.length} editable models, textures and source layers, not just the active model.</p>}
     <div className="library-save-row"><label><span>New snapshot label</span><input aria-label="New snapshot label" maxLength={100} value={label} onChange={event => setLabel(event.target.value)}/></label>
       <button type="button" className="creator-primary" disabled={busy || loading || !label.trim() || entries.length >= 12} onClick={() => void run(async () => {
-        const saved = await saveLibrarySnapshot(source, revision, label);
+        const saved = pack
+          ? await savePackLibrarySnapshot(pack.pack, pack.sources, revision, label)
+          : await saveLibrarySnapshot(source, revision, label);
         await refresh(); if (alive.current) setStatus(`Snapshot saved on this device: ${saved.label} · revision ${saved.revision}.`);
       })}>Save new local snapshot</button>
       <button type="button" disabled={busy} onClick={() => void onBackup()}>Download current project</button></div>
@@ -44,14 +52,16 @@ export function ProjectLibraryDialog({ source, revision, onOpen, onBackup, onClo
     {loading && <p role="status">Reading local snapshots…</p>}
     {!loading && !entries.length && <p className="creator-empty">No local snapshots yet. Add one above without replacing your current recovery checkpoint.</p>}
     <div className="library-list">{entries.map(entry => <article key={entry.id} className="library-entry" aria-label={"Backup " + entry.label}>
-      <div><strong>{entry.label}</strong><p>{entry.projectName} · revision {entry.revision} · {new Date(entry.savedAt).toLocaleString()}</p><small>{Math.ceil(entry.byteLength / 1024)} KiB · SHA-256 {entry.sha256.slice(0, 12)}…</small></div>
+      <div><strong>{entry.label}</strong><p>{entry.projectName} · {entry.kind === "pack"
+          ? `Complete pack · ${entry.modelCount} editable models`
+          : "Standalone project"} · revision {entry.revision} · {new Date(entry.savedAt).toLocaleString()}</p><small>{Math.ceil(entry.byteLength / 1024)} KiB · SHA-256 {entry.sha256.slice(0, 12)}…</small></div>
       <div className="library-entry-actions"><button type="button" disabled={busy} onClick={() => setConfirm({ entry, action: "open" })}>Open copy</button>
         <button type="button" disabled={busy} onClick={() => void run(async () => {
           const bytes = await downloadLibraryBytes(entry);
-          const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/zip" }));
-          const link = document.createElement("a"); link.href = url;
-          link.download = (entry.label.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "backup") + ".3dmc";
-          document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+          startBrowserDownload({
+            filename: (entry.label.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "backup") + ".3dmc",
+            mimeType: "application/zip", content: bytes
+          });
           if (alive.current) setStatus("Verified native backup download started. This does not prove a durable file write.");
         })}>Download</button>
         <button type="button" disabled={busy} onClick={() => { setRenaming(entry.id); setRename(entry.label); }}>Rename</button>
@@ -68,7 +78,10 @@ export function ProjectLibraryDialog({ source, revision, onOpen, onBackup, onClo
           await deleteLibrarySnapshot(chosen.entry); setConfirm(null); await refresh(); setStatus("The selected local snapshot was deleted.");
         } else {
           const restored = await openLibrarySnapshot(chosen.entry);
-          if (await onOpen(restored)) onClose(); else throw new Error("The workspace could not be safely replaced. Your library snapshot is unchanged.");
+          const opened = restored.kind === "pack"
+            ? await onOpenPack(restored)
+            : await onOpen(restored.document);
+          if (opened) onClose(); else throw new Error("The workspace could not be safely replaced. Your library snapshot is unchanged.");
         }
       })}>{confirm.action === "open" ? "Open verified copy" : "Delete selected snapshot"}</button>
     </section>}
