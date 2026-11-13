@@ -199,6 +199,23 @@ export function createApothecaryCabinet(): AuthoredPrefab {
   add("Carcass", "continuous oak work surface", [0.7, 7.85, 1.6], [15.3, 8.48, 15.45], oak);
   add("Carcass", "front counter lip", [0.65, 7.88, 15.28], [15.35, 8.27, 15.68], cut);
   add("Carcass", "counter edge brass inlay", [1.0, 7.96, 15.7], [15.0, 8.08, 15.85], brass);
+  // A raised fielded panel on EACH outside cheek makes the broad lower
+  // carcass read like joinery rather than an undecorated solid wood cube.
+  for (const [side, x0, x1] of [
+    ["left", .99, 1.10], ["right", 14.90, 15.01]
+  ] as const) {
+    add("Carcass", side + " inset side field", [x0, 3.18, 4.09],
+      [x1, 6.53, 12.58], walnut);
+    add("Carcass", side + " upper side moulding", [x0, 6.54, 3.93],
+      [x1, 6.82, 12.74], cut);
+    add("Carcass", side + " lower side moulding", [x0, 2.92, 3.93],
+      [x1, 3.19, 12.74], cut);
+    add("Carcass", side + " forward side stile", [x0, 3.16, 12.4],
+      [x1, 6.55, 12.74], oak);
+    add("Carcass", side + " rear side stile", [x0, 3.16, 3.93],
+      [x1, 6.55, 4.27], oak);
+  }
+
   for (const [side, x] of [["left", 1.15], ["right", 14.4]] as const) {
     add("Carcass", side + " square brass corner", [x, 8.3, 14.62],
       [x + .46, 8.5, 15.04], brass);
@@ -258,8 +275,16 @@ export function createApothecaryCabinet(): AuthoredPrefab {
     [14.3, 11.94, 14.55], oak);
   add("Hutch", "display shelf carved front edge", [1.65, 11.42, 14.47],
     [14.35, 11.79, 14.84], cut);
-  add("Hutch", "upper cornice shadow", [0.88, 15.22, 1.75],
+  // Shadow moulding follows the crown's perimeter. A solid shadow slab here
+  // would erase the open skylight and conceal the colored bottles from above.
+  add("Hutch", "rear cornice shadow rail", [0.88, 15.22, 1.75],
+    [15.12, 15.49, 3.12], walnut);
+  add("Hutch", "front cornice shadow rail", [0.88, 15.22, 14.12],
     [15.12, 15.49, 15.1], walnut);
+  add("Hutch", "left cornice shadow rail", [0.88, 15.22, 3.12],
+    [1.89, 15.49, 14.12], walnut);
+  add("Hutch", "right cornice shadow rail", [14.11, 15.22, 3.12],
+    [15.12, 15.49, 14.12], walnut);
   // The original full-size roof hid almost every bottle in the elevated
   // editor view. Four structural crown rails keep the silhouette while
   // exposing the hand-modeled potion stock from above and both sides.
