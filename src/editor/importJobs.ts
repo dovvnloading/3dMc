@@ -1,7 +1,6 @@
 import type { EditorDocument } from "./domain";
 import type { NativePackProject } from "./nativePackArchive";
 import type { PackImportReport } from "../import/javaPack";
-import type { NativePackProject } from "./nativePackArchive";
 
 /** Extends Java preflight without widening the original single-block contract. */
 export type JavaImportReport = PackImportReport |
