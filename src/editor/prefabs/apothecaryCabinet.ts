@@ -196,8 +196,7 @@ export function createApothecaryCabinet(): AuthoredPrefab {
   add("Carcass", "left side chamfer", [1.1, 2.15, 3.0], [1.65, 7.5, 13.9], oak);
   add("Carcass", "right side chamfer", [14.35, 2.15, 3.0], [14.9, 7.5, 13.9], oak);
   add("Carcass", "shadow line below countertop", [1.0, 7.48, 1.8], [15.0, 7.85, 15.2], walnut);
-  add("Carcass", "continuous oak work surface", [0.7, 7.85, 1.6], [15.3, 8.48, 15.45], oak,
-    { top: cut });
+  add("Carcass", "continuous oak work surface", [0.7, 7.85, 1.6], [15.3, 8.48, 15.45], oak);
   add("Carcass", "front counter lip", [0.65, 7.88, 15.28], [15.35, 8.27, 15.68], cut);
   add("Carcass", "counter edge brass inlay", [1.0, 7.96, 15.7], [15.0, 8.08, 15.85], brass);
   for (const [side, x] of [["left", 1.15], ["right", 14.4]] as const) {
@@ -233,10 +232,18 @@ export function createApothecaryCabinet(): AuthoredPrefab {
   // panelled back. The long mid shelf supports three separate potion bottles.
   add("Hutch", "inset walnut back panel", [1.83, 8.49, 1.92],
     [14.17, 15.42, 2.62], walnut);
-  add("Hutch", "left side cheek", [1.02, 8.49, 2.04],
-    [1.85, 15.44, 14.4], walnut);
-  add("Hutch", "right side cheek", [14.15, 8.49, 2.04],
-    [14.98, 15.44, 14.4], walnut);
+  // Open side frames make the merchandise visible from a three-quarter
+  // viewpoint instead of enclosing the shelves in two solid opaque walls.
+  add("Hutch", "left rear upright", [1.02, 8.49, 2.04],
+    [1.85, 15.44, 3.35], walnut);
+  add("Hutch", "right rear upright", [14.15, 8.49, 2.04],
+    [14.98, 15.44, 3.35], walnut);
+  for (const [side, x] of [["left", 1.02], ["right", 14.15]] as const) {
+    add("Hutch", side + " lower open-frame rail", [x, 10.91, 3.32],
+      [x + .83, 11.35, 13.65], oak);
+    add("Hutch", side + " upper open-frame rail", [x, 14.75, 3.32],
+      [x + .83, 15.16, 13.65], oak);
+  }
   add("Hutch", "left front upright", [1.01, 8.45, 13.64],
     [2.15, 15.42, 14.72], oak);
   add("Hutch", "right front upright", [13.85, 8.45, 13.64],
@@ -248,13 +255,22 @@ export function createApothecaryCabinet(): AuthoredPrefab {
   add("Hutch", "center back inlay", [7.76, 8.6, 2.62],
     [8.24, 15.29, 2.87], cut);
   add("Hutch", "supporting display shelf", [1.7, 11.46, 2.7],
-    [14.3, 11.94, 14.55], oak, { top: cut });
+    [14.3, 11.94, 14.55], oak);
   add("Hutch", "display shelf carved front edge", [1.65, 11.42, 14.47],
     [14.35, 11.79, 14.84], cut);
   add("Hutch", "upper cornice shadow", [0.88, 15.22, 1.75],
     [15.12, 15.49, 15.1], walnut);
-  add("Hutch", "overhanging oak cornice", [0.38, 15.48, 1.5],
-    [15.62, 15.91, 15.57], oak, { top: cut });
+  // The original full-size roof hid almost every bottle in the elevated
+  // editor view. Four structural crown rails keep the silhouette while
+  // exposing the hand-modeled potion stock from above and both sides.
+  add("Hutch", "overhanging rear crown", [0.38, 15.48, 1.5],
+    [15.62, 15.91, 3.06], oak);
+  add("Hutch", "overhanging front crown", [0.38, 15.48, 14.27],
+    [15.62, 15.91, 15.57], oak);
+  add("Hutch", "overhanging left crown", [0.38, 15.48, 3.06],
+    [1.85, 15.91, 14.27], oak);
+  add("Hutch", "overhanging right crown", [14.15, 15.48, 3.06],
+    [15.62, 15.91, 14.27], oak);
   add("Hutch", "front cornice moulding", [0.55, 15.49, 15.48],
     [15.45, 15.83, 15.87], cut);
   add("Hutch", "center brand plaque", [6.13, 15.57, 15.85],
