@@ -58,6 +58,16 @@ base pigments and editable transparent detail layers. Their flattened
 output is opaque, so the experimental Java pack export does not run into
 the current alpha restriction.
 
+## First-open gallery
+
+The initial Preview now uses model-aware framing and a slightly off-diagonal
+camera angle to reveal the crystal between its corner supports. The inspector
+offers working shortcuts to inspect the core, explore the gyroscopes and paint
+the star chart. Extra warm and cyan lights are purely **viewport atmosphere**
+and do not export as game lighting. For a detailed before/after audit and
+repeatable verification checklist, read the
+[visual and functional QA review](AETHERHEART_QA_REVIEW.md).
+
 ## Fidelity and performance
 
 - The scene uses **real native cuboids**, not a static screenshot or a GLTF
