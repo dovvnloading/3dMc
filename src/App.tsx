@@ -62,12 +62,13 @@ import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
+import { RecoveryDetailsDialog } from "./components/RecoveryDetailsDialog";
+import { recoveryStatusText } from "./editor/recoveryPresentation";
+import type { RecoveryAcknowledgement, RecoveryStatus, WriterStatus } from "./editor/recoveryPresentation";
 import type { PackImportReport } from "./import/javaPack";
 import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/javaBlock";
 import type { ExportIssue } from "./export/javaBlock";
 
-type RecoveryStatus = "unsaved" | "saving" | "saved" | "failed" | "blocked";
-type WriterStatus = "checking" | "owned" | "blocked" | "failed";
 type CommitFn = (document: EditorDocument) => EditorDocument;
 
 function IconButton({ label, children, onClick, disabled = false, active = false }: {
@@ -182,6 +183,9 @@ export function App() {
   const [writerEpoch, setWriterEpoch] = useState(0), [takingOver, setTakingOver] = useState(false);
   const awaitingRecoveryRef = useRef(false);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>("unsaved");
+  const [lastAcknowledgedRecovery, setLastAcknowledgedRecovery] = useState<RecoveryAcknowledgement | null>(null);
+  const [recoveryDetailsOpen, setRecoveryDetailsOpen] = useState(false);
+  const [libraryRequest, setLibraryRequest] = useState(0);
   const [candidate, setCandidate] = useState<AnyRecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
   const [pendingPackOpen, setPendingPackOpen] = useState<NativePackProject | null>(null);
@@ -461,7 +465,13 @@ export function App() {
       const pack = packRef.current;
       const save = pack ? savePackRecovery(pack.present.pack, pack.present.sources, revision, lease)
         : saveRecovery(snapshot, revision, lease);
-      save.then(() => { if (current()) setRecoveryStatus("saved"); }).catch((error: unknown) => {
+      save.then(() => {
+        if (current()) {
+          setLastAcknowledgedRecovery({ session, revision, savedAt: Date.now(),
+            modelCount: pack?.present.pack.models.length ?? 1 });
+          setRecoveryStatus("saved");
+        }
+      }).catch((error: unknown) => {
         if (!current()) return;
         if (error instanceof RecoveryOwnershipLost) markWriterLost();
         else {
@@ -734,7 +744,7 @@ export function App() {
       setWriterEpoch(epoch => epoch + 1); setHistory(nextHistory); setOpenSession(nextSession);
       setSelectedId(document.cuboids[0]?.id ?? null); setSelectedFace("north"); setSearch(""); setShapeMenuOpen(false);
       setMode("model"); switchTool("select"); setPendingOpen(null); setPendingPackOpen(null); setPackStudioOpen(false); setPendingPack(null); setPendingTexture(null); textureSource.current = null;
-      setCandidate(null); setRecoveryStatus("unsaved"); setDeletingTextureId(null); setDeleteReplacementId(null);
+      setCandidate(null); setRecoveryStatus("unsaved"); setLastAcknowledgedRecovery(null); setDeletingTextureId(null); setDeleteReplacementId(null);
       setNotice("Project opened. Local recovery is updating; download a .3dmc archive for a portable backup."); return true;
     } catch (error) {
       markWriterLost(); setNotice(error instanceof Error ? error.message : "Could not safely open the project."); return false;
@@ -760,7 +770,7 @@ export function App() {
       setPendingOpen(null); setPendingPackOpen(null); setPendingPack(null);
       setPendingTexture(null); textureSource.current = null;
       setDeletingTextureId(null); setDeleteReplacementId(null);
-      setPackStudioOpen(false); setCandidate(null); setRecoveryStatus("unsaved");
+      setPackStudioOpen(false); setCandidate(null); setRecoveryStatus("unsaved"); setLastAcknowledgedRecovery(null);
       setNotice("Pack opened with " + next.present.pack.models.length + " editable models. Recovery is updating.");
       return true;
     } catch (error) {
@@ -844,9 +854,7 @@ export function App() {
     .map(node => ({ kind: "part" as const, node })));
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
-  const statusText = writerStatus === "blocked" ? "Other tab owns recovery" : writerStatus === "failed" ? "Recovery unavailable — download backup" :
-    recoveryStatus === "saved" ? "Saved on this device" : recoveryStatus === "saving" ? "Saving locally…" : recoveryStatus === "failed" ? "Local save unavailable · download backup" :
-    writerStatus === "checking" ? "Checking recovery ownership…" : "Unsaved local changes";
+  const statusText = recoveryStatusText(writerStatus, recoveryStatus);
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
     <header className="app-bar">
@@ -886,7 +894,9 @@ export function App() {
       <div className="mode-options creator-options"><CreatorTools key={openSession} document={doc} revision={history.revision} pack={packSession?.present} mode={mode}
         selectedId={selectedId} face={selectedFace} onApply={applyBatch} onOpen={acceptOpen}
         onOpenPack={project => acceptPackOpen(createPackSession(project.pack, project.sources))}
-        onBackup={saveProject} onCancelGesture={clearStroke}
+        onBackup={saveProject} onCancelGesture={clearStroke} libraryRequest={libraryRequest}
+        onNewProject={() => setNewProjectOpen(true)} onModeChange={changeMode}
+        onExport={() => setExportOpen(true)}
         onLayout={layout => { clearStroke(); setSceneOpen(layout === "balanced"); setInspectorOpen(layout !== "canvas"); if (layout === "paint") changeMode("paint"); }}/></div>
     </nav>
     <div className="editor-grid">
@@ -1083,15 +1093,21 @@ export function App() {
       </aside>
     </div>
     <footer className="status-bar"><div aria-live="polite" className={"save-status status-" + recoveryStatus}><span className="status-indicator"/>{statusText}</div><span className="status-divider"/>
-      <button onClick={() => setNotice("Recovery uses a single-tab writer generation with atomic checkpoints and a verified previous version. Another tab must explicitly take over. Browser storage is not a portable backup; download a project copy.")}>Recovery details <Info size={12}/></button>
+      <button onClick={() => setRecoveryDetailsOpen(true)}>Recovery details <Info size={12}/></button>
       <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
+    {recoveryDetailsOpen && <RecoveryDetailsDialog
+      writer={writerStatus} status={recoveryStatus} session={openSession} revision={history.revision}
+      acknowledgement={lastAcknowledgedRecovery} modelCount={packSession?.present.pack.models.length ?? 1}
+      savingBackup={savingProject} onClose={() => setRecoveryDetailsOpen(false)}
+      onBackup={() => { void saveProject(); }}
+      onLibrary={() => { setRecoveryDetailsOpen(false); setLibraryRequest(value => value + 1); }}/>}
     {!bootChecked && <div className="boot-loader" aria-live="polite">Checking local recovery ownership…</div>}
     {bootChecked && writerStatus !== "owned" && <ModalDialog className="writer-modal" labelledBy="writer-title"><div className="modal-icon"><Lock size={22}/></div>
       <h2 id="writer-title">{writerStatus === "blocked" ? "Another tab controls local recovery" : "Local recovery isn't available"}</h2><p>{writerStatus === "blocked" ? "This editor is read-only here to protect the other tab's saved work. You can download the current project, or explicitly take over editing. A suspended older tab will no longer be able to overwrite this tab's checkpoints." : "You can still download the current project as a portable backup. Retry ownership only when you're ready to edit."}</p>
       <div className="modal-actions"><button className="text-button quiet" onClick={saveProject}><Save size={15}/>Download backup</button><button className="text-button primary" disabled={takingOver} onClick={takeOverWriter}>{takingOver ? "Taking over…" : "Take over editing"}</button></div>
     </ModalDialog>}
-    {candidate && bootChecked && writerStatus === "owned" && <ModalDialog className="recovery-banner" labelledBy="recovery-title"><div><Info size={19}/><p><strong id="recovery-title">Continue a local session?</strong><span>{candidate.kind === "pack" ? candidate.pack.name + " · " + candidate.pack.models.length + " models" : candidate.document.name} · {getFilename(new Date(candidate.savedAt))}{candidate.fallback ? " · Previous verified checkpoint" : ""}</span></p></div>
+    {candidate && bootChecked && writerStatus === "owned" && <ModalDialog className="recovery-banner" labelledBy="recovery-title"><div><Info size={19}/><p><strong id="recovery-title">Continue a local session?</strong><span>{candidate.kind === "pack" ? candidate.pack.name + " · " + candidate.pack.models.length + " models" : candidate.document.name} · {getFilename(new Date(candidate.savedAt))}{candidate.fallback ? " · Latest checkpoint could not be verified; this previous checkpoint is available" : ""}</span></p></div>
       <button className="text-button quiet" onClick={keepCurrentWorkspace}>Keep current workspace</button><button className="text-button primary" onClick={() => candidate.kind === "pack" ? void acceptPackOpen(createPackSession(candidate.pack, candidate.sources)) : void acceptOpen(candidate.document)}>Recover project</button></ModalDialog>}
     {notice && <div role="status" className="notice-toast"><Info size={17}/><span>{notice}</span><button onClick={() => setNotice(null)} aria-label="Dismiss notice">×</button></div>}
     {packStudioOpen && <PackStudioDialog source={doc} session={packSession ?? undefined}

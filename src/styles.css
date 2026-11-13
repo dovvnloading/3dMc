@@ -1030,3 +1030,15 @@ button, input, select { -webkit-tap-highlight-color: transparent; }
 }
 .import-progress button:hover, .import-progress button:focus-visible { border-color: var(--accent); }
 @media (max-width: 760px) { .import-progress:not(.inline) { top: 108px; left: 10px; right: 10px; width: auto; } }
+
+.recovery-details-modal{width:min(560px,calc(100vw - 36px));max-height:min(88dvh,770px);overflow:auto}
+.recovery-details-head{display:flex;gap:12px;align-items:center}
+.recovery-details-head>svg{flex-shrink:0;color:var(--accent)}
+.recovery-details-head h2{font-size:19px;line-height:1.3;margin:4px 0}
+.recovery-details-modal section{border-top:1px solid var(--divider);padding:14px 0}
+.recovery-details-modal section h3{font-size:13px;margin:0 0 6px}
+.recovery-details-modal section p{font-size:12px;line-height:1.65;color:var(--secondary);margin:5px 0 11px}
+.recovery-details-status{font-size:12px;line-height:1.6;padding:10px;border:1px solid var(--divider);border-radius:6px;color:var(--text);background:var(--panel)}
+.recovery-details-modal .recovery-details-warning{color:#f5c2ae}
+.recovery-details-note{display:flex;align-items:center;gap:8px;color:var(--secondary);font-size:11px;line-height:1.5}
+.recovery-details-note svg{flex-shrink:0}
