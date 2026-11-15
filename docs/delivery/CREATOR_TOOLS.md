@@ -46,11 +46,17 @@ Locked elements cannot be converted, reordered, resized or deleted until unlocke
 | G | Connected RGBA fill (Paint) |
 | I | Eyedropper (Paint) |
 | L | Line (Paint) |
-| U | Rectangle outline (Paint) |
+| U | Rectangle (Paint; outline or filled via the Paint controls) |
+| O | Ellipse (Paint; outline or filled via the Paint controls) |
+| M | Cycle symmetry for current texture sheet: off, X, Y, both |
+| Shift+drag | Constrain rectangle to square or ellipse to circle (Paint) |
+| Alt+drag | Draw rectangle or ellipse from its centre (Paint) |
 | [ / ] | Decrease / increase the paint brush size, from 1 to 16 texels |
 | + / - / 0 | Zoom in / zoom out / reset the focused 2D texture sheet |
 | Wheel / Space+drag / middle-drag | Zoom or pan the 2D texture sheet |
 | Escape | Cancel a gesture or dismiss the shape menu |
+
+Symmetry is a per-texture-sheet painting option, not an authored pixel operation. Visible axis guides are overlaid on the texture canvas. Mirrored pixels are committed together with their original marks; constrained face UV masks clip all painted destinations and the active raster layer is preserved. Shape previews rebuild while dragging; Escape discards the preview.
 
 Global shortcuts intentionally avoid typing into input fields, dropdowns, editable text or open dialogs. A keyboard can also activate the shape menu and surface switches directly without relying on a canvas pointer hit.
 
