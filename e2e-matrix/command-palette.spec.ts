@@ -42,6 +42,9 @@ test("palette traps focus, scopes edit shortcuts and restores the search-field o
   const sceneSearch = page.getByRole("textbox", { name: "Filter scene elements" });
   await sceneSearch.focus();
   await page.keyboard.press("Control+k");
+  await expect(page.getByRole("dialog", { name: "Command palette" })).toHaveCount(0);
+  await opener.focus();
+  await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: "Command palette" });
   const input = dialog.getByRole("combobox", { name: "Search commands" });
   const close = dialog.getByRole("button", { name: "Close command palette" });
@@ -57,7 +60,7 @@ test("palette traps focus, scopes edit shortcuts and restores the search-field o
   await expect(page.getByRole("listbox", { name: "Scene elements" }).getByRole("option")).toHaveCount(7);
   await input.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(sceneSearch).toBeFocused();
+  await expect(opener).toBeFocused();
 
   await page.getByRole("button", { name: "New project" }).click();
   const newDialog = page.getByRole("dialog", { name: "Create a new project" });

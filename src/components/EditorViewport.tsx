@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentRef, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
@@ -14,11 +14,12 @@ import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 import type { PaintModifiers } from "../editor/paintGeometry";
+import { calculateFrameBounds, frameCameraDistance } from "../editor/frameSelection";
 
 export type Mode = "model" | "paint" | "preview";
 export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle" | "ellipse";
 export type ViewKind = "iso" | "front" | "right" | "top";
-export type ViewRequest = { kind: ViewKind; count: number };
+export type ViewRequest = { kind: ViewKind | "frame"; count: number };
 
 interface ViewportProps {
   document: EditorDocument;
@@ -59,17 +60,73 @@ const dimensions = (node: Cuboid): Vec3 => [
   (node.to[2] - node.from[2]) / WORLD
 ];
 
-function CameraControls({ view }: { view: ViewRequest }) {
+interface CameraMove {
+  elapsed: number;
+  startPosition: THREE.Vector3;
+  endPosition: THREE.Vector3;
+  startTarget: THREE.Vector3;
+  endTarget: THREE.Vector3;
+}
+
+function CameraControls({ view, document, selectedIds }: {
+  view: ViewRequest;
+  document: EditorDocument;
+  selectedIds: readonly string[];
+}) {
   const { camera, invalidate } = useThree();
+  const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
+  const movement = useRef<CameraMove | null>(null);
+  useFrame((_, delta) => {
+    const orbit = controls.current, move = movement.current;
+    if (!orbit || !move) return;
+    move.elapsed = Math.min(0.45, move.elapsed + Math.min(delta, 0.05));
+    const t = move.elapsed / 0.45;
+    const eased = t * t * (3 - 2 * t);
+    camera.position.lerpVectors(move.startPosition, move.endPosition, eased);
+    orbit.target.lerpVectors(move.startTarget, move.endTarget, eased);
+    orbit.update();
+    if (t === 1) movement.current = null;
+    else invalidate(); // frameloop="demand" needs a new frame throughout the animation.
+  });
   useEffect(() => {
-    const positions: Record<ViewKind, [number, number, number]> = {
-      iso: [2.9, 2.35, 3.2], front: [0, 0.65, 4], right: [4, 0.65, 0], top: [0, 4, 0.001]
+    const orbit = controls.current;
+    if (!orbit) return;
+    if (view.kind !== "frame") {
+      movement.current = null;
+      const positions: Record<ViewKind, [number, number, number]> = {
+        iso: [2.9, 2.35, 3.2], front: [0, 0.65, 4], right: [4, 0.65, 0], top: [0, 4, 0.001]
+      };
+      camera.position.set(...positions[view.kind]);
+      orbit.target.set(0, 0.58, 0);
+      orbit.update(); invalidate();
+      return;
+    }
+    const bounds = calculateFrameBounds(document, selectedIds);
+    const perspective = camera instanceof THREE.PerspectiveCamera ? camera : null;
+    const distance = frameCameraDistance(bounds.radius, perspective?.fov ?? 40,
+      perspective?.aspect ?? 1);
+    const direction = camera.position.clone().sub(orbit.target);
+    if (direction.lengthSq() < 1e-8) direction.set(1, 0.8, 1);
+    direction.normalize();
+    const target = new THREE.Vector3(...bounds.center);
+    if (perspective) {
+      perspective.near = Math.max(0.001, Math.min(0.1, distance / 1000));
+      perspective.far = Math.max(100, distance + bounds.radius * 4);
+      perspective.updateProjectionMatrix();
+    }
+    movement.current = {
+      elapsed: 0,
+      startPosition: camera.position.clone(),
+      endPosition: target.clone().addScaledVector(direction, distance),
+      startTarget: orbit.target.clone(), endTarget: target
     };
-    camera.position.set(...positions[view.kind]);
-    camera.lookAt(0, 0.58, 0); camera.updateProjectionMatrix(); invalidate();
+    invalidate();
+    // This effect intentionally follows the explicit view request, not document
+    // mutations or selection changes: an ordinary edit must not move the camera.
   }, [camera, invalidate, view]);
-  return <OrbitControls makeDefault enableDamping dampingFactor={0.095}
-    target={[0, 0.58, 0]} minDistance={0.9} maxDistance={25} enablePan screenSpacePanning />;
+  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.095}
+    minDistance={0.02} maxDistance={2000} enablePan screenSpacePanning
+    onStart={() => { movement.current = null; }}/>;
 }
 
 function useTextureMaps(textures: PixelTexture[], draftPixels: number[],
@@ -363,7 +420,7 @@ function Scene(props: ViewportProps) {
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}
-    <CameraControls view={props.view}/>
+    <CameraControls view={props.view} document={props.document} selectedIds={ids}/>
   </>;
 }
 

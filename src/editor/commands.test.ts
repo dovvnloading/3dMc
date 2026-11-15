@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createSampleDocument } from "./domain";
 import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
+import { groupEditorShortcuts, SHORTCUT_AREAS } from "./shortcuts";
+import { keyToShortcut } from "./useEditorKeyboardShortcuts";
 
 function fixture() {
   const state: EditorCommandContext = {
@@ -24,6 +26,8 @@ function fixture() {
     newProject: vi.fn(), openProject: vi.fn(), saveProject: vi.fn(),
     importPack: vi.fn(), exportMinecraft: vi.fn(), exportTexture: vi.fn(),
     importTexture: vi.fn(), saveLegacyJson: vi.fn(), undo: vi.fn(), redo: vi.fn(),
+    cancelCurrentTool: vi.fn(), decreaseBrushSize: vi.fn(), increaseBrushSize: vi.fn(),
+    frameSelection: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
     addCuboid: vi.fn(), addShape: vi.fn(), duplicate: vi.fn(), deleteSelection: vi.fn(),
     selectAll: vi.fn(), changeMode: vi.fn(), switchTool: vi.fn(),
     cycleSymmetry: vi.fn(), setSymmetry: vi.fn(), navigate: vi.fn(),
@@ -51,7 +55,8 @@ describe("editor command registry", () => {
       "tool.select", "tool.move", "tool.resize", "tool.rotate", "tool.pencil", "tool.eraser",
       "tool.fill", "tool.eyedropper", "tool.line", "tool.rectangle", "tool.ellipse",
       "paint.symmetry.cycle", "paint.symmetry.off", "paint.symmetry.x", "paint.symmetry.y", "paint.symmetry.both",
-      "view.iso", "view.top",
+      "view.iso", "view.top", "view.frame", "dialog.shortcuts", "dialog.command-palette",
+      "paint.brush.decrease", "paint.brush.increase", "edit.cancel",
       "dialog.pack-studio", "dialog.import-model", "dialog.library", "dialog.region", "dialog.face"]) {
       expect(all.some(command => command.id === id), id).toBe(true);
     }
@@ -175,5 +180,78 @@ describe("editor command registry", () => {
     expect(get("project.import-png", { importingTexture: true }).enabled).toBe(false);
     const unsupported = { ...state.document, target: { ...state.document.target, candidateRelease: "26.3" as const } };
     expect(get("dialog.pack-studio", { document: unsupported }).disabledReason).toContain("1.21.4");
+  });
+});
+
+describe("shortcut reference", () => {
+  it("groups every shortcut directly from the registry, including unavailable tools and alternate keys", () => {
+    const { commands } = fixture();
+    const modelCommands = commands();
+    const paintCommands = commands({ mode: "paint" });
+    const groups = groupEditorShortcuts(modelCommands);
+    expect(groups.map(group => group.area)).toEqual(SHORTCUT_AREAS);
+    expect(groups.every(group => group.entries.length > 0)).toBe(true);
+    const entries = groups.flatMap(group => group.entries);
+    const shortcutCommands = modelCommands.filter(command => command.shortcut);
+    expect(entries.map(entry => entry.id)).toHaveLength(shortcutCommands.length);
+    expect(new Set(entries.map(entry => entry.id)).size).toBe(shortcutCommands.length);
+    for (const command of shortcutCommands) {
+      const entry = entries.find(entry => entry.id === command.id);
+      expect(entry?.shortcuts).toEqual([command.shortcut, ...(command.alternateShortcuts ?? [])]);
+      expect(command.shortcutArea, command.id).toBeDefined();
+    }
+    expect(groupEditorShortcuts(paintCommands).map(group => group.entries.map(entry => entry.id)))
+      .toEqual(groups.map(group => group.entries.map(entry => entry.id)));
+    expect(groups.find(group => group.area === "Paint tools")?.entries.some(entry => entry.id === "tool.eraser"))
+      .toBe(true); // Listed even when currently disabled in Model mode.
+    expect(entries.find(entry => entry.id === "edit.redo")?.shortcuts)
+      .toEqual(["Ctrl/Cmd+Shift+Z", "Ctrl/Cmd+Y"]);
+    expect(entries.find(entry => entry.id === "edit.delete")?.shortcuts)
+      .toEqual(["Delete", "Backspace"]);
+    expect(entries.find(entry => entry.id === "view.frame")?.shortcuts).toEqual(["F"]);
+    expect(modelCommands.find(command => command.id === "view.iso")?.shortcut).toBeUndefined();
+    expect(entries.find(entry => entry.id === "dialog.shortcuts")?.shortcuts).toEqual(["?"]);
+  });
+
+  it("avoids same-mode collisions and invokes the existing handlers", () => {
+    const { commands, actions, get } = fixture();
+    for (const mode of ["model", "paint", "preview"] as const) {
+      const occupied = new Set<string>();
+      for (const command of commands({ mode })) {
+        if (!command.enabled) continue;
+        for (const shortcut of [command.shortcut, ...(command.alternateShortcuts ?? [])]) {
+          if (!shortcut) continue;
+          expect(occupied.has(shortcut), `Duplicate ${mode} shortcut: ${shortcut}`).toBe(false);
+          occupied.add(shortcut);
+        }
+      }
+    }
+    get("view.frame").run();
+    get("dialog.shortcuts").run();
+    get("dialog.command-palette").run();
+    get("paint.brush.increase", { mode: "paint" }).run();
+    get("edit.cancel").run();
+    expect(actions.frameSelection).toHaveBeenCalledOnce();
+    expect(actions.openShortcuts).toHaveBeenCalledOnce();
+    expect(actions.openCommandPalette).toHaveBeenCalledOnce();
+    expect(actions.increaseBrushSize).toHaveBeenCalledOnce();
+    expect(actions.cancelCurrentTool).toHaveBeenCalledOnce();
+  });
+
+  it("normalizes platform modifiers, the question mark, and both deletion keys", () => {
+    const key = (changes: Partial<Parameters<typeof keyToShortcut>[0]>) =>
+      keyToShortcut({ key: "f", ctrlKey: false, metaKey: false, shiftKey: false,
+        altKey: false, isComposing: false, ...changes });
+    expect(key({})).toBe("F");
+    expect(key({ key: "?", shiftKey: true })).toBe("?");
+    expect(key({ key: "/", shiftKey: true })).toBe("?");
+    expect(key({ key: "k", metaKey: true })).toBe("Ctrl/Cmd+K");
+    expect(key({ key: "Z", ctrlKey: true, shiftKey: true })).toBe("Ctrl/Cmd+Shift+Z");
+    expect(key({ key: "Delete" })).toBe("Delete");
+    expect(key({ key: "Backspace" })).toBe("Backspace");
+    expect(key({ key: "[" })).toBe("[");
+    expect(key({ altKey: true })).toBeNull();
+    expect(key({ shiftKey: true })).toBeNull();
+    expect(key({ isComposing: true })).toBeNull();
   });
 });
