@@ -211,7 +211,8 @@ export function distributeSelection(document: EditorDocument, ids: readonly stri
 
 /** A rigid world translation must move the rotation pivot by the exact same amount. */
 function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
-  if (offset === 0) return node;
+  // Rotated extents include trig roundoff: a second identical command is a no-op.
+  if (Math.abs(offset) < 1e-10) return node;
   const shift = (values: Vec3): Vec3 => values.map((value, component) =>
     component === axis ? value + offset : value) as unknown as Vec3;
   const from = shift(node.from);
