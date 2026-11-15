@@ -1,3 +1,6 @@
+import { brushOffsets } from "./brush";
+import type { BrushShape } from "./brush";
+
 /** Source pixels use a top-left origin; WebGL UVs have a bottom-left origin. */
 export type Texel = readonly [number, number];
 /** Pixel-space boundaries; right and bottom exclude the texel center. */
@@ -26,25 +29,23 @@ export function hexToRGB(hex: string): [number, number, number] {
 /** Deterministic nearest-texel brush; caller owns gesture history. */
 export function drawStroke(
   pixels: number[], width: number, height: number,
-  start: Texel, end: Texel, color: string, size: 1 | 2 | 4,
-  alpha: 0 | 255 = 255, mask?: PixelMask
+  start: Texel, end: Texel, color: string, size: number,
+  alpha: 0 | 255 = 255, mask?: PixelMask, shape: BrushShape = "square"
 ): number[] {
   const result = [...pixels];
   const [r, g, b] = alpha === 0 ? [0, 0, 0] : hexToRGB(color);
+  const offsets = brushOffsets(size, shape);
   let x = start[0], y = start[1];
   const dx = Math.abs(end[0] - start[0]), dy = Math.abs(end[1] - start[1]);
   const sx = start[0] < end[0] ? 1 : -1;
   const sy = start[1] < end[1] ? 1 : -1;
   let error = dx - dy;
   for (;;) {
-    for (let oy = 0; oy < size; oy++) {
-      for (let ox = 0; ox < size; ox++) {
-        const px = x + ox - Math.floor((size - 1) / 2);
-        const py = y + oy - Math.floor((size - 1) / 2);
-        if (px < 0 || py < 0 || px >= width || py >= height || !insideMask(mask, px, py)) continue;
-        const i = (py * width + px) * 4;
-        result[i] = r; result[i + 1] = g; result[i + 2] = b; result[i + 3] = alpha;
-      }
+    for (const [ox, oy] of offsets) {
+      const px = x + ox, py = y + oy;
+      if (px < 0 || py < 0 || px >= width || py >= height || !insideMask(mask, px, py)) continue;
+      const i = (py * width + px) * 4;
+      result[i] = r; result[i + 1] = g; result[i + 2] = b; result[i + 3] = alpha;
     }
     if (x === end[0] && y === end[1]) break;
     const doubled = error * 2;
@@ -57,15 +58,15 @@ export function drawStroke(
 /** Outline an inclusive texel rectangle using the same brush and RGBA rules. */
 export function drawRectangle(
   pixels: number[], width: number, height: number,
-  start: Texel, end: Texel, color: string, size: 1 | 2 | 4,
-  alpha: 0 | 255 = 255, mask?: PixelMask
+  start: Texel, end: Texel, color: string, size: number,
+  alpha: 0 | 255 = 255, mask?: PixelMask, shape: BrushShape = "square"
 ): number[] {
   const left = Math.min(start[0], end[0]), right = Math.max(start[0], end[0]);
   const top = Math.min(start[1], end[1]), bottom = Math.max(start[1], end[1]);
-  let result = drawStroke(pixels, width, height, [left, top], [right, top], color, size, alpha, mask);
-  result = drawStroke(result, width, height, [right, top], [right, bottom], color, size, alpha, mask);
-  result = drawStroke(result, width, height, [right, bottom], [left, bottom], color, size, alpha, mask);
-  return drawStroke(result, width, height, [left, bottom], [left, top], color, size, alpha, mask);
+  let result = drawStroke(pixels, width, height, [left, top], [right, top], color, size, alpha, mask, shape);
+  result = drawStroke(result, width, height, [right, top], [right, bottom], color, size, alpha, mask, shape);
+  result = drawStroke(result, width, height, [right, bottom], [left, bottom], color, size, alpha, mask, shape);
+  return drawStroke(result, width, height, [left, bottom], [left, top], color, size, alpha, mask, shape);
 }
 
 export function readHex(pixels: number[], width: number, [x, y]: Texel): string {

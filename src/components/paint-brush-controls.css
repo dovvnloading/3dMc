@@ -1,0 +1,41 @@
+.paint-brush-controls {
+  display: grid;
+  gap: 9px;
+  margin: 8px 0 15px;
+}
+.paint-brush-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text);
+}
+.paint-brush-controls small { font-size: 11px; color: var(--muted); }
+.paint-brush-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.paint-brush-shapes { display: flex; gap: 7px; }
+.paint-brush-shapes button {
+  flex: 1;
+  padding: 8px 10px;
+  min-height: 34px;
+  border: 1px solid var(--interactive-border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  font-size: 12px;
+}
+.paint-brush-shapes button[aria-pressed="true"] {
+  background: var(--selected);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.paint-brush-shapes button:focus-visible,
+.paint-brush-controls input:focus-visible {
+  outline: 2px solid #a0afff;
+  outline-offset: 2px;
+}
+.paint-brush-controls p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }

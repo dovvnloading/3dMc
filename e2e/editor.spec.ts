@@ -935,6 +935,8 @@ test("face UV sheet supports pixel-snapped drag, corner resize, cancel and copy/
   await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 16);
   await page.keyboard.press("Escape");
   await page.mouse.up();
+  // Cancel an active UV drag without also dismissing the UV editing mode.
+  await expect(region).toBeVisible();
   expect([await field("U1").inputValue(), await field("V1").inputValue(),
     await field("U2").inputValue(), await field("V2").inputValue()]).toEqual(afterResize);
 
@@ -1222,7 +1224,7 @@ test("PNG replacement explicitly warns when it would discard editable source lay
   await page.locator('input[accept=".png,image/png"]').setInputFiles(png);
   const modal = page.getByRole("dialog", { name: "Replace the shared texture?" });
   await expect(modal.getByText(/removes all editable raster layers/)).toBeVisible();
-  await modal.getByRole("button", { name: "Cancel" }).click();
+  await modal.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Flatten editable texture layers" }))
     .toBeVisible();
 });
