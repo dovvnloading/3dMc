@@ -91,6 +91,10 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
         <dt>W / R / V</dt><dd>Move, resize and select. Numeric inspector fields provide exact alternatives.</dd>
         <dt>Ctrl/Cmd + D</dt><dd>Duplicate the complete editable selection as one undo step.</dd>
         <dt>B / E / G / I</dt><dd>Pencil, eraser, connected RGBA fill and eyedropper in Paint mode.</dd>
+        <dt>L / U</dt><dd>Line and rectangle outline in Paint mode.</dd>
+        <dt>[ / ]</dt><dd>Decrease or increase brush size by one texel, 1–16.</dd>
+        <dt>+ / - / 0</dt><dd>Zoom in, zoom out or reset the 2D texture sheet when focused.</dd>
+        <dt>Wheel / Space+drag / middle-drag</dt><dd>Zoom under the cursor or pan the texture sheet. Fit and Reset are also visible buttons.</dd>
         <dt>Ctrl/Cmd + Z / Shift + Z</dt><dd>Undo and redo. Typing fields and dialogs keep their own shortcuts.</dd>
         <dt>Escape</dt><dd>Cancel live gestures or staged region previews without a content edit.</dd>
         <dt>Ctrl/Cmd + S</dt><dd>Start a portable native .3dmc download.</dd>

@@ -43,6 +43,9 @@ Locked elements cannot be converted, reordered, resized or deleted until unlocke
 | R | Resize tool (Model) |
 | B | Pencil (Paint) |
 | I | Eyedropper (Paint) |
+| [ / ] | Decrease / increase the paint brush size, from 1 to 16 texels |
+| + / - / 0 | Zoom in / zoom out / reset the focused 2D texture sheet |
+| Wheel / Space+drag / middle-drag | Zoom or pan the 2D texture sheet |
 | Escape | Cancel a gesture or dismiss the shape menu |
 
 Global shortcuts intentionally avoid typing into input fields, dropdowns, editable text or open dialogs. A keyboard can also activate the shape menu and surface switches directly without relying on a canvas pointer hit.

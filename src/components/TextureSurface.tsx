@@ -112,6 +112,7 @@ export function TextureSurface(props: Props) {
     const wheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return;
       event.preventDefault();
+      if (strokePointer.current !== null) return;
       const rect = element.getBoundingClientRect();
       const units = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
       const { width, height } = viewportSize();
@@ -237,15 +238,18 @@ export function TextureSurface(props: Props) {
     props.onCancel();
   };
   const zoomBy = (factor: number) => {
+    if (strokePointer.current !== null) return;
     const { width, height } = viewportSize();
     applyView(sheetZoomAt(viewRef.current, viewRef.current.zoom * factor,
       width / 2, height / 2, props.width, props.height, width, height));
   };
   const reset = () => {
+    if (strokePointer.current !== null) return;
     const { width, height } = viewportSize();
     applyView(sheetResetView(props.width, props.height, width, height));
   };
   const fit = () => {
+    if (strokePointer.current !== null) return;
     const { width, height } = viewportSize();
     applyView(sheetFitView(props.width, props.height, width, height));
   };
@@ -280,7 +284,7 @@ export function TextureSurface(props: Props) {
         props.onBegin(cursor, FACE); props.onEnd();
       }
     } else if (event.key === "Escape") {
-      event.preventDefault(); props.onCancel();
+      event.preventDefault(); event.stopPropagation(); props.onCancel();
     }
   };
   const focusTexels = useMemo(() => brushTexels(cursor,
