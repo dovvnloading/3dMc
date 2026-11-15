@@ -9,7 +9,7 @@ import {
 import {
   activeTexture, addTexture, affectedFaces, textureById, removeTexture, renameTexture, selectTexture,
   addCuboid, createSampleDocument, renameCuboid, renameProject, setAxisValue, setJavaCandidateRelease,
-  setMaterialColor, setTexturePixels, toggleFlag
+  setMaterialColor, setTexturePixels, setCuboidFlags, toggleFlag
 } from "./editor/domain";
 import type { Cuboid, EditorDocument, EditorGroup, FaceDirection, PixelTexture, Vec3 } from "./editor/domain";
 import { faceLabel } from "./editor/uv";
@@ -404,10 +404,7 @@ export function App() {
     applyBatch(current => deleteSelection(current, selectedIds));
   }, [selectedIds, applyBatch]);
   const setSelectedFlag = useCallback((flag: "visible" | "locked", value: boolean) => {
-    const ids = new Set(selectedIds);
-    // One undo entry for the whole selection, using the outliner's existing toggle handler.
-    commitDocument(current => current.cuboids.reduce((next, node) =>
-      ids.has(node.id) && node[flag] !== value ? toggleFlag(next, node.id, flag) : next, current));
+    commitDocument(current => setCuboidFlags(current, selectedIds, flag, value));
   }, [selectedIds, commitDocument]);
   const selectEditable = useCallback(() => {
     clearStroke();

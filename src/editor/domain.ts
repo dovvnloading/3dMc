@@ -426,10 +426,23 @@ export function setMaterialColor(doc: EditorDocument, id: string, color: string)
   return updateCuboid(doc, id, (node) => node.color === color ? node : { ...node, color });
 }
 
+/** One pass for a single flag operation across an arbitrary selection. */
+export function setCuboidFlags(doc: EditorDocument, ids: readonly string[],
+  field: "visible" | "locked", value: boolean): EditorDocument {
+  if (!ids.length) return doc;
+  const selected = new Set(ids);
+  let changed = false;
+  const cuboids = doc.cuboids.map(node => {
+    if (!selected.has(node.id) || node[field] === value) return node;
+    changed = true;
+    return { ...node, [field]: value };
+  });
+  return changed ? { ...doc, cuboids } : doc;
+}
+
 export function toggleFlag(doc: EditorDocument, id: string, field: "visible" | "locked"): EditorDocument {
-  if (!doc.cuboids.some((node) => node.id === id)) return doc;
-  return { ...doc, cuboids: doc.cuboids.map((node) => node.id === id
-    ? { ...node, [field]: !node[field] } : node) };
+  const node = doc.cuboids.find(node => node.id === id);
+  return node ? setCuboidFlags(doc, [id], field, !node[field]) : doc;
 }
 
 export function setTexturePixels(
