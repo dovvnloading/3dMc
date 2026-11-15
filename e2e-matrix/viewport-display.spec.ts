@@ -38,7 +38,17 @@ test("projection can switch via button, keypad and palette without changing the 
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * .79 + 85, box.y + box.height * .48 + 33, { steps: 5 });
   await page.mouse.up();
-  await page.waitForTimeout(550); // OrbitControls damping finishes before the snapshot.
+  // Damping progresses per rendered frame, not wall time. On software WebGL
+  // browsers a fixed sleep can capture a moving camera and give false failures.
+  let previous = await cameraSnapshot(page);
+  await expect.poll(async () => {
+    await page.waitForTimeout(90);
+    const current = await cameraSnapshot(page);
+    const movement = Math.hypot(...current.direction.map((value, index) =>
+      value - previous.direction[index]!));
+    previous = current;
+    return movement;
+  }, { timeout: 10000 }).toBeLessThan(0.00005);
   const before = await cameraSnapshot(page);
   await button.click();
   await expect(canvas).toHaveAttribute("data-camera-projection", "orthographic");
