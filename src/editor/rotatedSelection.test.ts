@@ -153,6 +153,20 @@ describe("rotation-aware selection operations", () => {
     expect(mirrorSelection(mirrored, ["body"], 0).cuboids[0]).toEqual(source.cuboids[0]);
   });
 
+  it("does not reject a valid 64-unit translation because of floating-point roundoff", () => {
+    const source = createSampleDocument();
+    source.cuboids[0] = { ...source.cuboids[0]!,
+      from: [-37.225578, 3, 3], to: [26.774422, 12, 13],
+      rotation: { axis: "z", angle: 0, origin: [-5, 7.5, 8], rescale: false } };
+    source.cuboids[1] = { ...source.cuboids[1]!,
+      from: [158.138888814, 1, 2], to: [170.138888814, 3, 14] };
+    const aligned = alignSelection(source, ["body", "base"], 0, "maximum");
+    expect(visibleEdge(aligned.cuboids[0]!, 0, "maximum"))
+      .toBeCloseTo(visibleEdge(aligned.cuboids[1]!, 0, "maximum"), 9);
+    expect(aligned.cuboids[0]!.to[0] - aligned.cuboids[0]!.from[0]).toBeLessThanOrEqual(64);
+    expect(parseDocument(aligned)).toEqual(aligned);
+  });
+
   it("rejects unrepresentable reflected pivots and batch translations atomically", () => {
     const source = createSampleDocument();
     source.cuboids[0] = { ...source.cuboids[0]!, from: [-220, 3, 3], to: [-210, 12, 13],
