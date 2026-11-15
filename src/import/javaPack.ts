@@ -5,6 +5,7 @@ import type { Cuboid, CuboidFaces, EditorDocument, FaceRotation, FaceUV, Vec3 } 
 import { inspectJava1214, JAVA_PACK_PATHS, MIN_JAVA_TEXTURE_SIZE, RESOURCE_PACK_FORMAT } from "../export/javaBlock";
 import { read3dMcRgbaPng } from "./strictPng";
 import { read3dMcStoredZip } from "./storedZip";
+import { parseJavaElementRotation } from "../editor/elementRotation";
 
 export type PackImportReport =
   | { status: "editable"; document: EditorDocument; paths: string[]; notices: string[] }
@@ -113,7 +114,7 @@ function inspectOwnExport(files: Map<string, Uint8Array>): { document: EditorDoc
   const nodes: Cuboid[] = [];
   let legacySolids = false;
    for (let index = 0; index < model.elements.length; index++) {
-    const element = asObject(model.elements[index], "element " + index, ["from","to","faces"]);
+    const element = asObject(model.elements[index], "element " + index, ["from","to","faces","rotation"]);
     requiredKeys(element, "element " + index, ["from","to","faces"]);
     const from = vec3(element.from, "element " + index + ":from");
     const to = vec3(element.to, "element " + index + ":to");
@@ -174,7 +175,9 @@ function inspectOwnExport(files: Map<string, Uint8Array>): { document: EditorDoc
     nodes.push({
       id: "pack-element-" + index,
       name: "Imported cuboid " + String(index + 1).padStart(2,"0"),
-      from, to, material: isSolid ? "solid" : "texture", color,
+      from, to,
+      ...(element.rotation === undefined ? {} : { rotation: parseJavaElementRotation(element.rotation, "element " + index + ":rotation") }),
+      material: isSolid ? "solid" : "texture", color,
       faces: mapped as CuboidFaces, visible: true, locked: false
     });
   }
@@ -230,7 +233,7 @@ export function inspectJava1214Pack(bytes: Uint8Array): PackImportReport {
           ? "The generated geometry and opaque texture pixels are editable; a small image needs replacement before re-export."
           : "The generated geometry and opaque texture pixels are editable and re-exportable.",
         "Resource packs do not retain native part names, visibility, locks, or undo history; imported editor metadata is initialized.",
-        "Per-face texture aliases, UV rectangles and quarter-turns are retained within the supported 16-texture profile; parent models and unrelated resources remain unsupported.",
+        "Per-face texture aliases, UV rectangles, UV quarter-turns and supported single-axis element rotations are retained within the 16-texture profile; parent models and unrelated resources remain unsupported.",
         ...(legacySolids ? ["Legacy 1×1 solid-color images will be regenerated as 16×16 images when exported; their colors are retained."] : []),
         ...(hasSmallTexture
           ? ["This legacy pack contains an image smaller than 16×16. It remains editable at its original size; replace it with a 16×16, 32×32, or 64×64 image before exporting."] : []),

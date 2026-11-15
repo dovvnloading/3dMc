@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import { parseDocument } from "../editor/domain";
+import { isElementRotation } from "../editor/elementRotation";
 import { FACE_DIRECTIONS } from "../editor/domain";
 import type { Cuboid, EditorDocument } from "../editor/domain";
 import { hexToRGB } from "../editor/pixels";
@@ -93,6 +94,10 @@ export function inspectJava1214(document: EditorDocument): ExportIssue[] {
         `Element "${node.name}" extends outside Java model element bounds (-16 to 32 units). Move or resize it.`,
         node.id));
     }
+    if (node.rotation !== undefined && !isElementRotation(node.rotation)) {
+      issues.push(error("ELEMENT_ROTATION_UNSUPPORTED",
+        `Element "${node.name}" has an unsupported rotation. Java 1.21.4 permits only X/Y/Z and −45°, −22.5°, 0°, 22.5° or 45° with a finite pivot and boolean rescale.`, node.id));
+    }
     if (node.material === "texture" && node.color.toLowerCase() !== "#ffffff") {
       issues.push(error("UNSUPPORTED_TINT",
         `Element "${node.name}" uses a viewport tint that this exporter cannot reproduce. Reset its material color to white.`,
@@ -130,7 +135,11 @@ export function buildJava1214Model(document: EditorDocument) {
         ...(binding.rotation === 0 ? {} : { rotation: binding.rotation })
       }];
     }));
-    return { from: [...node.from], to: [...node.to], faces };
+    return { from: [...node.from], to: [...node.to],
+      ...(node.rotation ? { rotation: {
+        origin: [...node.rotation.origin], axis: node.rotation.axis,
+        angle: node.rotation.angle, rescale: node.rotation.rescale
+      } } : {}), faces };
   });
   return { ambientocclusion: true, textures, elements };
 }

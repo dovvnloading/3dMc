@@ -36,7 +36,7 @@ The active model is selected by the pack index. Source documents remain canonica
 - Require the exact files declared by the manifest and valid SHA-256 for every referenced document, texture and pack index.
 - Validate source-document schema and PNG dimensions, pack index identity, and all model/texture reference bindings before returning editable data. No partial import or silent orphaned source files.
 - Limit to eight model assets and a 12 MB total archive, with existing 64-pixel source textures and per-file budgets. These are initial limits, not a promise of unbounded projects.
-- Preserve model names, element locks/visibility, per-face UV/rotation, complete RGBA pixels and active-model selection through round-trip tests.
+- Preserve model names, element locks/visibility, per-face UV/rotation, complete RGBA pixels and active-model selection through round-trip tests. Optional element axis/angle/pivot/rescale records are preserved in the v3 source documents without changing the pack index v1 or native ZIP v3; old sources lacking those records remain valid.
 - Existing v1/v2 native archives are still decoded by the original exact parser. `openNativePack` migrates a supported Java 1.21.4 legacy project in memory using `indexLegacyProject` without modifying its source bytes. An old document targeting unsupported 26.3 is not silently converted to a supported pack; the old single-model reader remains available.
 - The old `decodeNativeProject` API must reject v3 rather than returning only one model and dropping the rest.
 

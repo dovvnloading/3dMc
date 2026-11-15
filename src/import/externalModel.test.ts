@@ -59,7 +59,7 @@ describe("bounded external block-model preflight", () => {
   it("rejects unknown model/element/face properties and missing faces instead of dropping them", () => {
     const variants = [
       { ...model(), display: {} }, { ...model(), ambientocclusion: false },
-      { ...model(), elements: [{ ...model().elements[0], rotation: { axis: "y", angle: 22.5 } }] },
+      { ...model(), elements: [{ ...model().elements[0], rotation: { axis: "y", angle: 17 } }] },
       { ...model(), elements: [{ ...model().elements[0], faces: { ...faces(), north: { texture: "#surface", uv: [0,0,16,16], cullface: "north" } } }] },
       { ...model(), elements: [{ ...model().elements[0], faces: { north: faces().north } }] }
     ];

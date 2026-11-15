@@ -1,4 +1,6 @@
 import { validRasterLayers } from "./layers";
+import { copyElementRotation, isElementRotation, mapRotationToBounds } from "./elementRotation";
+import type { ElementRotation } from "./elementRotation";
 
 /**
  * Canonical, renderer-independent v3 editor source document. Native .3dmc
@@ -64,6 +66,8 @@ export interface Cuboid {
   material: MaterialKind;
   color: string;
   faces: CuboidFaces;
+  /** Optional Java 1.21.4 single-axis element transform; absent on old v3 sources. */
+  rotation?: ElementRotation;
   visible: boolean;
   locked: boolean;
 }
@@ -149,6 +153,7 @@ export function isValidCuboid(value: unknown): value is Cuboid {
     }) &&
     (node.material === "solid" || node.material === "texture") &&
     isHex(node.color) && isValidFaces(node.faces) &&
+    (node.rotation === undefined || isElementRotation(node.rotation)) &&
     typeof node.visible === "boolean" && typeof node.locked === "boolean";
 }
 
@@ -180,9 +185,14 @@ export function parseDocument(input: unknown): EditorDocument {
       throw new Error("Unsupported target metadata cannot be silently removed.");
     if (Array.isArray(value.cuboids) && value.cuboids.some(node =>
       !node || typeof node !== "object" || Object.keys(node).some(key =>
-        !["id", "name", "from", "to", "material", "color", "faces", "visible", "locked"].includes(key))))
+        !["id", "name", "from", "to", "material", "color", "faces", "rotation", "visible", "locked"].includes(key))))
       throw new Error("Unsupported cuboid metadata cannot be silently removed.");
   }
+  // Older JSON schemas never defined a per-element rotation. Refuse a stray
+  // transform instead of retrospectively assigning it new Java semantics.
+  if (isLegacy && Array.isArray(value.cuboids) && value.cuboids.some(node =>
+    node && typeof node === "object" && "rotation" in node))
+    throw new Error("Legacy project contains unsupported element rotation metadata. The original file was not changed.");
   const textures = isLegacy ? [inputRecord.texture] : inputRecord.textures;
   if (!Array.isArray(textures) || textures.length < 1 || textures.length > MAX_TEXTURE_SLOTS)
     throw new Error("A project requires 1–16 texture assets.");
@@ -278,7 +288,9 @@ export function parseDocument(input: unknown): EditorDocument {
       from: [...node.from] as [number, number, number],
       to: [...node.to] as [number, number, number],
       material: node.material, color: node.color,
-      faces: copyFaces(node.faces), visible: node.visible, locked: node.locked
+      faces: copyFaces(node.faces),
+      ...(node.rotation ? { rotation: copyElementRotation(node.rotation) } : {}),
+      visible: node.visible, locked: node.locked
     })),
     textures: textures.map(t => ({
       id: t.id, name: t.name, width: t.width, height: t.height,
@@ -364,7 +376,8 @@ export function setAxisValue(
       from[axis] += delta;
       to[axis] += delta;
     }
-    return { ...node, from, to };
+    return { ...node, from, to,
+      ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
   });
 }
 
@@ -380,7 +393,8 @@ export function duplicateCuboid(doc: EditorDocument, id: string, newId: string):
   return { ...doc, cuboids: [...doc.cuboids, {
     ...source, id: newId, name: source.name + " copy", locked: false,
     from: [...source.from] as [number, number, number], to: [...source.to] as [number, number, number],
-    faces: copyFaces(source.faces)
+    faces: copyFaces(source.faces),
+    ...(source.rotation ? { rotation: copyElementRotation(source.rotation) } : {})
   }] };
 }
 

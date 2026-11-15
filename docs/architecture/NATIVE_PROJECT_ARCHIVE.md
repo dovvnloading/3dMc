@@ -31,7 +31,7 @@ Example manifest shape:
 
 On import, the strict reader verifies the complete ZIP directory, local/central field agreement, CRC, ordered whitelisted paths, per-file size, SHA checksums, PNG pixel/dimension equality, exact known object fields, source IDs, and absence of dangling texture references. An invalid file does not replace the workspace. SHA-256 is an **integrity check**, not a digital signature or authenticity assertion.
 
-The source preserves every texture's RGBA bytes, visibility/locks, part names and Java UV mappings. Undo history is not included.
+The source preserves every texture's RGBA bytes, visibility/locks, part names and Java UV mappings. Undo history is not included. An optional, strictly validated `cuboid.rotation` record (single Java 1.21.4 axis, allowed angle, model-space pivot and rescale) extends source schema v3 without changing the v2 ZIP container or manifest version. Existing v3 documents without this field reopen exactly as before; the reader rejects unsupported rotation fields rather than discarding them. Opening is in-memory and never writes over an old source file.
 
 ## Migrations
 

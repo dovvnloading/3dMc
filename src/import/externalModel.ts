@@ -1,6 +1,8 @@
 import { createDefaultFaces, FACE_DIRECTIONS, parseDocument } from "../editor/domain";
 import type { Cuboid, EditorDocument, FaceRotation, FaceUVRect, PixelTexture, Vec3 } from "../editor/domain";
 import { parseStrictJson } from "./strictJson";
+import { parseJavaElementRotation } from "../editor/elementRotation";
+import type { ElementRotation } from "../editor/elementRotation";
 
 export interface LocalModelSource { readonly resource: string; readonly text: string; }
 export interface LocalTextureSource { readonly resource: string; readonly image: Pick<PixelTexture, "width" | "height" | "pixels">; }
@@ -8,7 +10,7 @@ export interface ExternalModelPlan {
   readonly root: string;
   readonly chain: readonly string[];
   readonly textures: readonly string[];
-  readonly elements: readonly { from: Vec3; to: Vec3; faces: Record<string, { uv: FaceUVRect; rotation: FaceRotation; resource: string }> }[];
+  readonly elements: readonly { from: Vec3; to: Vec3; rotation?: ElementRotation; faces: Record<string, { uv: FaceUVRect; rotation: FaceRotation; resource: string }> }[];
   readonly unusedModels: readonly string[];
   readonly notices: readonly string[];
 }
@@ -100,7 +102,7 @@ export function inspectExternalModel(sources: readonly LocalModelSource[], root:
   if (aliases.has("particle")) used.add(resolve("#particle", canonicalRoot + ":particle"));
   const elements = rawElements.map((raw, index) => {
     const path = `${canonicalRoot}:element[${index}]`;
-    const element = object(raw, path, ["from", "to", "faces"]);
+    const element = object(raw, path, ["from", "to", "faces", "rotation"]);
     const from = coordinates(element.from, path + ":from"), to = coordinates(element.to, path + ":to");
     if (from.some((value, axis) => value >= to[axis]!)) fail(path, "Every cuboid dimension must be positive.");
     const rawFaces = object(element.faces, path + ":faces", FACE_DIRECTIONS);
@@ -116,13 +118,15 @@ export function inspectExternalModel(sources: readonly LocalModelSource[], root:
       const resource = resolve(face.texture, facePath); used.add(resource);
       faces[direction] = { uv: [...uv] as unknown as FaceUVRect, rotation: rotation as FaceRotation, resource };
     }
-    return { from, to, faces };
+    return { from, to,
+      ...(element.rotation === undefined ? {} : { rotation: parseJavaElementRotation(element.rotation, path + ":rotation") }),
+      faces };
   });
   if (used.size > 16) fail(canonicalRoot, "The resolved model uses more than 16 texture sheets.");
   const notices = [
     "This imports a resolved editable copy, not the original resource-pack structure. Original files are never modified.",
     "Export creates the existing experimental diamond-block replacement; source namespaces, blockstates, parent links and filenames are not an export contract.",
-    "Explicit six-face UVs, supported quarter-turns, cuboid coordinates and decoded RGBA pixels are retained. Game appearance is not verified."
+    "Explicit six-face UVs, quarter-turn UVs, supported single-axis element rotations and decoded RGBA pixels are retained. Game appearance is not verified."
   ];
   if (chain.length > 1) notices.push(`The ${chain.length}-model parent chain will be resolved into standalone elements. Download the original-source bundle to retain editable parent files.`);
   if (!aliases.has("particle")) notices.push("No particle alias was supplied. The generated pack will use the first referenced texture for particles.");
@@ -155,7 +159,8 @@ export function materializeExternalModel(plan: ExternalModelPlan, images: readon
       faces[direction] = { uv: [...face.uv], rotation: face.rotation, textureId: textureIds.get(face.resource)! };
     }
     return { id: "external-part-" + index, name: "Imported part " + String(index + 1).padStart(2, "0"),
-      from: element.from, to: element.to, material: "texture", color: "#ffffff", visible: true, locked: false, faces };
+      from: element.from, to: element.to, ...(element.rotation ? { rotation: element.rotation } : {}),
+      material: "texture", color: "#ffffff", visible: true, locked: false, faces };
   });
   const document = parseDocument({ schemaVersion: 3, id: projectId, name: name.trim().slice(0, 100) || "Imported block model",
     target: { edition: "java", family: "static-block", candidateRelease: "1.21.4", status: "unverified" },

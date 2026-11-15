@@ -330,7 +330,7 @@ export async function decodeNativeProject(data: Uint8Array): Promise<EditorDocum
   if (!Array.isArray(doc.cuboids) || doc.cuboids.length > 2000)
     reject("Native document has an invalid number of elements.");
   for (const node of doc.cuboids) {
-    const c = exactKeys(node, ["id","name","from","to","material","color","visible","locked","faces"], "cuboid");
+    const c = exactKeys(node, ["id","name","from","to","material","color","visible","locked","faces"], "cuboid", ["rotation"]);
     const faces = exactKeys(c.faces, ["down","up","north","south","west","east"], "faces");
     for (const face of Object.values(faces))
       exactKeys(face, ["uv","rotation","textureId"], "face");
