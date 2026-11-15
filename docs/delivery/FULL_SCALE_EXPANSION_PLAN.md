@@ -50,7 +50,7 @@ Current constraints:
 - The 26.3 option is marked unsupported; it is not a second working target.
 - Native textures are limited to 64×64, and export has additional opacity and dimension restrictions.
 - The document supports more cuboids than the current exporter can output.
-- Geometry has align/distribute but not named groups, geometry mirroring, or element rotation.
+- Geometry has named groups, mirroring, arrays, and Java 1.21.4 single-axis element rotation (experimental; not in-game verified); world-axis group resizing of rotated parts remains unavailable.
 - `App.tsx` owns substantial interaction and project orchestration.
 - External import is intentionally narrower than arbitrary Minecraft pack support.
 

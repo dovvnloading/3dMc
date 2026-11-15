@@ -1,0 +1,28 @@
+/* Java element rotation: kept separate from Paint's UV tools and global styles. */
+.rotation-inspector{display:grid;gap:9px;min-width:0}
+.rotation-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rotation-title h3{margin:0;font-size:13px;color:var(--text);font-weight:600}
+.rotation-title>span{font-size:10px;font-weight:650;letter-spacing:.04em;color:var(--secondary)}
+.rotation-help{margin:0;color:var(--secondary);font-size:12px;line-height:1.55}
+.rotation-reason{margin:0;border:1px solid var(--interactive-border);border-radius:6px;padding:9px;color:#f2cc82;font-size:12px;line-height:1.5}
+.rotation-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rotation-pair label,.rotation-pivot-field{display:grid;gap:6px;color:var(--secondary);font-size:12px;min-width:0}
+.rotation-pair select,.rotation-pivot-field input{box-sizing:border-box;min-width:0;width:100%;background:var(--control);color:var(--text);border:1px solid var(--interactive-border);border-radius:6px;padding:9px 8px;font:inherit;font-size:13px;min-height:36px;font-variant-numeric:tabular-nums}
+.rotation-pair select:disabled,.rotation-pivot-field input:disabled{opacity:.55;cursor:not-allowed}
+.rotation-pair select:focus-visible,.rotation-pivot-field input:focus-visible,.rotation-inspector button:focus-visible,.rotation-rescale input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.rotation-pivot-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px}
+.rotation-pivot-heading strong{color:var(--text);font-weight:600}
+.rotation-pivot-heading span{color:var(--secondary)}
+.rotation-pivot-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.rotation-pivot-field .axis-letter{font-size:11px;font-weight:600}
+.rotation-pivot-field input::placeholder{color:var(--secondary);font-style:italic}
+.rotation-pivot-field input[aria-invalid=true]{border-color:var(--error,#ff9b9b)}
+.rotation-pivot-field small{grid-column:1/-1;color:#ff9b9b;font-size:11px;line-height:1.4}
+.rotation-inspector button{min-height:34px;border-radius:6px;border:1px solid var(--interactive-border);background:var(--control);color:var(--text);font:inherit;font-size:12px;cursor:pointer}
+.rotation-inspector button:disabled{cursor:not-allowed;opacity:.55}
+.rotation-inspector .rotation-reset{background:transparent}
+.rotation-rescale{display:flex;align-items:center;gap:9px;color:var(--text);font-size:13px;min-height:30px}
+.rotation-rescale input{accent-color:var(--accent,#80dbbf);width:17px;height:17px}
+.rotation-rescale em{font-style:normal;color:var(--secondary);font-size:12px}
+.rotation-handle-label{background:#1b1e23e8;color:#f0f2f6;border:1px solid #748196;border-radius:6px;padding:4px 7px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none}
+@media(max-width:850px){.rotation-pair{grid-template-columns:repeat(2,minmax(0,1fr))}}

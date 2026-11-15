@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
@@ -7,12 +7,15 @@ import * as THREE from "three";
 import type { Cuboid, EditorDocument, FaceDirection, Vec3, PixelTexture } from "../editor/domain";
 import type { SelectionGesture, SelectionModifiers } from "../editor/selection";
 import { SelectionTransform } from "./SelectionTransform";
+import { RotationHandle } from "./RotationHandle";
+import { defaultElementRotation, elementCenter, elementRescale } from "../editor/elementRotation";
+import type { ElementAngle } from "../editor/elementRotation";
 import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 
 export type Mode = "model" | "paint" | "preview";
-export type Tool = "select" | "move" | "resize" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle";
+export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle";
 export type ViewKind = "iso" | "front" | "right" | "top";
 export type ViewRequest = { kind: ViewKind; count: number };
 
@@ -38,6 +41,7 @@ interface ViewportProps {
   onSample: (texel: Texel, textureId: string) => void;
   onFill: (texel: Texel, textureId: string, faceKey?: string) => void;
   onTransform: (id: string, position: Vec3, scale: Vec3) => void;
+  onRotate: (id: string, angle: ElementAngle) => void;
   onBatchTransform?: (gesture: SelectionGesture, translation: Vec3, scale: Vec3) => void;
 }
 
@@ -142,9 +146,10 @@ function DevPerformanceProbe() {
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedIds" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
   "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
-  "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "cancelToken"> & {
+  "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "onRotate" | "cancelToken"> & {
     node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[];
     opaqueTextureIds: ReadonlySet<string>;
+    rotationEnabled: boolean;
     groupOrigin?: Vec3; suppressGizmo?: boolean; groupOutline?: boolean;
   };
 
@@ -171,6 +176,7 @@ function AssetMesh(props: MeshProps) {
   const anchor = useRef<THREE.Group>(null!);
   const { invalidate } = useThree();
   const draggingGizmo = useRef(false), cancelledGizmo = useRef(false);
+  const [previewAngle, setPreviewAngle] = useState<ElementAngle | null>(null);
   const worldPosition = center(node);
   const initialPosition: Vec3 = props.groupOrigin ?
     [worldPosition[0] - props.groupOrigin[0], worldPosition[1] - props.groupOrigin[1], worldPosition[2] - props.groupOrigin[2]] : worldPosition;
@@ -186,13 +192,29 @@ function AssetMesh(props: MeshProps) {
   const sharedOpaque = node.material === "solid" ||
     (sharedTexture && props.opaqueTextureIds.has(firstTextureId));
   const isSelected = props.selectedIds?.includes(node.id) ?? selectedId === node.id;
+  const activeRotation = node.rotation ?? defaultElementRotation(node);
+  const renderedRotation = previewAngle === null ? activeRotation : { ...activeRotation, angle: previewAngle };
+  const angle = renderedRotation.angle * Math.PI / 180;
+  const rotationEuler: Vec3 = renderedRotation.axis === "x" ? [angle, 0, 0] :
+    renderedRotation.axis === "y" ? [0, angle, 0] : [0, 0, angle];
+  const pivotPosition = renderedRotation.origin;
+  const pivotDelta: Vec3 = pivotPosition.map((value, axis) =>
+    (value - elementCenter(node)[axis]!) / WORLD) as [number, number, number];
+  const unpivot: Vec3 = pivotDelta.map(value => -value) as [number, number, number];
+  const scale = elementRescale(renderedRotation);
+  const pivotWorld: Vec3 = [(pivotPosition[0] - 8) / WORLD,
+    pivotPosition[1] / WORLD, (pivotPosition[2] - 8) / WORLD];
+  const activeRotate = !props.suppressGizmo && isSelected && mode === "model" &&
+    tool === "rotate" && props.rotationEnabled && !node.locked && node.visible;
+  // A world-axis scale of an angled box introduces shear, unsupported by Java.
+  // Numeric size changes instead scale the *unrotated* local bounds and pivot.
   const activeGizmo = !props.suppressGizmo && isSelected && mode === "model" && !node.locked &&
-    (tool === "move" || tool === "resize") ? tool : null;
+    (tool === "move" || (tool === "resize" && !node.rotation)) ? tool : null;
   const rollbackGizmo = () => {
     cancelledGizmo.current = true; draggingGizmo.current = false;
     anchor.current?.position.set(...initialPosition); anchor.current?.scale.set(1, 1, 1); invalidate();
   };
-  useEffect(() => { rollbackGizmo(); }, [props.cancelToken, activeGizmo, node, props.groupOrigin]);
+  useEffect(() => { rollbackGizmo(); setPreviewAngle(null); }, [props.cancelToken, activeGizmo, node, props.groupOrigin]);
   useEffect(() => {
     if (!activeGizmo) return;
     const abort = (event: KeyboardEvent) => { if (event.key === "Escape" && draggingGizmo.current) rollbackGizmo(); };
@@ -243,6 +265,7 @@ function AssetMesh(props: MeshProps) {
     if (capture?.hasPointerCapture?.(event.pointerId)) capture.releasePointerCapture?.(event.pointerId);
   };
   const mesh = <group ref={anchor} position={initialPosition}>
+    <group position={pivotDelta}><group rotation={rotationEuler} scale={scale}><group position={unpivot}>
     <mesh castShadow receiveShadow onClick={event => {
       event.stopPropagation();
       if (mode === "model" && event.delta <= 4) {
@@ -267,6 +290,22 @@ function AssetMesh(props: MeshProps) {
       {isSelected && !props.groupOutline && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
     {selectedId === node.id && !props.groupOutline && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
+    </group></group></group>
+    {isSelected && mode === "model" && !props.groupOutline && <group position={pivotDelta}>
+      <mesh raycast={() => null} renderOrder={10}>
+        <sphereGeometry args={[0.047, 12, 10]}/>
+        <meshBasicMaterial color="#f0f2f6" depthTest={false} depthWrite={false}/>
+      </mesh>
+      <mesh raycast={() => null} renderOrder={10}>
+        <sphereGeometry args={[0.024, 10, 8]}/>
+        <meshBasicMaterial color="#141619" depthTest={false} depthWrite={false}/>
+      </mesh>
+    </group>}
+    {activeRotate && <RotationHandle axis={activeRotation.axis} angle={activeRotation.angle}
+      position={pivotDelta} worldPivot={pivotWorld}
+      radius={Math.max(0.35, ...dimensions(node).map(value => value / 2 + 0.08))}
+      cancelToken={props.cancelToken} onPreview={setPreviewAngle}
+      onCommit={value => props.onRotate(node.id, value)}/>}
   </group>;
   if (!activeGizmo) return mesh;
   return <TransformControls object={anchor} mode={activeGizmo === "move" ? "translate" : "scale"}
@@ -298,11 +337,13 @@ function Scene(props: ViewportProps) {
   const selected = new Set(ids), multiple = ids.length > 1;
   const members = props.document.cuboids.filter(node => selected.has(node.id));
   const grouped = multiple && members.length === ids.length && members.every(node => node.visible && !node.locked);
-  const groupOutline = grouped && props.mode === "model" && !!props.document.groups?.some(group =>
+  const groupOutline = grouped && members.every(node => !node.rotation) &&
+    props.mode === "model" && !!props.document.groups?.some(group =>
     group.memberIds.length === selected.size && group.memberIds.every(id => selected.has(id)));
   const renderNode = (node: Cuboid, groupOrigin?: Vec3) => <AssetMesh key={node.id} {...props}
     selectedIds={ids} node={node} textureMaps={textureMaps} textures={props.document.textures}
-    opaqueTextureIds={opaqueTextureIds} suppressGizmo={multiple} groupOrigin={groupOrigin} groupOutline={groupOutline}/>;
+    opaqueTextureIds={opaqueTextureIds} rotationEnabled={props.document.target.candidateRelease === "1.21.4"}
+    suppressGizmo={multiple} groupOrigin={groupOrigin} groupOutline={groupOutline}/>;
   return <>
     <color attach="background" args={["#141619"]}/>
     <ambientLight intensity={1.35}/>
@@ -313,7 +354,8 @@ function Scene(props: ViewportProps) {
     {props.document.cuboids.filter(node => node.visible && (!grouped || !selected.has(node.id))).map(node => renderNode(node))}
     {grouped && <SelectionTransform document={props.document} ids={ids} snap={props.snap} cancelToken={props.cancelToken}
       outline={groupOutline}
-      active={props.mode === "model" && props.onBatchTransform && (props.tool === "move" || props.tool === "resize") ? props.tool : null}
+      active={props.mode === "model" && props.onBatchTransform &&
+        (props.tool === "move" || (props.tool === "resize" && members.every(node => !node.rotation))) ? props.tool : null}
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}

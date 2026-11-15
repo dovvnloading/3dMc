@@ -7,7 +7,7 @@
 - **Edition/release:** Minecraft Java Edition 1.21.4, stable, with resource-pack version **46**.
 - **Replacement:** Visual model of the existing `minecraft:diamond_block`. This does not add a new vanilla block, change collision, supply light, or alter gameplay.
 - **Blockstate dispatch:** `assets/minecraft/blockstates/diamond_block.json` uses an explicit single empty variant pointing to `3dmc:block/lantern`. A resource pack can override a vanilla model via a blockstate/model reference; do not assume the game's default stone blockstate selects a single model.
-- **Model:** `assets/3dmc/models/block/lantern.json`, with explicit `elements`, six face bindings, explicit per-face logical 0–16 UV rectangles, optional quarter-turn rotation fields, and namespaced texture references. Newly created cuboids default to full-sheet `[0,0,16,16]`.
+- **Model:** `assets/3dmc/models/block/lantern.json`, with explicit `elements`, six face bindings, explicit per-face logical 0–16 UV rectangles, optional quarter-turn UV rotation fields, optional Java 1.21.4 single-axis element rotation, and namespaced texture references. Newly created cuboids default to full-sheet `[0,0,16,16]`.
 - **Images:** `assets/3dmc/textures/block/main.png` holds the editable opaque RGBA pixel sheet. Solid-color elements each receive a uniform 16×16 PNG, preserving their colors without reducing the 1.21.4 block atlas's default four mip levels. Export requires source sheets to be square power-of-two images from 16×16 through 64×64; smaller legacy source sheets remain importable at their original size and must be replaced before export.
 - **Metadata:** `pack.mcmeta` contains `pack.pack_format = 46`.
 - **ZIP:** Flat expected resource paths, uncompressed ZIP entries, fixed file timestamps. Repeated exports of the same document have identical bytes in the same runtime environment.
@@ -49,7 +49,7 @@ Do **not** repair the generated pack by hand and then call the original exporter
 
 ## Next compatibility boundaries
 
-The native project schema remains transitional `.3dmc.json`. Broad third-party model and resource-pack support, element pivots/transforms, target texture references beyond one shared sheet, texture alpha, and a versioned native ZIP archive are not included. Each needs its own fixture and preservation contract before export can be promoted beyond this experiment.
+Portable source projects use native `.3dmc` v2/v3 ZIP containers with editor-source schema v3 (legacy `.3dmc.json` remains readable). Broad third-party model and resource-pack support, multi-axis or arbitrary-angle element transforms, texture alpha, and unlisted target profiles are not included. Each needs its own fixture and preservation contract before export can be promoted beyond this experiment.
 
 The release-agnostic strategy remains in [COMPATIBILITY.md](../architecture/COMPATIBILITY.md).
 
@@ -57,7 +57,7 @@ The release-agnostic strategy remains in [COMPATIBILITY.md](../architecture/COMP
 
 The Java 1.21.4 experiment can now re-import the **exact STORED ZIP subset emitted by 3dMc's own exporter** and recover editable cuboid bounds, material/color assignments and the shared opaque RGBA texture. The import runs as a preflight report; nothing replaces the active project until the user explicitly accepts it.
 
-This is **not** a general Minecraft resource-pack importer. A valid ZIP containing additional resources, inherited models, different per-face texture **references**, element transforms, compressed ZIP entries, unsupported PNG formats, alternate blockstate variants, or unknown fields is **blocked with a specific reason** rather than silently flattened.
+This is **not** a general Minecraft resource-pack importer. A valid ZIP containing additional resources, inherited models, different per-face texture **references**, unsupported element transforms, compressed ZIP entries, unsupported PNG formats, alternate blockstate variants, or unknown fields is **blocked with a specific reason** rather than silently flattened.
 
 ZIP inspection rejects oversized archives, unexpected paths, repeated names, non-stored/compressed entries, malformed directories/local headers, mismatched sizes and CRCs, and overlapping/untracked bytes. The PNG decoder accepts only the bounded RGBA8/filter-0 output from our encoder and checks PNG chunk CRCs plus zlib Adler-32 using a fixed-size inflate buffer.
 
@@ -87,3 +87,11 @@ The native editor can assign separate textures to each cuboid face. Java pack JS
 The first v3 source migration preserves legacy v2 face UVs and rotation, assigning their old shared sheet stable ID \`main\`. The Vite editor stores each sheet as one validated RGBA buffer, and the R3F renderer disposes maps when the resource key changes. Tests cover source migration, exact per-face aliases and deterministic native and experimental game-pack reimport.
 
 The recorded Minecraft 1.21.4 run covers the diagnostic and lantern examples, not every multi-texture model. Check the exported pack in the intended game version.
+
+## Optional Java 1.21.4 element rotation (experimental)
+
+Source schema v3 now accepts an optional `cuboid.rotation` with an `x`, `y` or `z` axis, an angle of exactly −45, −22.5, 0, 22.5 or 45 degrees, an explicit finite origin/pivot in model units (bounded to −256…256 by the editor), and a boolean `rescale`. New rotations start at the element centre; the Java model JSON exporter writes the supported single-axis `{origin, axis, angle, rescale}` object. Java imports with an omitted `origin` use the format's `[8,8,8]` default; an omitted `rescale` is `false`. These rules follow the older single-axis format described by Forge's 1.21.x model documentation and the changes recorded in the official Java 1.21.6 and 1.21.11 release notes.
+
+The renderer applies translation to the pivot, axis rotation and `1/cos(angle)` compensation on the perpendicular axes when rescale is enabled. A visible pivot and snapped ring are provided; per-face UV rotation and semantic face direction remain independent. Moves and local numeric resizing update the pivot consistently. World-axis group resizing, align, distribute and mirroring of a selection containing rotated elements are disabled because their former unrotated-bounds semantics cannot represent the resulting geometry faithfully. Duplicates, arrays, group membership, project snapshots, native single-model and pack archives, and local recovery preserve the authored rotation. Each supported edit remains one undoable transaction.
+
+No rotated fixture has been checked in Minecraft Java 1.21.4; this is a code/format implementation, **not game verification**. Other transforms, multi-axis rotations and arbitrary-angle values remain blocked with diagnostics.

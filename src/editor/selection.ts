@@ -1,5 +1,6 @@
 import type { Axis, Cuboid, EditorDocument, Vec3 } from "./domain";
 import { copyFaces, isValidCuboid, pruneGroupMembers } from "./domain";
+import { mapRotationToBounds } from "./elementRotation";
 
 /** Selection belongs to the session, never the native document or undo history. */
 export interface Selection {
@@ -96,13 +97,18 @@ export function transformSelection(document: EditorDocument, ids: readonly strin
   if (!finite(translation) || !finite(scale) || scale.some(n => n <= 0) || (pivot && !finite(pivot)))
     throw new SelectionEditError("Use finite translation and positive scale values. No parts were changed.");
   const nodes = editableSelection(document, ids);
+  if (nodes.some(node => node.rotation) && scale.some(factor => factor !== 1))
+    throw new SelectionEditError("Scaling a selection containing rotated elements is not representable by Java single-axis cuboids. Resize them individually; no parts changed.");
   const bounds = selectionBounds(nodes);
   if (!bounds || (translation.every(n => n === 0) && scale.every(n => n === 1))) return document;
   const origin = pivot ?? bounds.center;
   const point = (values: Vec3): Vec3 => values.map((value, axis) =>
     rounded(origin[axis]! + (value - origin[axis]!) * scale[axis]! + translation[axis]!)
   ) as unknown as Vec3;
-  return publish(document, nodes.map(node => ({ ...node, from: point(node.from), to: point(node.to) })));
+  return publish(document, nodes.map(node => {
+    const from = point(node.from), to = point(node.to);
+    return { ...node, from, to, ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
+  }));
 }
 
 /** Position moves the whole selection; size scales it about its minimum corner. */
@@ -124,6 +130,8 @@ export function setSelectionBounds(document: EditorDocument, ids: readonly strin
 export function alignSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis, edge: "minimum" | "center" | "maximum"): EditorDocument {
   const nodes = editableSelection(document, ids);
+  if (nodes.some(node => node.rotation))
+    throw new SelectionEditError("Align is unavailable for rotated elements: unrotated box edges would not match the visible edges. No parts changed.");
   const bounds = selectionBounds(nodes);
   if (!bounds || nodes.length < 2) return document;
   const target = edge === "minimum" ? bounds.from[axis] :
@@ -142,6 +150,8 @@ export function alignSelection(document: EditorDocument, ids: readonly string[],
 export function mirrorSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis): EditorDocument {
   const nodes = editableSelection(document, ids);
+  if (nodes.some(node => node.rotation))
+    throw new SelectionEditError("Mirror is unavailable for rotated elements: reflecting an angled cuboid also changes its face orientation. No parts changed.");
   const bounds = selectionBounds(nodes);
   if (!bounds) return document;
   const sum = bounds.from[axis] + bounds.to[axis];
@@ -158,6 +168,8 @@ export function mirrorSelection(document: EditorDocument, ids: readonly string[]
 export function distributeSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis): EditorDocument {
   const nodes = editableSelection(document, ids);
+  if (nodes.some(node => node.rotation))
+    throw new SelectionEditError("Distribute is unavailable for rotated elements because the visible centres and unrotated centres differ. No parts changed.");
   if (nodes.length < 3) return document;
   const center = (node: Cuboid) => (node.from[axis] + node.to[axis]) / 2;
   // ES stable sort retains scene order as the tie breaker.
@@ -173,7 +185,8 @@ function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
   if (offset === 0) return node;
   const shift = (values: Vec3): Vec3 => values.map((value, a) =>
     a === axis ? rounded(value + offset) : value) as unknown as Vec3;
-  return { ...node, from: shift(node.from), to: shift(node.to) };
+  const from = shift(node.from), to = shift(node.to);
+  return { ...node, from, to, ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
 }
 
 export function setEachSize(document: EditorDocument, ids: readonly string[], axis: Axis,
@@ -183,7 +196,7 @@ export function setEachSize(document: EditorDocument, ids: readonly string[], ax
   return publish(document, editableSelection(document, ids).map(node => {
     const to = [...node.to] as [number, number, number];
     to[axis] = rounded(node.from[axis] + value);
-    return { ...node, to };
+    return { ...node, to, ...(node.rotation ? { rotation: mapRotationToBounds(node, node.from, to) } : {}) };
   }));
 }
 
@@ -207,11 +220,13 @@ export function duplicateSelection(document: EditorDocument, ids: readonly strin
     throw new SelectionEditError("Duplicate identifiers or offset are invalid. No parts were added.");
   if (document.cuboids.length + nodes.length > 2000)
     throw new SelectionEditError("This duplication exceeds the 2,000-part source limit. No parts were added.");
-  const copies = nodes.map((node, index): Cuboid => ({
-    ...node, id: newIds[index]!, name: node.name.slice(0, 95) + " copy", faces: copyFaces(node.faces),
-    from: node.from.map((n, axis) => rounded(n + offset[axis]!)) as unknown as Vec3,
-    to: node.to.map((n, axis) => rounded(n + offset[axis]!)) as unknown as Vec3
-  }));
+  const copies = nodes.map((node, index): Cuboid => {
+    const from = node.from.map((n, axis) => rounded(n + offset[axis]!)) as unknown as Vec3;
+    const to = node.to.map((n, axis) => rounded(n + offset[axis]!)) as unknown as Vec3;
+    return { ...node, id: newIds[index]!, name: node.name.slice(0, 95) + " copy",
+      faces: copyFaces(node.faces), from, to,
+      ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
+  });
   if (copies.some(node => !isValidCuboid(node)))
     throw new SelectionEditError("The duplicate would exceed the source geometry limits. No parts were added.");
   return { ...document, cuboids: [...document.cuboids, ...copies] };
@@ -240,16 +255,17 @@ export function repeatSelection(document: EditorDocument, ids: readonly string[]
     throw new SelectionEditError("Array copy identifiers are invalid or already exist. No parts were added.");
 
   const copies = Array.from({ length: count }, (_, copyIndex) =>
-    nodes.map((node, nodeIndex): Cuboid => ({
-      ...node,
-      id: newIds[copyIndex * nodes.length + nodeIndex]!,
-      name: node.name.slice(0, 92) + " copy " + (copyIndex + 1),
-      faces: copyFaces(node.faces),
-      from: node.from.map((value, axis) =>
-        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3,
-      to: node.to.map((value, axis) =>
-        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3
-    }))
+    nodes.map((node, nodeIndex): Cuboid => {
+      const from = node.from.map((value, axis) =>
+        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3;
+      const to = node.to.map((value, axis) =>
+        rounded(value + step[axis]! * (copyIndex + 1))) as unknown as Vec3;
+      return { ...node,
+        id: newIds[copyIndex * nodes.length + nodeIndex]!,
+        name: node.name.slice(0, 92) + " copy " + (copyIndex + 1),
+        faces: copyFaces(node.faces), from, to,
+        ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
+    })
   ).flat();
 
   if (copies.some(node => !isValidCuboid(node)))
