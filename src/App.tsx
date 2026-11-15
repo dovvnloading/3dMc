@@ -580,13 +580,17 @@ export function App() {
       if (key === "i" && mode === "paint") switchTool("eyedropper");
       if (key === "l" && mode === "paint") switchTool("line");
       if (key === "u" && mode === "paint") switchTool("rectangle");
+      if (key === "o" && mode === "paint") { event.preventDefault(); switchTool("ellipse"); }
+      if (key === "m" && mode === "paint" && !event.repeat) {
+        event.preventDefault(); clearStroke(); cycleSymmetry();
+      }
       if (key === "f") navigate("iso");
       if ((key === "delete" || key === "backspace") && mode === "model" && selectedIds.length) {
         event.preventDefault(); deleteCurrentSelection();
       }
     };
     window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
-  }, [mode, selectedIds, runUndo, runRedo, clearStroke, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
+  }, [mode, selectedIds, runUndo, runRedo, clearStroke, cycleSymmetry, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
 
   const saveLegacyJson = () => {
     try {
@@ -1069,20 +1073,13 @@ export function App() {
           <IconButton active={tool === "move"} label="Move (W)" onClick={() => switchTool("move")}><Move3D size={18}/></IconButton>
           <IconButton active={tool === "resize"} label="Resize (R)" onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton><div className="rail-divider"/>
           <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
-        </> : <>
-          <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
-          <IconButton active={tool === "line"} label="Line tool (L)" onClick={() => switchTool("line")}><Minus size={18}/></IconButton>
-          <IconButton active={tool === "rectangle"} label="Rectangle outline (U)" onClick={() => switchTool("rectangle")}><Square size={18}/></IconButton>
-          <IconButton active={tool === "eraser"} label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
-          <IconButton active={tool === "fill"} label="Fill connected area (G)" onClick={() => switchTool("fill")}><PaintBucket size={18}/></IconButton>
-          <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
-        </>}</div>}
-        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? tool === "fill" ? "Fill a four-connected RGBA region · one undo step" : tool === "eraser" ? "Erase RGBA pixels in 3D or 2D · Esc cancels" : tool === "line" ? "Drag a straight pixel line · release to commit · Esc cancels" : tool === "rectangle" ? "Drag a rectangle outline · release to commit · Esc cancels" : "Paint in 3D or on the texture sheet · Esc cancels stroke" : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : "Drag a gizmo axis to resize · R"}</div>
+        </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/></div>}
+        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
         {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
-          brushSize={brushSize} brushShape={brushShape}
+          brushSize={brushSize} brushShape={brushShape} symmetry={symmetry}
           paintMask={constrainPaint ? (selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) : null) : undefined}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
@@ -1146,11 +1143,13 @@ export function App() {
           <PaletteControls document={doc} color={color} onChoose={setColor}
             onEdit={change => commitDocument(change)}/>
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
-          <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
+          <div className="paint-tool-note" role="status"><PaintToolHint tool={tool} filled={filledShapes} detail/></div>
           <PaintBrushControls size={brushSize} shape={brushShape}
             disabled={tool === "fill" || tool === "eyedropper"}
             onSize={size => { clearStroke(); setBrushSize(size); }}
             onShape={shape => { clearStroke(); setBrushShape(shape); }}/>
+          <PaintGeometryControls symmetry={symmetry} onSymmetry={setSymmetry}
+            filled={filledShapes} onFilled={setFilledShapes} onCancel={clearStroke} tool={tool}/>
           <label className="face-paint-constrain">
             <input type="checkbox" aria-label="Constrain paint to selected face UV"
               checked={constrainPaint} onChange={event => { clearStroke(); setConstrainPaint(event.currentTarget.checked); }}/>
