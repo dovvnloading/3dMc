@@ -15,11 +15,12 @@ import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 import type { PaintModifiers } from "../editor/paintGeometry";
 import { CameraControls } from "./CameraControls";
+import { ViewportContextTarget } from "./ViewportContextTarget";
 
 export type Mode = "model" | "paint" | "preview";
 export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle" | "ellipse";
 export type ViewKind = "iso" | "front" | "right" | "top";
-export type ViewRequest = { kind: ViewKind | "frame"; count: number };
+export type ViewRequest = { kind: ViewKind | "frame" | "frame-all"; count: number };
 
 interface ViewportProps {
   document: EditorDocument;
@@ -35,6 +36,7 @@ interface ViewportProps {
   painting: boolean;
   cancelToken: number;
   onSelect: (id: string | null, modifiers?: SelectionModifiers) => void;
+  onContextMenu: (id: string | null, x: number, y: number, canvas: HTMLCanvasElement) => void;
   onSelectFace: (face: FaceDirection) => void;
   onBeginPaint: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
   onContinuePaint: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
@@ -258,7 +260,8 @@ function AssetMesh(props: MeshProps) {
   };
   const mesh = <group ref={anchor} position={initialPosition}>
     <group position={pivotDelta}><group rotation={rotationEuler} scale={scale}><group position={unpivot}>
-    <mesh castShadow receiveShadow onClick={event => {
+    <mesh castShadow receiveShadow userData={{ contextElementId: node.id }} onClick={event => {
+      if (event.button !== 0) return;
       event.stopPropagation();
       if (mode === "model" && event.delta <= 4) {
         props.onSelect(node.id, { toggle: event.ctrlKey || event.metaKey || event.shiftKey });
@@ -384,9 +387,11 @@ export function EditorViewport(props: ViewportProps) {
       frameloop="demand" shadows="percentage" dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}
       fallback={<div className="webgl-fallback">3D rendering is unavailable. Your project remains editable through the Scene and Inspector.</div>}
       onPointerMissed={event => {
-        if (props.mode === "model" && props.tool === "select" && !event.ctrlKey && !event.metaKey && !event.shiftKey) props.onSelect(null);
+        if (event.button === 0 && props.mode === "model" && props.tool === "select" &&
+            !event.ctrlKey && !event.metaKey && !event.shiftKey) props.onSelect(null);
       }}>
       <Scene {...props}/>
+      <ViewportContextTarget onOpen={props.onContextMenu}/>
       {import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("benchmark") && <DevPerformanceProbe/>}
       </Canvas>
     </ViewportFailureBoundary>

@@ -81,6 +81,10 @@ import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { ContextMenu } from "./components/ContextMenu";
+import { RenameElementDialog } from "./components/RenameElementDialog";
+import { buildContextMenuItems } from "./editor/contextMenuItems";
+import type { ContextMenuSurface } from "./editor/contextMenuItems";
 import { ShortcutReferenceDialog } from "./components/ShortcutReferenceDialog";
 import { createEditorCommands } from "./editor/commands";
 import type { CreatorPanelName } from "./editor/commands";
@@ -92,6 +96,9 @@ import { inspectJava1214, JavaExportBlocked, JAVA_PACK_PATHS } from "./export/ja
 import type { ExportIssue } from "./export/javaBlock";
 
 type CommitFn = (document: EditorDocument) => EditorDocument;
+type OpenContextMenu = {
+  x: number; y: number; surface: ContextMenuSurface; origin: HTMLElement;
+};
 
 function IconButton({ label, children, onClick, disabled = false, active = false }: {
   label: string; children: ReactNode; onClick: () => void; disabled?: boolean; active?: boolean;
@@ -244,6 +251,8 @@ export function App() {
   const [recoveryDetailsOpen, setRecoveryDetailsOpen] = useState(false);
   const [libraryRequest, setLibraryRequest] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<OpenContextMenu | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ kind: "element" | "group"; id: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [creatorPaletteRequest, setCreatorPaletteRequest] = useState<{ panel: CreatorPanelName; nonce: number } | null>(null);
   const [candidate, setCandidate] = useState<AnyRecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
@@ -394,6 +403,12 @@ export function App() {
   const deleteCurrentSelection = useCallback(() => {
     applyBatch(current => deleteSelection(current, selectedIds));
   }, [selectedIds, applyBatch]);
+  const setSelectedFlag = useCallback((flag: "visible" | "locked", value: boolean) => {
+    const ids = new Set(selectedIds);
+    // One undo entry for the whole selection, using the outliner's existing toggle handler.
+    commitDocument(current => current.cuboids.reduce((next, node) =>
+      ids.has(node.id) && node[flag] !== value ? toggleFlag(next, node.id, flag) : next, current));
+  }, [selectedIds, commitDocument]);
   const selectEditable = useCallback(() => {
     clearStroke();
     const ids = historyRef.current.present.cuboids.filter(node => node.visible && !node.locked &&
@@ -572,6 +587,7 @@ export function App() {
   const keepCurrentWorkspace = () => { awaitingRecoveryRef.current = false; setCandidate(null); setWriterEpoch(epoch => epoch + 1); };
   const navigate = (kind: ViewKind) => setView(current => ({ kind, count: current.count + 1 }));
   const frameSelection = () => setView(current => ({ kind: "frame", count: current.count + 1 }));
+  const frameAll = () => setView(current => ({ kind: "frame-all", count: current.count + 1 }));
   const runUndo = useCallback(() => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
     clearStroke();
@@ -913,6 +929,21 @@ export function App() {
     .map(node => ({ kind: "part" as const, node })));
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
+  const openElementMenu = (id: string, x: number, y: number, origin: HTMLElement) => {
+    if (!selectedSet.has(id)) { clearStroke(); setSelection(selectOnly(id)); }
+    setContextMenu({ x, y, origin, surface: "element" });
+  };
+  const openGroupMenu = (group: EditorGroup, x: number, y: number, origin: HTMLElement) => {
+    selectGroup(group);
+    setContextMenu({ x, y, origin, surface: "group" });
+  };
+  const openViewportMenu = (id: string | null, x: number, y: number, canvas: HTMLCanvasElement) => {
+    if (id && !selectedSet.has(id)) { clearStroke(); setSelection(selectOnly(id)); }
+    setContextMenu({ x, y, origin: canvas, surface: id ? "element" : "empty" });
+  };
+  const renameName = renameTarget && (renameTarget.kind === "group"
+    ? doc.groups?.find(group => group.id === renameTarget.id)?.name
+    : doc.cuboids.find(node => node.id === renameTarget.id)?.name);
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
   const openCommandPalette = useCallback(() => {
     clearStroke(); setShapeMenuOpen(false); setCommandPaletteOpen(true);
@@ -934,7 +965,13 @@ export function App() {
     importTexture: () => { setTextureImportMode("replace"); textureFileRef.current?.click(); },
     saveLegacyJson, undo: runUndo, redo: runRedo, addCuboid: addElement, addShape,
     duplicate: duplicateCurrentSelection, deleteSelection: deleteCurrentSelection, selectAll: selectEditable,
-    changeMode, switchTool, navigate, frameSelection, openPackStudio,
+    rename: () => { if (selectedId) setRenameTarget({ kind: "element", id: selectedId }); },
+    renameGroup: id => setRenameTarget({ kind: "group", id }),
+    setSelectionVisibility: visible => setSelectedFlag("visible", visible),
+    setSelectionLocked: locked => setSelectedFlag("locked", locked),
+    groupSelection: createGroupFromSelection,
+    ungroup: id => { applyBatch(current => ungroup(current, id)); },
+    changeMode, switchTool, navigate, frameSelection, frameAll, openPackStudio,
     openShortcuts, openCommandPalette,
     cancelCurrentTool: () => { clearStroke(); setShapeMenuOpen(false); switchTool("select"); },
     decreaseBrushSize: () => { clearStroke(); setBrushSize(size => Math.max(MIN_BRUSH_SIZE, size - 1)); },
@@ -1031,7 +1068,20 @@ export function App() {
             if (entry.kind === "group") {
               const group = entry.group;
               const collapsed = !query && collapsedGroups.includes(group.id);
-              return <div key={group.id} className="scene-group-row" role="presentation">
+              return <div key={group.id} className="scene-group-row" role="group"
+                aria-label={"Group " + group.name} tabIndex={0}
+                onContextMenu={event => {
+                  if ((event.target as HTMLElement).closest("input")) return;
+                  event.preventDefault(); openGroupMenu(group, event.clientX, event.clientY, event.currentTarget);
+                }}
+                onKeyDown={event => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "ContextMenu" || event.key === "Menu" || (event.shiftKey && event.key === "F10")) {
+                    event.preventDefault();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    openGroupMenu(group, rect.left + 16, rect.bottom, event.currentTarget);
+                  }
+                }}>
                 <button type="button" aria-expanded={!collapsed} disabled={!!query}
                   title={query ? "Matching parts are expanded while filtering" : undefined}
                   aria-label={(collapsed ? "Expand group " : "Collapse group ") + group.name}
@@ -1052,9 +1102,19 @@ export function App() {
             const index = matching.indexOf(node);
             return <div role="option" aria-selected={selectedSet.has(node.id)} tabIndex={focusableId === node.id ? 0 : -1}
             key={node.id} className={"scene-row" + (groupedMembers.has(node.id) ? " grouped-part" : "") + (selectedSet.has(node.id) ? " selected" : "") + (selectedId === node.id ? " primary-selected" : "") + (!node.visible ? " hidden-row" : "")}
+            onContextMenu={event => {
+              event.preventDefault(); openElementMenu(node.id, event.clientX, event.clientY, event.currentTarget);
+            }}
             onClick={event => {
               clearStroke(); setSelection(current => selectAt(current, node.id, matching.map(item => item.id), { toggle: event.ctrlKey || event.metaKey, range: event.shiftKey }));
             }} onKeyDown={event => {
+              if (event.target === event.currentTarget &&
+                  (event.key === "ContextMenu" || event.key === "Menu" || (event.shiftKey && event.key === "F10"))) {
+                event.preventDefault();
+                const rect = event.currentTarget.getBoundingClientRect();
+                openElementMenu(node.id, rect.left + 16, rect.bottom, event.currentTarget);
+                return;
+              }
               if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault(); clearStroke();
@@ -1100,7 +1160,7 @@ export function App() {
           cancelToken={cancelToken} draftTextureId={draftTextureId} onSelect={selectNode} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
           onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint} onFill={fillPaint} onTransform={transform}
           onRotate={(id: string, angle: ElementAngle) => commitDocument(current => setElementAngle(current, [id], angle))}
-          onBatchTransform={transformBatch}/>
+          onBatchTransform={transformBatch} onContextMenu={openViewportMenu}/>
         {mode !== "preview" && <div className="tool-rail" aria-label="Editor tools">{mode === "model" ? <>
           <IconButton active={tool === "select"} label="Select (V)" onClick={() => switchTool("select")}><MousePointer2 size={18}/></IconButton>
           <IconButton active={tool === "move"} label="Move (W)" onClick={() => switchTool("move")}><Move3D size={18}/></IconButton>
@@ -1209,6 +1269,18 @@ export function App() {
     </>}
     {bootChecked && <CommandPalette open={commandPaletteOpen}
       onClose={() => setCommandPaletteOpen(false)} commands={commands}/>}
+    {bootChecked && contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y}
+      label={contextMenu.surface === "empty" ? "Viewport context menu" : "Element context menu"}
+      items={buildContextMenuItems(commands, contextMenu.surface)}
+      onClose={restore => {
+        setContextMenu(null);
+        if (restore && contextMenu.origin.isConnected) contextMenu.origin.focus();
+      }}/>}
+    {bootChecked && renameTarget && renameName && <RenameElementDialog
+      key={renameTarget.kind + renameTarget.id} kind={renameTarget.kind} name={renameName}
+      onClose={() => setRenameTarget(null)}
+      onRename={name => commitDocument(current => renameTarget.kind === "group"
+        ? renameGroup(current, renameTarget.id, name) : renameCuboid(current, renameTarget.id, name))}/>}
     {bootChecked && shortcutsOpen && <ShortcutReferenceDialog commands={commands}
       onClose={() => setShortcutsOpen(false)}/>}
     {recoveryDetailsOpen && <RecoveryDetailsDialog
