@@ -61,6 +61,7 @@ describe("rotation-aware selection operations", () => {
           (Math.min(...all.map(node => transformedBounds(node).from[axis])) +
            Math.max(...all.map(node => transformedBounds(node).to[axis]))) / 2;
       const aligned = alignSelection(source, ids, axis, edge);
+      expect(alignSelection(aligned, ids, axis, edge)).toBe(aligned);
       for (const id of ids) {
         expect(visibleEdge(byId(aligned, id), axis, edge)).toBeCloseTo(target, 3);
         expectRigidMove(byId(source, id), byId(aligned, id), axis);
@@ -79,6 +80,7 @@ describe("rotation-aware selection operations", () => {
     const first = center(source, order[0]!);
     const last = center(source, order.at(-1)!);
     const distributed = distributeSelection(source, chosen, 1);
+    expect(distributeSelection(distributed, chosen, 1)).toBe(distributed);
     order.forEach((id, i) => {
       expect(center(distributed, id)).toBeCloseTo(first + (last - first) * i / (order.length - 1), 3);
       expectRigidMove(byId(source, id), byId(distributed, id), 1);
