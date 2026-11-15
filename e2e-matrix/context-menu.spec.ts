@@ -94,7 +94,10 @@ test("multi-selection context actions apply atomically and group rows can ungrou
   await menu.getByRole("menuitem", { name: "Group" }).click();
   const group = scene.getByRole("group", { name: /Group Group 1/ });
   await expect(group).toBeVisible();
-  await group.click({ button: "right" });
+  // The editable group-name input retains the native text-edit menu.
+  // Open the group context menu from its Select control instead.
+  await group.getByRole("button", { name: "Select group Group 1" })
+    .click({ button: "right" });
   await expect(menu.getByRole("menuitem", { name: "Ungroup" })).toBeEnabled();
   await menu.getByRole("menuitem", { name: "Ungroup" }).click();
   await expect(group).toHaveCount(0);
