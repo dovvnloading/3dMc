@@ -1,0 +1,27 @@
+.editor-context-menu {
+  position: fixed; z-index: 1000; box-sizing: border-box;
+  min-width: min(205px, calc(100vw - 16px)); width: max-content; max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px); overflow-y: auto;
+  padding: 6px; border: 1px solid #557669; border-radius: 9px;
+  color: var(--text); background: #242c31; box-shadow: 0 20px 55px #000b;
+}
+.editor-context-menu .context-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  box-sizing: border-box; width: 100%; max-width: 340px; min-height: 34px;
+  text-align: left; font: inherit; font-size: 12px; padding: 8px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.editor-context-menu .context-item:is(:hover, :focus-visible, .active):not(:disabled) {
+  background: #324940; border-color: #4f7669; outline: none;
+}
+.editor-context-menu .context-item:disabled { opacity: .58; cursor: not-allowed; }
+.editor-context-menu .context-item-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.editor-context-menu .context-item small {
+  max-width: 275px; color: #bac4c8; line-height: 1.4;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.editor-context-menu .context-item kbd {
+  flex-shrink: 0; color: #b0c6bc; font-size: 10px; font-family: inherit;
+}
+.editor-context-menu .context-item:disabled kbd { color: #98a7ad; }

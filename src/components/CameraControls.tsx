@@ -38,7 +38,7 @@ export function CameraControls({ view, document, selectedIds }: {
   useEffect(() => {
     const orbit = controls.current;
     if (!orbit) return;
-    if (view.kind !== "frame") {
+    if (view.kind !== "frame" && view.kind !== "frame-all") {
       movement.current = null;
       const positions: Record<ViewKind, [number, number, number]> = {
         iso: [2.9, 2.35, 3.2], front: [0, 0.65, 4], right: [4, 0.65, 0], top: [0, 4, 0.001]
@@ -51,7 +51,7 @@ export function CameraControls({ view, document, selectedIds }: {
       orbit.update(); invalidate();
       return;
     }
-    const bounds = calculateFrameBounds(document, selectedIds);
+    const bounds = calculateFrameBounds(document, view.kind === "frame-all" ? [] : selectedIds);
     const perspective = camera instanceof THREE.PerspectiveCamera ? camera : null;
     const distance = frameCameraDistance(bounds.radius, perspective?.fov ?? 40,
       perspective?.aspect ?? 1);
