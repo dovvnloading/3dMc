@@ -4,6 +4,7 @@ import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
 import { buildContextMenuItems } from "./contextMenuItems";
 import { findSelectedGroup } from "./groups";
+import { DEFAULT_VIEWPORT_DISPLAY } from "./viewportProjection";
 import type { ContextMenuSurface } from "./contextMenuItems";
 
 function fixture(changes: Partial<EditorCommandContext> = {}) {
@@ -13,6 +14,7 @@ function fixture(changes: Partial<EditorCommandContext> = {}) {
     editDisabledReason: null, canUndo: false, canRedo: false,
     rotatedSelection: false, symmetry: "off", rotateToolReason: null,
     savingProject: false, importingPack: false, importingTexture: false,
+    viewportDisplay: DEFAULT_VIEWPORT_DISPLAY,
     ...changes
   };
   const calls = vi.fn();

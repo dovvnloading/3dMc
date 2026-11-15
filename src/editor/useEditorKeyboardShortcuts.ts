@@ -3,8 +3,15 @@ import type { EditorCommand } from "./commands";
 
 /** The spelling used by the command registry, across Windows and macOS. */
 export function keyToShortcut(event: Pick<KeyboardEvent,
-  "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "isComposing">): string | null {
+  "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "isComposing"> & Partial<Pick<KeyboardEvent, "code">>): string | null {
   if (event.isComposing || event.altKey) return null;
+  if (!event.ctrlKey && !event.metaKey) {
+    // Physical keypad key works with NumLock on or off (key may be "Clear").
+    if (event.code === "Numpad5") return "Numpad5";
+    // Numbers cannot collide with letter-based editing and painting tools.
+    if (event.shiftKey && /^Digit[123]$/.test(event.code ?? ""))
+      return "Shift+" + event.code!.slice(-1);
+  }
   if (event.ctrlKey || event.metaKey) {
     if (event.ctrlKey && event.metaKey || !/^[a-z]$/i.test(event.key)) return null;
     return "Ctrl/Cmd+" + (event.shiftKey ? "Shift+" : "") + event.key.toUpperCase();

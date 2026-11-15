@@ -1,0 +1,15 @@
+.viewport-display {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-left: 1px solid #48514f;
+  margin-left: 4px;
+  padding-left: 7px;
+}
+.camera-views .viewport-display button { min-width: 34px; }
+.viewport-display button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+@media (max-width: 900px) {
+  .view-bottom { flex-wrap: wrap; }
+  .view-bottom .view-tool-caption { max-width: 100%; }
+  .camera-views { margin-left: auto; }
+}

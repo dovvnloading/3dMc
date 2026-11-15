@@ -59,6 +59,9 @@ import type { PaintModifiers } from "./editor/paintGeometry";
 import { useTextureSymmetry } from "./editor/useTextureSymmetry";
 import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
+import { ViewportDisplayControls } from "./components/ViewportDisplayControls";
+import { useViewportDisplay } from "./editor/useViewportDisplay";
+import type { ViewportDisplayKey } from "./editor/viewportProjection";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
 import { TextureSurface } from "./components/TextureSurface";
 import { TextureLayersPanel } from "./components/TextureLayersPanel";
@@ -229,6 +232,7 @@ export function App() {
   const [mode, setMode] = useState<Mode>("model"), [tool, setTool] = useState<Tool>("select");
   const [snap, setSnap] = useState(1);
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
+  const [viewportDisplay, setViewportDisplay] = useViewportDisplay();
   const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState(1);
   const [recentColors, setRecentColors] = useState<readonly string[]>([]);
   const [brushShape, setBrushShape] = useState<BrushShape>("square");
@@ -585,6 +589,9 @@ export function App() {
   const navigate = (kind: ViewKind) => setView(current => ({ kind, count: current.count + 1 }));
   const frameSelection = () => setView(current => ({ kind: "frame", count: current.count + 1 }));
   const frameAll = () => setView(current => ({ kind: "frame-all", count: current.count + 1 }));
+  const toggleProjection = () => setViewportDisplay(current => ({ ...current,
+    projection: current.projection === "perspective" ? "orthographic" : "perspective" }));
+  const toggleViewportDisplay = (key: ViewportDisplayKey) => setViewportDisplay(current => ({ ...current, [key]: !current[key] }));
   const runUndo = useCallback(() => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
     clearStroke();
@@ -947,7 +954,7 @@ export function App() {
   }, [clearStroke]);
   const openShortcuts = () => { clearStroke(); setShapeMenuOpen(false); setShortcutsOpen(true); };
   const commands = createEditorCommands({
-    document: doc, mode, selectedIds, selectedId, sceneSearch: search,
+    document: doc, mode, selectedIds, selectedId, sceneSearch: search, viewportDisplay,
     editDisabledReason: writerStatus !== "owned" ? "This tab does not own local recovery."
       : candidate ? "Resolve the pending recovery session before editing."
       : openingProject.current ? "A project is opening." : null,
@@ -968,7 +975,7 @@ export function App() {
     setSelectionLocked: locked => setSelectedFlag("locked", locked),
     groupSelection: createGroupFromSelection,
     ungroup: id => { applyBatch(current => ungroup(current, id)); },
-    changeMode, switchTool, navigate, frameSelection, frameAll, openPackStudio,
+    changeMode, switchTool, navigate, frameSelection, frameAll, toggleProjection, toggleViewportDisplay, openPackStudio,
     openShortcuts, openCommandPalette,
     cancelCurrentTool: () => { clearStroke(); setShapeMenuOpen(false); switchTool("select"); },
     decreaseBrushSize: () => { clearStroke(); setBrushSize(size => Math.max(MIN_BRUSH_SIZE, size - 1)); },
@@ -1150,10 +1157,10 @@ export function App() {
         </div>
       </aside>
       <main className="stage" aria-label="3D editing workspace"><div className="stage-main">
-        <div className="view-topbar"><div className="view-top-left"><span className="view-mode"><span className="view-spark"/> {mode === "preview" ? "PREVIEW" : "PERSPECTIVE"}</span><span className="view-separator"/><span>{mode === "paint" ? "TEXTURED · EDITABLE" : "TEXTURED"}</span></div>
+        <div className="view-topbar"><div className="view-top-left"><span className="view-mode"><span className="view-spark"/> {mode === "preview" ? "PREVIEW · " + viewportDisplay.projection.toUpperCase() : viewportDisplay.projection.toUpperCase()}</span><span className="view-separator"/><span>{mode === "paint" ? "TEXTURED · EDITABLE" : "TEXTURED"}</span></div>
           <div className="view-top-right"><span className="dot"/><span>LOCAL SESSION</span></div></div>
         <EditorViewport document={doc} pixels={viewPixels} selectedId={selectedId} selectedIds={selectedIds}
-          selectedFace={selectedFace} onSelectFace={setSelectedFace} mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
+          selectedFace={selectedFace} onSelectFace={setSelectedFace} mode={mode} tool={tool} view={view} display={viewportDisplay} snap={snap} painting={!!draftPixels}
           cancelToken={cancelToken} draftTextureId={draftTextureId} onSelect={selectNode} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
           onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint} onFill={fillPaint} onTransform={transform}
           onRotate={(id: string, angle: ElementAngle) => commitDocument(current => setElementAngle(current, [id], angle))}
@@ -1171,7 +1178,9 @@ export function App() {
         </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/>}</div>}
         <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : tool === "rotate" ? (rotateToolReason ?? "Drag the colored rotation ring · snaps to five Java angles · E · Esc cancels") : rotatedSelection ? "Resize gizmo unavailable for rotated elements · use local Size fields" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
-            <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
+            <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton>
+              <ViewportDisplayControls display={viewportDisplay} onToggleProjection={toggleProjection}
+                onToggleDisplay={toggleViewportDisplay}/></div></div>
       </div>
         {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
           brushSize={brushSize} brushShape={brushShape} symmetry={symmetryFor(visibleTexture.id)}
@@ -1261,7 +1270,7 @@ export function App() {
     </div>
     <footer className="status-bar"><div aria-live="polite" className={"save-status status-" + recoveryStatus}><span className="status-indicator"/>{statusText}</div><span className="status-divider"/>
       <button onClick={() => setRecoveryDetailsOpen(true)}>Recovery details <Info size={12}/></button>
-      <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
+      <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Snap {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
     </>}
     {bootChecked && <CommandPalette open={commandPaletteOpen}

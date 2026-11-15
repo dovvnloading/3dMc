@@ -4,6 +4,7 @@ import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
 import { groupEditorShortcuts, SHORTCUT_AREAS } from "./shortcuts";
 import { keyToShortcut, resolveEditorShortcut } from "./useEditorKeyboardShortcuts";
+import { DEFAULT_VIEWPORT_DISPLAY } from "./viewportProjection";
 
 function fixture() {
   const state: EditorCommandContext = {
@@ -20,14 +21,16 @@ function fixture() {
     rotateToolReason: null,
     savingProject: false,
     importingPack: false,
-    importingTexture: false
+    importingTexture: false,
+    viewportDisplay: DEFAULT_VIEWPORT_DISPLAY
   };
   const actions: EditorCommandActions = {
     newProject: vi.fn(), openProject: vi.fn(), saveProject: vi.fn(),
     importPack: vi.fn(), exportMinecraft: vi.fn(), exportTexture: vi.fn(),
     importTexture: vi.fn(), saveLegacyJson: vi.fn(), undo: vi.fn(), redo: vi.fn(),
     cancelCurrentTool: vi.fn(), decreaseBrushSize: vi.fn(), increaseBrushSize: vi.fn(),
-    frameSelection: vi.fn(), frameAll: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
+    frameSelection: vi.fn(), frameAll: vi.fn(), toggleProjection: vi.fn(),
+    toggleViewportDisplay: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
     addCuboid: vi.fn(), addShape: vi.fn(), duplicate: vi.fn(), deleteSelection: vi.fn(),
     rename: vi.fn(), renameGroup: vi.fn(), setSelectionVisibility: vi.fn(),
     setSelectionLocked: vi.fn(), groupSelection: vi.fn(), ungroup: vi.fn(),
@@ -57,7 +60,8 @@ describe("editor command registry", () => {
       "tool.select", "tool.move", "tool.resize", "tool.rotate", "tool.pencil", "tool.eraser",
       "tool.fill", "tool.eyedropper", "tool.line", "tool.rectangle", "tool.ellipse",
       "paint.symmetry.cycle", "paint.symmetry.off", "paint.symmetry.x", "paint.symmetry.y", "paint.symmetry.both",
-      "view.iso", "view.top", "view.frame", "dialog.shortcuts", "dialog.command-palette",
+      "view.iso", "view.top", "view.frame", "view.projection", "view.grid", "view.axes", "view.outline",
+      "dialog.shortcuts", "dialog.command-palette",
       "paint.brush.decrease", "paint.brush.increase", "edit.cancel",
       "dialog.pack-studio", "dialog.import-model", "dialog.library", "dialog.region", "dialog.face"]) {
       expect(all.some(command => command.id === id), id).toBe(true);
@@ -183,6 +187,31 @@ describe("editor command registry", () => {
     const unsupported = { ...state.document, target: { ...state.document.target, candidateRelease: "26.3" as const } };
     expect(get("dialog.pack-studio", { document: unsupported }).disabledReason).toContain("1.21.4");
   });
+  it("exposes session projection and overlays with non-colliding view shortcuts", () => {
+    const { commands, actions, get } = fixture();
+    const projection = get("view.projection");
+    expect(projection.shortcut).toBe("Numpad5");
+    expect(projection.title).toContain("Orthographic");
+    projection.run();
+    get("view.grid").run();
+    get("view.axes").run();
+    get("view.outline").run();
+    expect(actions.toggleProjection).toHaveBeenCalledOnce();
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("grid");
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("axes");
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("outline");
+    const toggled = commands({ viewportDisplay: {
+      projection: "orthographic", grid: false, axes: true, outline: false
+    } });
+    expect(toggled.find(command => command.id === "view.projection")?.title).toContain("Perspective");
+    expect(toggled.find(command => command.id === "view.grid")?.title).toBe("Show grid");
+    expect(toggled.find(command => command.id === "view.axes")?.title).toBe("Hide XYZ axes");
+    for (const [id, shortcut] of [["view.grid", "Shift+1"], ["view.axes", "Shift+2"],
+      ["view.outline", "Shift+3"]] as const) {
+      expect(toggled.find(command => command.id === id)?.shortcut).toBe(shortcut);
+      expect(resolveEditorShortcut(toggled, shortcut).command?.id).toBe(id);
+    }
+  });
 });
 
 describe("shortcut reference", () => {
@@ -279,6 +308,12 @@ describe("shortcut reference", () => {
     expect(key({ key: "Delete", shiftKey: true })).toBe("Delete");
     expect(key({ key: "Escape", shiftKey: true })).toBe("Esc");
     expect(key({ key: "{", shiftKey: true })).toBeNull();
+    expect(key({ key: "5", code: "Numpad5" })).toBe("Numpad5");
+    expect(key({ key: "Clear", code: "Numpad5" })).toBe("Numpad5");
+    expect(key({ key: "5", code: "Numpad5", ctrlKey: true })).toBeNull();
+    expect(key({ key: "!", code: "Digit1", shiftKey: true })).toBe("Shift+1");
+    expect(key({ key: "@", code: "Digit2", shiftKey: true })).toBe("Shift+2");
+    expect(key({ key: "#", code: "Digit3", shiftKey: true })).toBe("Shift+3");
     expect(key({ isComposing: true })).toBeNull();
   });
 });
