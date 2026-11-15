@@ -31,6 +31,16 @@ test("Firefox/WebKit symmetry and filled ellipse survive history and expose guid
   await expect.poll(() => pixel(26, 11)).toEqual(before);
   await page.getByRole("button", { name: "Redo (Ctrl/Cmd+Shift+Z)" }).click();
   await expect.poll(() => pixel(26, 11)).toEqual([199, 109, 104, 255]);
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const archive = await downloaded;
+  const path = await archive.path();
+  if (!path) throw new Error("Missing native .3dmc archive");
+  await page.locator('input[accept=".3dmc,.json,application/json,application/zip"]').setInputFiles(path);
+  await page.getByRole("dialog", { name: "Open this project?" })
+    .getByRole("button", { name: "Open project" }).click();
+  await page.getByRole("tab", { name: "Paint" }).click();
+  await expect.poll(() => pixel(26, 11)).toEqual([199, 109, 104, 255]);
   await page.screenshot({ path: `test-results/matrix-${browserName}-symmetry-ellipse.png` });
   expect(errors).toEqual([]);
 });
