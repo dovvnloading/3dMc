@@ -154,7 +154,7 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
       <div className="color-picker-fields">
         <label className="color-picker-hex">Hex
           <input aria-label="Hex color" type="text" spellCheck={false} autoComplete="off"
-            value={hexDraft} aria-invalid={normalizeHex(hexDraft) === null}
+            value={hexDraft} aria-invalid={parseFullHex(hexDraft) === null}
             onChange={event => {
               const text = event.currentTarget.value;
               setHexDraft(text);
