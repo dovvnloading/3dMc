@@ -17,7 +17,7 @@ test("symmetry controls, pencil mirrors, undo/redo and native save/reopen work i
     return { x: box.x + (x + .5) * box.width / 32, y: box.y + (y + .5) * box.height / 32 };
   };
 
-  await expect(page.getByRole("status", { name: /OFF/ })).toBeVisible();
+  await expect(page.locator(".paint-symmetry-heading .symmetry-off")).toHaveText("OFF");
   await canvas.focus();
   await page.keyboard.press("m");
   await expect(page.getByRole("button", { name: "Mirror X symmetry" })).toHaveAttribute("aria-pressed", "true");
