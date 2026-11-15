@@ -62,10 +62,11 @@ export function strokeStencil(width: number, height: number, start: Texel,
 
 const withinEllipse = (x: number, y: number, b: ShapeBounds): boolean => {
   if (x < b.left || x > b.right || y < b.top || y > b.bottom) return false;
-  const rx = (b.right - b.left) === 1 ? Math.SQRT1_2 :
-    Math.max(0.5, (b.right - b.left) / 2);
-  const ry = (b.bottom - b.top) === 1 ? Math.SQRT1_2 :
-    Math.max(0.5, (b.bottom - b.top) / 2);
+  // With a two-texel side, sample each texel as an area rather than
+  // dropping whole end rows/columns of tiny ellipses.
+  const thin = b.right - b.left === 1 || b.bottom - b.top === 1;
+  const rx = thin ? (b.right - b.left + 1) / 2 : Math.max(0.5, (b.right - b.left) / 2);
+  const ry = thin ? (b.bottom - b.top + 1) / 2 : Math.max(0.5, (b.bottom - b.top) / 2);
   const cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
   return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1 + 1e-10;
 };
