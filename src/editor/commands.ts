@@ -87,6 +87,8 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     : null;
   const matchingEditable = state.document.cuboids.filter(node => node.visible && !node.locked &&
     node.name.toLowerCase().includes(state.sceneSearch.toLowerCase())).length;
+  const duplicateLimitReason = state.document.cuboids.length + selection.length > 2000
+    ? "Duplicating this selection exceeds the 2,000-element limit." : null;
   const selectAllReason = state.mode !== "model" ? "Switch to Model mode to select elements."
     : matchingEditable === 0 ? "No visible, unlocked elements match the scene filter." : null;
   const modelToolReason = state.mode !== "model" ? "Switch to Model mode to use this tool." : null;
@@ -112,7 +114,7 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   add("edit.select-all", "Select all editable", "Edit", actions.selectAll,
     selectAllReason, "Ctrl/Cmd+A", ["selection", "visible matches"]);
   add("edit.duplicate", "Duplicate selection", "Edit", actions.duplicate,
-    editOr(selectionReason), "Ctrl/Cmd+D", ["copy elements"]);
+    editOr(selectionReason ?? duplicateLimitReason), "Ctrl/Cmd+D", ["copy elements"]);
   add("edit.delete", "Delete selection", "Edit", actions.deleteSelection,
     editOr(selectionReason), "Del / Backspace", ["remove elements"]);
 
