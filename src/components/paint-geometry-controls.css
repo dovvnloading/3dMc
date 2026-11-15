@@ -1,0 +1,19 @@
+.paint-geometry-controls {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--divider);
+  border-radius: 7px;
+  background: var(--control);
+  color: var(--text);
+}
+.paint-symmetry-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; }
+.paint-symmetry-heading span { border:1px solid var(--interactive-border); border-radius:4px; padding:3px 6px; font-weight:700; font-size:10px; letter-spacing:.04em; }
+.paint-symmetry-heading .symmetry-on { background:#295443; color:#b8f6d7; border-color:#60a88b; }
+.paint-symmetry-heading .symmetry-off { color:var(--secondary); }
+.paint-symmetry-modes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; margin-top:9px; }
+.paint-symmetry-modes button { min-height:31px; padding:4px 6px; border:1px solid var(--interactive-border); border-radius:5px; background:#283238; color:var(--text); font-size:11px; cursor:pointer; }
+.paint-symmetry-modes button[aria-pressed="true"] { border-color:#80dbbf; background:#315647; color:#e0fff3; }
+.paint-symmetry-modes button:focus-visible, .paint-shape-fill input:focus-visible { outline:2px solid #a0afff; outline-offset:2px; }
+.paint-geometry-controls p { font-size:10px; line-height:1.5; color:var(--secondary); margin:7px 0 10px; }
+.paint-shape-fill { display:flex; align-items:center; gap:7px; font-size:11px; font-weight:600; cursor:pointer; }
+.paint-shape-fill input { accent-color:var(--accent); }
