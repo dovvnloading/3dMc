@@ -46,8 +46,9 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   await expect(square).toHaveCSS("outline-style", "solid");
   const hue = picker.getByRole("slider", { name: "Hue" });
   await hue.focus();
+  const hueBefore = await hue.inputValue();
   await hue.press("ArrowRight");
-  await expect(hue).toHaveAttribute("aria-valuenow", /\d+/);
+  expect(await hue.inputValue()).not.toBe(hueBefore);
 
   // Set an exact paint colour again, then close with Escape.
   await hex.fill("#123456");
