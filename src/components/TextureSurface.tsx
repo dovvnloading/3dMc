@@ -138,7 +138,10 @@ export function TextureSurface(props: Props) {
       if (pointerOver.current || (target && viewportRef.current?.contains(target))) event.preventDefault();
     };
     const up = (event: globalThis.KeyboardEvent) => {
-      if (event.key === " ") { space.current = false; setSpaceHeld(false); }
+      if (event.key === " ") {
+        if (space.current) event.preventDefault();
+        space.current = false; setSpaceHeld(false);
+      }
     };
     const blur = () => {
       space.current = false; setSpaceHeld(false);

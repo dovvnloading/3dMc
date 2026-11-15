@@ -9,14 +9,16 @@ export const MAX_BRUSH_SIZE = 16;
  * The anchor is the central texel for odd footprints. Even footprints place
  * their extra row/column to the right and bottom of the anchor (size 2 => [0,1]).
  * A round footprint includes texels whose centers fall in the disk of radius
- * size/2 around the center of the size-by-size bounding square.
+ * (size - 0.5)/2 around the bounding square's center. This yields a
+ * five-texel cross for a round size-3 brush rather than a 3×3 square.
  */
 export function brushOffsets(size: number, shape: BrushShape): Texel[] {
   if (!Number.isSafeInteger(size) || size < MIN_BRUSH_SIZE || size > MAX_BRUSH_SIZE)
     throw new RangeError("Brush size must be an integer between 1 and 16.");
   const before = Math.floor((size - 1) / 2);
   const center = (size - 1) / 2;
-  const radiusSquared = size * size / 4;
+  const radius = (size - 0.5) / 2;
+  const radiusSquared = radius * radius;
   const offsets: Texel[] = [];
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     if (shape === "round" &&

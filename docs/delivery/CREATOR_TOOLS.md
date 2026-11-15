@@ -42,7 +42,11 @@ Locked elements cannot be converted, reordered, resized or deleted until unlocke
 | W | Move tool (Model) |
 | R | Resize tool (Model) |
 | B | Pencil (Paint) |
+| E | Eraser (Paint) |
+| G | Connected RGBA fill (Paint) |
 | I | Eyedropper (Paint) |
+| L | Line (Paint) |
+| U | Rectangle outline (Paint) |
 | [ / ] | Decrease / increase the paint brush size, from 1 to 16 texels |
 | + / - / 0 | Zoom in / zoom out / reset the focused 2D texture sheet |
 | Wheel / Space+drag / middle-drag | Zoom or pan the 2D texture sheet |

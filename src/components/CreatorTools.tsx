@@ -95,7 +95,7 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
         <dt>[ / ]</dt><dd>Decrease or increase brush size by one texel, 1–16.</dd>
         <dt>+ / - / 0</dt><dd>Zoom in, zoom out or reset the 2D texture sheet when focused.</dd>
         <dt>Wheel / Space+drag / middle-drag</dt><dd>Zoom under the cursor or pan the texture sheet. Fit and Reset are also visible buttons.</dd>
-        <dt>Ctrl/Cmd + Z / Shift + Z</dt><dd>Undo and redo. Typing fields and dialogs keep their own shortcuts.</dd>
+        <dt>Ctrl/Cmd + Z / Ctrl/Cmd + Shift + Z</dt><dd>Undo and redo. Typing fields and dialogs keep their own shortcuts.</dd>
         <dt>Escape</dt><dd>Cancel live gestures or staged region previews without a content edit.</dd>
         <dt>Ctrl/Cmd + S</dt><dd>Start a portable native .3dmc download.</dd>
       </dl>

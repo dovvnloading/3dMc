@@ -18,6 +18,7 @@ describe("exact square and round footprints", () => {
     expect(brushOffsets(3, "square")).toContainEqual([1, 1]);
     expect(brushOffsets(4, "square")).toContainEqual([-1, -1]);
     expect(brushOffsets(4, "square")).toContainEqual([2, 2]);
+    expect(brushOffsets(3, "round")).toEqual([[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]]);
     expect(brushOffsets(4, "round")).toHaveLength(12);
     expect(brushOffsets(2, "round")).toHaveLength(4);
     expect(() => brushOffsets(0, "square")).toThrow(RangeError);
