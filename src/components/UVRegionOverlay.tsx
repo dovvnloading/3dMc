@@ -42,7 +42,8 @@ export function UVRegionOverlay(props: Props) {
   useEffect(() => {
     const escape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape" && active.current) {
-        event.preventDefault(); cancel();
+        // Cancel only the UV drag: do not also dismiss UV edit mode or switch tools.
+        event.preventDefault(); event.stopPropagation(); cancel();
       }
     };
     const blur = () => { if (active.current) cancel(); };
