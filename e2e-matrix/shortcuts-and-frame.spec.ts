@@ -75,3 +75,14 @@ test("typing in fields does not invoke tools, palette, help or frame; F frames r
   await expect(palette).toHaveCount(0);
   await expect(page.getByRole("button", { name: "View iso" })).not.toHaveClass(/current/);
 });
+
+test("E selects the active-mode tool rather than the disabled command sharing its shortcut", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("listbox", { name: "Scene elements" }).getByRole("option")).toHaveCount(7);
+  await page.getByRole("tab", { name: "Paint" }).click();
+  const eraser = page.getByRole("button", { name: "Pixel eraser (E)" });
+  await page.keyboard.press("e");
+  await expect(eraser).toHaveClass(/active/);
+  await page.keyboard.press("b");
+  await expect(page.getByRole("button", { name: "Pixel pencil (B)" })).toHaveClass(/active/);
+});
