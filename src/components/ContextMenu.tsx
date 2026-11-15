@@ -53,10 +53,13 @@ export function ContextMenu({ x, y, label, items, onClose }: Props) {
     const resize = () => onClose(false);
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("scroll", scrolling, true);
+    // Canvas zoom/orbit consumes wheel input without scrolling the document.
+    window.addEventListener("wheel", scrolling, { capture: true, passive: true });
     window.addEventListener("resize", resize);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("scroll", scrolling, true);
+      window.removeEventListener("wheel", scrolling, true);
       window.removeEventListener("resize", resize);
     };
   }, [onClose]);
