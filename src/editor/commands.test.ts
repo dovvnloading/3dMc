@@ -14,6 +14,7 @@ function fixture() {
     canUndo: false,
     canRedo: false,
     rotatedSelection: false,
+    symmetry: "off",
     rotateToolReason: null,
     savingProject: false,
     importingPack: false,
@@ -24,7 +25,8 @@ function fixture() {
     importPack: vi.fn(), exportMinecraft: vi.fn(), exportTexture: vi.fn(),
     importTexture: vi.fn(), saveLegacyJson: vi.fn(), undo: vi.fn(), redo: vi.fn(),
     addCuboid: vi.fn(), addShape: vi.fn(), duplicate: vi.fn(), deleteSelection: vi.fn(),
-    selectAll: vi.fn(), changeMode: vi.fn(), switchTool: vi.fn(), navigate: vi.fn(),
+    selectAll: vi.fn(), changeMode: vi.fn(), switchTool: vi.fn(),
+    cycleSymmetry: vi.fn(), setSymmetry: vi.fn(), navigate: vi.fn(),
     openPackStudio: vi.fn(), openCreatorPanel: vi.fn(), openRecoveryDetails: vi.fn()
   };
   const commands = (changes: Partial<EditorCommandContext> = {}) => createEditorCommands({ ...state, ...changes }, actions);
@@ -47,7 +49,9 @@ describe("editor command registry", () => {
       "edit.undo", "edit.redo", "edit.select-all", "edit.duplicate", "edit.delete",
       "create.cuboid", "create.half-slab", "mode.model", "mode.paint", "mode.preview",
       "tool.select", "tool.move", "tool.resize", "tool.rotate", "tool.pencil", "tool.eraser",
-      "tool.fill", "tool.eyedropper", "tool.line", "tool.rectangle", "view.iso", "view.top",
+      "tool.fill", "tool.eyedropper", "tool.line", "tool.rectangle", "tool.ellipse",
+      "paint.symmetry.cycle", "paint.symmetry.off", "paint.symmetry.x", "paint.symmetry.y", "paint.symmetry.both",
+      "view.iso", "view.top",
       "dialog.pack-studio", "dialog.import-model", "dialog.library", "dialog.region", "dialog.face"]) {
       expect(all.some(command => command.id === id), id).toBe(true);
     }
@@ -114,7 +118,25 @@ describe("editor command registry", () => {
     expect(get("tool.pencil").disabledReason).toContain("Paint mode");
     expect(get("tool.move", { mode: "paint" }).disabledReason).toContain("Model mode");
     expect(get("tool.eraser", { mode: "paint" }).enabled).toBe(true);
+    expect(get("tool.ellipse", { mode: "paint" }).enabled).toBe(true);
     expect(get("tool.select", { mode: "preview" }).enabled).toBe(false);
+  });
+
+  it("exposes symmetry modes, ellipse and collision-free Paint shortcuts", () => {
+    const { commands, get, actions } = fixture();
+    const all = commands({ mode: "paint", symmetry: "x" });
+    const getShortcut = (id: string) => all.find(command => command.id === id)?.shortcut;
+    expect(getShortcut("tool.ellipse")).toBe("O");
+    expect(getShortcut("paint.symmetry.cycle")).toBe("M");
+    expect(all.filter(command => command.shortcut === "M")).toHaveLength(1);
+    expect(all.filter(command => command.shortcut === "O")).toHaveLength(1);
+    get("tool.ellipse", { mode: "paint" }).run();
+    get("paint.symmetry.cycle", { mode: "paint" }).run();
+    get("paint.symmetry.both", { mode: "paint" }).run();
+    expect(actions.switchTool).toHaveBeenCalledWith("ellipse");
+    expect(actions.cycleSymmetry).toHaveBeenCalledOnce();
+    expect(actions.setSymmetry).toHaveBeenCalledWith("both");
+    expect(get("paint.symmetry.x", { mode: "model" }).enabled).toBe(false);
   });
 
   it("explains protected selection, the scene filter, and face-tool availability", () => {

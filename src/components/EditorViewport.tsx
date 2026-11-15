@@ -13,9 +13,10 @@ import type { ElementAngle } from "../editor/elementRotation";
 import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
+import type { PaintModifiers } from "../editor/paintGeometry";
 
 export type Mode = "model" | "paint" | "preview";
-export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle";
+export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle" | "ellipse";
 export type ViewKind = "iso" | "front" | "right" | "top";
 export type ViewRequest = { kind: ViewKind; count: number };
 
@@ -34,8 +35,8 @@ interface ViewportProps {
   cancelToken: number;
   onSelect: (id: string | null, modifiers?: SelectionModifiers) => void;
   onSelectFace: (face: FaceDirection) => void;
-  onBeginPaint: (texel: Texel, face: string, textureId: string) => void;
-  onContinuePaint: (texel: Texel, face: string, textureId: string) => void;
+  onBeginPaint: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
+  onContinuePaint: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
   onFinishPaint: () => void;
   onCancelPaint: () => void;
   onSample: (texel: Texel, textureId: string) => void;
@@ -244,20 +245,23 @@ function AssetMesh(props: MeshProps) {
     if (tool === "eyedropper") { props.onSample(hit.texel, hit.textureId); return; }
     if (node.locked) return;
     if (tool === "fill") { props.onFill(hit.texel, hit.textureId, hit.face); return; }
-    if (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle") return;
+    if (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle" && tool !== "ellipse") return;
     const capture = event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null;
-    capture?.setPointerCapture?.(event.pointerId); props.onBeginPaint(hit.texel, hit.face, hit.textureId);
+    capture?.setPointerCapture?.(event.pointerId); props.onBeginPaint(hit.texel, hit.face, hit.textureId,
+      { shiftKey: event.shiftKey, altKey: event.altKey });
   };
   const handleMove = (event: ThreeEvent<PointerEvent>) => {
-    if (mode !== "paint" || !["pencil", "eraser", "line", "rectangle"].includes(tool) ||
+    if (mode !== "paint" || !["pencil", "eraser", "line", "rectangle", "ellipse"].includes(tool) ||
         (event.buttons & 1) === 0) return;
-    const hit = onHit(event); if (hit) props.onContinuePaint(hit.texel, hit.face, hit.textureId);
+    const hit = onHit(event); if (hit) props.onContinuePaint(hit.texel, hit.face, hit.textureId,
+      { shiftKey: event.shiftKey, altKey: event.altKey });
   };
   const handleUp = (event: ThreeEvent<PointerEvent>) => {
-    if (event.button !== 0 || mode !== "paint" || !["pencil", "eraser", "line", "rectangle"].includes(tool)) return;
+    if (event.button !== 0 || mode !== "paint" || !["pencil", "eraser", "line", "rectangle", "ellipse"].includes(tool)) return;
     event.stopPropagation();
     const hit = onHit(event);
-    if (hit) props.onContinuePaint(hit.texel, hit.face, hit.textureId);
+    if (hit) props.onContinuePaint(hit.texel, hit.face, hit.textureId,
+      { shiftKey: event.shiftKey, altKey: event.altKey });
     props.onFinishPaint();
     const capture = event.target as (EventTarget & {
       hasPointerCapture?: (id: number) => boolean; releasePointerCapture?: (id: number) => void;

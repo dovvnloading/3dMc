@@ -1,5 +1,6 @@
 import type { Mode, Tool, ViewKind } from "../components/EditorViewport";
 import type { EditorDocument } from "./domain";
+import type { SymmetryMode } from "./paintGeometry";
 import { PRIMITIVE_PRESETS } from "./primitives";
 import type { PrimitiveId } from "./primitives";
 
@@ -26,6 +27,7 @@ export interface EditorCommandContext {
   canUndo: boolean;
   canRedo: boolean;
   rotatedSelection: boolean;
+  symmetry: SymmetryMode;
   rotateToolReason: string | null;
   savingProject: boolean;
   importingPack: boolean;
@@ -51,6 +53,8 @@ export interface EditorCommandActions {
   selectAll: () => void;
   changeMode: (mode: Mode) => void;
   switchTool: (tool: Tool) => void;
+  cycleSymmetry: () => void;
+  setSymmetry: (mode: SymmetryMode) => void;
   navigate: (view: ViewKind) => void;
   openPackStudio: () => void;
   openCreatorPanel: (panel: CreatorPanelName) => void;
@@ -148,11 +152,20 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   const paintTools: readonly [Tool, string, string][] = [
     ["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"],
     ["fill", "Fill", "G"], ["eyedropper", "Eyedropper", "I"],
-    ["line", "Line", "L"], ["rectangle", "Rectangle outline", "U"]
+    ["line", "Line", "L"], ["rectangle", "Rectangle", "U"], ["ellipse", "Ellipse", "O"]
   ];
   for (const [next, title, shortcut] of paintTools) {
     add("tool." + next, "Tool: " + title, "Tool", () => actions.switchTool(next),
       paintToolReason, shortcut, ["paint", "brush", "texture"]);
+  }
+  add("paint.symmetry.cycle", "Cycle texture symmetry (" + state.symmetry.toUpperCase() + ")",
+    "Tool", actions.cycleSymmetry, paintToolReason, "M", ["mirror", "axis", "texture"]);
+  for (const [mode, title] of [
+    ["off", "Off"], ["x", "Mirror X"], ["y", "Mirror Y"], ["both", "Both axes"]
+  ] as const) {
+    add("paint.symmetry." + mode, "Symmetry: " + title, "Tool",
+      () => actions.setSymmetry(mode), paintToolReason, undefined,
+      ["paint", "mirror", "axis", "texture"]);
   }
 
   for (const [kind, title] of [["iso", "Isometric"], ["front", "Front"], ["right", "Right"],

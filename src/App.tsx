@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
+  AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eye, EyeOff,
   FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
-  MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw, Rotate3D,
-  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2, Minus, Square
+  MousePointer2, Move3D, Paintbrush, Plus, Redo2, RotateCcw, Rotate3D,
+  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
 import {
   activeTexture, addTexture, affectedFaces, textureById, removeTexture, renameTexture, selectTexture,
@@ -55,6 +55,8 @@ import { facePaintMask } from "./editor/paintMask";
 import { activeRasterLayer, setRasterLayerPixels } from "./editor/layers";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
 import type { PaintGesture } from "./editor/gestures";
+import type { PaintModifiers } from "./editor/paintGeometry";
+import { useTextureSymmetry } from "./editor/useTextureSymmetry";
 import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
@@ -66,6 +68,9 @@ import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { PaletteControls } from "./components/PaletteControls";
 import { PaintBrushControls } from "./components/PaintBrushControls";
+import { PaintGeometryControls } from "./components/PaintGeometryControls";
+import { PaintToolRail } from "./components/PaintToolRail";
+import { PaintToolHint } from "./components/PaintToolHint";
 import type { BrushShape } from "./editor/brush";
 import { usePaintBrushShortcuts } from "./editor/usePaintBrushShortcuts";
 import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
@@ -215,6 +220,8 @@ export function App() {
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
   const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState(1);
   const [brushShape, setBrushShape] = useState<BrushShape>("square");
+  const [filledShapes, setFilledShapes] = useState(false);
+  const { symmetry, symmetryFor, setSymmetry, cycleSymmetry } = useTextureSymmetry(openSession, texture.id);
   const [constrainPaint, setConstrainPaint] = useState(false);
   const [search, setSearch] = useState("");
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
@@ -405,22 +412,26 @@ export function App() {
     }
     return nodeId ? facePaintMask(source, nodeId, direction, textureId) : null;
   }, [constrainPaint, selectedId, selectedFace]);
-  const beginPaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
+  const beginPaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId, modifiers: PaintModifiers = {}) => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current ||
-        (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle")) return;
+        (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle" && tool !== "ellipse")) return;
     const source = historyRef.current.present;
     const mask = paintMask(source, textureId, face);
     if (mask === null) { setNotice("Choose a visible, unlocked painted face using this texture, or disable UV-constrained painting."); return; }
     try {
-      const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask, brushShape);
+      const started = beginPaintGesture(source, texel, face, color, brushSize, tool,
+        textureId, mask, brushShape, symmetryFor(textureId), filledShapes, modifiers);
       drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Cannot paint the active texture layer.");
     }
-  }, [color, brushSize, brushShape, tool, paintMask]);
-  const continuePaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
+  }, [color, brushSize, brushShape, tool, paintMask, symmetryFor, filledShapes]);
+  const continuePaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId, modifiers: PaintModifiers = {}) => {
     const current = drag.current; if (!current || current.textureId !== textureId) return;
-    const next = continuePaintGesture(current, texel, face); drag.current = next; setDraftPixels(next.pixels);
+    const next = continuePaintGesture(current, texel, face, modifiers);
+    drag.current = next; setDraftPixels(next.pixels);
   }, []);
   const finishPaint = useCallback(() => {
     const current = drag.current; if (!current) return;
@@ -586,13 +597,17 @@ export function App() {
       if (key === "i" && mode === "paint") switchTool("eyedropper");
       if (key === "l" && mode === "paint") switchTool("line");
       if (key === "u" && mode === "paint") switchTool("rectangle");
+      if (key === "o" && mode === "paint") { event.preventDefault(); switchTool("ellipse"); }
+      if (key === "m" && mode === "paint" && !event.repeat) {
+        event.preventDefault(); clearStroke(); cycleSymmetry();
+      }
       if (key === "f") navigate("iso");
       if ((key === "delete" || key === "backspace") && mode === "model" && selectedIds.length) {
         event.preventDefault(); deleteCurrentSelection();
       }
     };
     window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
-  }, [mode, selectedIds, rotatedSelection, rotateToolReason, runUndo, runRedo, clearStroke, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
+  }, [mode, selectedIds, rotatedSelection, rotateToolReason, runUndo, runRedo, clearStroke, cycleSymmetry, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
 
   const saveLegacyJson = () => {
     try {
@@ -932,7 +947,8 @@ export function App() {
       : candidate ? "Resolve the pending recovery session before editing."
       : openingProject.current ? "A project is opening." : null,
     canUndo: history.past.length > 0, canRedo: history.future.length > 0,
-    rotatedSelection, rotateToolReason, savingProject, importingPack: packInspecting, importingTexture: textureReading
+    rotatedSelection, rotateToolReason, savingProject,
+    importingPack: packInspecting, importingTexture: textureReading, symmetry
   }, {
     newProject: () => setNewProjectOpen(true), openProject: () => fileRef.current?.click(),
     saveProject: () => { void saveProjectRef.current(); },
@@ -942,7 +958,11 @@ export function App() {
     saveLegacyJson, undo: runUndo, redo: runRedo, addCuboid: addElement, addShape,
     duplicate: duplicateCurrentSelection, deleteSelection: deleteCurrentSelection, selectAll: selectEditable,
     changeMode, switchTool, navigate, openPackStudio,
-    openCreatorPanel: panel => setCreatorPaletteRequest(current => ({ panel, nonce: (current?.nonce ?? 0) + 1 })),
+    cycleSymmetry: () => { clearStroke(); cycleSymmetry(); },
+    setSymmetry: mode => { clearStroke(); setSymmetry(mode); },
+    openCreatorPanel: panel => setCreatorPaletteRequest(current => ({
+      panel, nonce: (current?.nonce ?? 0) + 1
+    })),
     openRecoveryDetails: () => setRecoveryDetailsOpen(true)
   });
 
@@ -1105,20 +1125,13 @@ export function App() {
              disabled={rotatedSelection}
              onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton><div className="rail-divider"/>
           <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
-        </> : <>
-          <IconButton active={tool === "pencil"} label="Pixel pencil (B)" onClick={() => switchTool("pencil")}><Paintbrush size={18}/></IconButton>
-          <IconButton active={tool === "line"} label="Line tool (L)" onClick={() => switchTool("line")}><Minus size={18}/></IconButton>
-          <IconButton active={tool === "rectangle"} label="Rectangle outline (U)" onClick={() => switchTool("rectangle")}><Square size={18}/></IconButton>
-          <IconButton active={tool === "eraser"} label="Pixel eraser (E)" onClick={() => switchTool("eraser")}><Eraser size={18}/></IconButton>
-          <IconButton active={tool === "fill"} label="Fill connected area (G)" onClick={() => switchTool("fill")}><PaintBucket size={18}/></IconButton>
-          <IconButton active={tool === "eyedropper"} label="Eyedropper (I)" onClick={() => switchTool("eyedropper")}><Pipette size={18}/></IconButton>
-        </>}</div>}
-        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? tool === "fill" ? "Fill a four-connected RGBA region · one undo step" : tool === "eraser" ? "Erase RGBA pixels in 3D or 2D · Esc cancels" : tool === "line" ? "Drag a straight pixel line · release to commit · Esc cancels" : tool === "rectangle" ? "Drag a rectangle outline · release to commit · Esc cancels" : "Paint in 3D or on the texture sheet · Esc cancels stroke" : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : tool === "rotate" ? (rotateToolReason ?? "Drag the colored rotation ring · snaps to five Java angles · E · Esc cancels") : rotatedSelection ? "Resize gizmo unavailable for rotated elements · use local Size fields" : "Drag a gizmo axis to resize · R"}</div>
+        </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/>}</div>}
+        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : tool === "rotate" ? (rotateToolReason ?? "Drag the colored rotation ring · snaps to five Java angles · E · Esc cancels") : rotatedSelection ? "Resize gizmo unavailable for rotated elements · use local Size fields" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
         {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
-          brushSize={brushSize} brushShape={brushShape}
+          brushSize={brushSize} brushShape={brushShape} symmetry={symmetryFor(visibleTexture.id)}
           paintMask={constrainPaint ? (selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) : null) : undefined}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
@@ -1183,11 +1196,13 @@ export function App() {
           <PaletteControls document={doc} color={color} onChoose={setColor}
             onEdit={change => commitDocument(change)}/>
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
-          <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
+          <div className="paint-tool-note" role="status"><PaintToolHint tool={tool} filled={filledShapes} detail/></div>
           <PaintBrushControls size={brushSize} shape={brushShape}
             disabled={tool === "fill" || tool === "eyedropper"}
             onSize={size => { clearStroke(); setBrushSize(size); }}
             onShape={shape => { clearStroke(); setBrushShape(shape); }}/>
+          <PaintGeometryControls symmetry={symmetry} onSymmetry={setSymmetry}
+            filled={filledShapes} onFilled={setFilledShapes} onCancel={clearStroke} tool={tool}/>
           <label className="face-paint-constrain">
             <input type="checkbox" aria-label="Constrain paint to selected face UV"
               checked={constrainPaint} onChange={event => { clearStroke(); setConstrainPaint(event.currentTarget.checked); }}/>

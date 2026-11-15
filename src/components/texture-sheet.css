@@ -74,3 +74,12 @@
   outline: 2px solid #a0afff;
   outline-offset: 2px;
 }
+
+/* Symmetry guides scale with the sheet but stay roughly 2 screen pixels wide. */
+.texture-editor .sheet-symmetry-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
