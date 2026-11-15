@@ -164,7 +164,7 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
           <label key={channel}>{channel}
             <input type="text" inputMode="numeric" aria-label={channel + " channel"}
               autoComplete="off" value={rgbDraft[index]}
-              aria-invalid={parseRgbChannel(rgbDraft[index]) === null}
+              aria-invalid={parseRgbChannel(rgbDraft[index]!) === null}
               onChange={event => chooseRgb(index as 0 | 1 | 2, event.currentTarget.value)}
               onBlur={() => setRgbDraft(channelDrafts(value))}/>
           </label>)}
