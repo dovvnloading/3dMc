@@ -67,6 +67,8 @@ import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { PaletteControls } from "./components/PaletteControls";
+import { ColorPicker } from "./components/ColorPicker";
+import { addRecentColor } from "./editor/recentColors";
 import { PaintBrushControls } from "./components/PaintBrushControls";
 import { PaintGeometryControls } from "./components/PaintGeometryControls";
 import { PaintToolRail } from "./components/PaintToolRail";
@@ -219,6 +221,7 @@ export function App() {
   const [snap, setSnap] = useState(1);
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
   const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState(1);
+  const [recentColors, setRecentColors] = useState<readonly string[]>([]);
   const [brushShape, setBrushShape] = useState<BrushShape>("square");
   const [filledShapes, setFilledShapes] = useState(false);
   const { symmetry, symmetryFor, setSymmetry, cycleSymmetry } = useTextureSymmetry(openSession, texture.id);
@@ -436,10 +439,13 @@ export function App() {
   const finishPaint = useCallback(() => {
     const current = drag.current; if (!current) return;
     drag.current = null; setDraftPixels(null); setDraftTextureId(null);
+    const before = historyRef.current.present;
     commitDocument(document => {
       const next = commitPaintGesture(document, current);
       return next === document ? document : selectTexture(next, current.textureId);
     });
+    if (current.brush !== "eraser" && historyRef.current.present !== before)
+      setRecentColors(previous => addRecentColor(previous, current.color));
   }, [commitDocument]);
   const samplePaint = useCallback((texel: Texel, textureId = historyRef.current.present.activeTextureId) => {
     const sheet = textureById(historyRef.current.present, textureId);
@@ -448,6 +454,7 @@ export function App() {
   const fillPaint = useCallback((texel: Texel,
     textureId = historyRef.current.present.activeTextureId, faceKey?: string) => {
     if (tool !== "fill" || !writerRef.current || awaitingRecoveryRef.current) return;
+    const before = historyRef.current.present;
     commitDocument(current => {
       const sheet = textureById(current, textureId); if (!sheet) return current;
       const mask = paintMask(current, textureId, faceKey);
@@ -464,6 +471,8 @@ export function App() {
         : setTexturePixels(current, filled, textureId);
       return changed === current ? current : selectTexture(changed, textureId);
     });
+    if (historyRef.current.present !== before)
+      setRecentColors(previous => addRecentColor(previous, color));
   }, [color, tool, commitDocument, paintMask]);
   const changeMode = (next: Mode) => {
     clearStroke(); setMode(next);
@@ -1171,7 +1180,8 @@ export function App() {
                   showTexture(faceAsset.id);
                   changeMode("paint");
                 }}><Paintbrush size={15}/>Edit texture <span>→</span></button></> : <><div className="form-caption">Material color</div>
-                <div className="color-control"><input type="color" aria-label="Element color" value={selected.color} disabled={selected.locked} onChange={event => commitDocument(current => setMaterialColor(current, selected.id, event.target.value))}/><span>{selected.color.toUpperCase()}</span></div></>}
+                <ColorPicker label="Element color" value={selected.color} disabled={selected.locked}
+                   onChange={hex => commitDocument(current => setMaterialColor(current, selected.id, hex))}/></>}
             </div>
             <div className="inspector-group"><SectionHeading title="Element actions"/><div className="element-actions">
               <button disabled={selected.locked || !selected.visible} onClick={duplicateCurrentSelection}><Copy size={15}/>Duplicate</button>
@@ -1193,9 +1203,9 @@ export function App() {
           <button type="button" onClick={() => { setTextureImportMode("replace"); textureFileRef.current?.click(); }} disabled={textureReading}><ImagePlus size={14}/>Replace PNG</button>
           <button type="button" onClick={downloadTexturePng}><Download size={14}/>Export PNG</button></div>
           <div className="form-caption">Brush color</div>
-          <PaletteControls document={doc} color={color} onChoose={setColor}
+          <PaletteControls document={doc} color={color} recentColors={recentColors} onChoose={setColor}
             onEdit={change => commitDocument(change)}/>
-          <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
+          <ColorPicker label="Custom paint color" value={color} onChange={setColor}/>
           <div className="paint-tool-note" role="status"><PaintToolHint tool={tool} filled={filledShapes} detail/></div>
           <PaintBrushControls size={brushSize} shape={brushShape}
             disabled={tool === "fill" || tool === "eyedropper"}

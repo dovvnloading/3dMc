@@ -1,0 +1,7 @@
+.palette-swatch-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+.palette-swatch-group { min-width:0; }
+.palette-group-title { display:block; margin-bottom:6px; font-size:10px; color:var(--secondary); }
+.palette-swatch-groups .palette { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-bottom:7px; }
+.palette-swatch-groups .palette button { width:100%; min-width:0; }
+.palette-empty { grid-column:1/-1; color:var(--muted); font-size:10px; line-height:1.5; }
+.palette-swatch-groups .palette button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
