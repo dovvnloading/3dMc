@@ -82,9 +82,14 @@ export function shapeStencil(width: number, height: number, kind: GeometricTool,
       y >= bounds.top && y <= bounds.bottom
     : (x: number, y: number) => withinEllipse(x, y, bounds);
   const offsets = filled ? ([[0, 0]] as Texel[]) : brushOffsets(size, brush);
-  // Only inspect in-sheet source texels; mirrored copies are clipped separately.
-  for (let y = Math.max(0, bounds.top); y <= Math.min(height - 1, bounds.bottom); y++) {
-    for (let x = Math.max(0, bounds.left); x <= Math.min(width - 1, bounds.right); x++) {
+  // Include just-off-sheet outline texels when their brush reaches the sheet.
+  // The final pixel writes remain clipped, even with Alt/Shift expanded bounds.
+  const minX = Math.min(...offsets.map(([dx]) => dx));
+  const maxX = Math.max(...offsets.map(([dx]) => dx));
+  const minY = Math.min(...offsets.map(([, dy]) => dy));
+  const maxY = Math.max(...offsets.map(([, dy]) => dy));
+  for (let y = Math.max(bounds.top, -maxY); y <= Math.min(bounds.bottom, height - 1 - minY); y++) {
+    for (let x = Math.max(bounds.left, -maxX); x <= Math.min(bounds.right, width - 1 - minX); x++) {
       if (!inside(x, y)) continue;
       if (!filled && inside(x - 1, y) && inside(x + 1, y) &&
           inside(x, y - 1) && inside(x, y + 1)) continue;
