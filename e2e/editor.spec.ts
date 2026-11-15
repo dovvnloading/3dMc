@@ -1064,7 +1064,10 @@ test("editable color palette persists additions and ordering in native source pr
   await page.getByRole("tab", { name: "Paint" }).click();
   const add = page.getByRole("button", { name: "Add selected color to palette" });
   await expect(add).toBeDisabled();
-  await page.locator('input[aria-label="Custom paint color"]').fill("#123abc");
+  await page.getByRole("button", { name: "Custom paint color" }).click();
+  const picker = page.getByRole("dialog", { name: "Custom paint color picker" });
+  await picker.getByRole("textbox", { name: "Hex color" }).fill("#123abc");
+  await picker.getByRole("textbox", { name: "Hex color" }).press("Escape");
   await expect(add).toBeEnabled();
   await add.click();
   await expect(page.getByRole("button", { name: "Choose color #123abc" })).toBeVisible();
