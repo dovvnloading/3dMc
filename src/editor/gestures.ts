@@ -1,5 +1,6 @@
 import type { EditorDocument, Vec3 } from "./domain";
 import { activeTexture, setTexturePixels, textureById, updateCuboid } from "./domain";
+import { mapRotationToBounds } from "./elementRotation";
 import type { Texel, PixelMask } from "./pixels";
 import { paintStencil, shapeBounds, shapeStencil, strokeStencil } from "./paintGeometry";
 import type { PaintModifiers, SymmetryMode } from "./paintGeometry";
@@ -140,7 +141,9 @@ export function commitGizmoTransform(
     const round = (n: number) => Math.round(n * 10000) / 10000;
     if (node.from.every((n, i) => Math.abs(n - from[i]!) < .00001) &&
         node.to.every((n, i) => Math.abs(n - to[i]!) < .00001)) return node;
-    return { ...node, from: from.map(round) as [number, number, number],
-      to: to.map(round) as [number, number, number] };
+    const nextFrom = from.map(round) as [number, number, number];
+    const nextTo = to.map(round) as [number, number, number];
+    return { ...node, from: nextFrom, to: nextTo,
+      ...(node.rotation ? { rotation: mapRotationToBounds(node, nextFrom, nextTo) } : {}) };
   });
 }

@@ -3,7 +3,7 @@ import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eye, EyeOff,
   FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
-  MousePointer2, Move3D, Paintbrush, Plus, Redo2, RotateCcw,
+  MousePointer2, Move3D, Paintbrush, Plus, Redo2, RotateCcw, Rotate3D,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
 import {
@@ -18,6 +18,9 @@ import type { History } from "./editor/history";
 import { commitSelectionGesture, deleteSelection, duplicateSelection, repeatSelection, reconcileSelection, selectAt, selectOnly } from "./editor/selection";
 import type { Selection, SelectionGesture, SelectionModifiers } from "./editor/selection";
 import { SelectionInspector } from "./components/SelectionInspector";
+import { RotationInspector } from "./components/RotationInspector";
+import { setElementAngle } from "./editor/rotationCommands";
+import type { ElementAngle } from "./editor/elementRotation";
 import { SelectionArrayTools } from "./components/SelectionArrayTools";
 import { MoveSnapControl } from "./components/MoveSnapControl";
 import { groupSelection, renameGroup, ungroup } from "./editor/groups";
@@ -193,6 +196,14 @@ export function App() {
   const [uvClipboard, setUVClipboard] = useState<FaceUVClipboard | null>(null);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const selected = doc.cuboids.find(node => node.id === selectedId) ?? null;
+  const rotatedSelection = selectedIds.some(id => doc.cuboids.some(node => node.id === id && node.rotation !== undefined));
+  const rotateToolReason = doc.target.candidateRelease !== "1.21.4"
+    ? "This target has no supported element-rotation profile. Select experimental Java 1.21.4."
+    : selectedIds.length !== 1 || !selected
+      ? "Select one visible, unlocked element for the canvas ring; use Rotation in the Inspector for multiple elements."
+      : selected.locked || !selected.visible
+        ? `“${selected.name}” is ${selected.locked ? "locked" : "hidden"}. Unlock and show it before rotating.`
+        : null;
   const faceAsset = selected ? textureById(doc, selected.faces[selectedFace].textureId) : null;
   const selectedIndex = doc.cuboids.findIndex(node => node.id === selectedId);
   useEffect(() => {
@@ -573,7 +584,8 @@ export function App() {
       if (key === "escape") { clearStroke(); setShapeMenuOpen(false); switchTool("select"); }
       if (key === "v") switchTool("select");
       if (key === "w" && mode === "model") switchTool("move");
-      if (key === "r" && mode === "model") switchTool("resize");
+      if (key === "r" && mode === "model" && !rotatedSelection) switchTool("resize");
+      if (key === "e" && mode === "model" && !rotateToolReason) switchTool("rotate");
       if (key === "b" && mode === "paint") switchTool("pencil");
       if (key === "e" && mode === "paint") switchTool("eraser");
       if (key === "g" && mode === "paint") switchTool("fill");
@@ -590,7 +602,7 @@ export function App() {
       }
     };
     window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
-  }, [mode, selectedIds, runUndo, runRedo, clearStroke, cycleSymmetry, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
+  }, [mode, selectedIds, rotatedSelection, rotateToolReason, runUndo, runRedo, clearStroke, cycleSymmetry, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
 
   const saveLegacyJson = () => {
     try {
@@ -1067,14 +1079,21 @@ export function App() {
         <EditorViewport document={doc} pixels={viewPixels} selectedId={selectedId} selectedIds={selectedIds}
           selectedFace={selectedFace} onSelectFace={setSelectedFace} mode={mode} tool={tool} view={view} snap={snap} painting={!!draftPixels}
           cancelToken={cancelToken} draftTextureId={draftTextureId} onSelect={selectNode} onBeginPaint={beginPaint} onContinuePaint={continuePaint}
-          onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint} onFill={fillPaint} onTransform={transform} onBatchTransform={transformBatch}/>
+          onFinishPaint={finishPaint} onCancelPaint={clearStroke} onSample={samplePaint} onFill={fillPaint} onTransform={transform}
+          onRotate={(id: string, angle: ElementAngle) => commitDocument(current => setElementAngle(current, [id], angle))}
+          onBatchTransform={transformBatch}/>
         {mode !== "preview" && <div className="tool-rail" aria-label="Editor tools">{mode === "model" ? <>
           <IconButton active={tool === "select"} label="Select (V)" onClick={() => switchTool("select")}><MousePointer2 size={18}/></IconButton>
           <IconButton active={tool === "move"} label="Move (W)" onClick={() => switchTool("move")}><Move3D size={18}/></IconButton>
-          <IconButton active={tool === "resize"} label="Resize (R)" onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton><div className="rail-divider"/>
+          <IconButton active={tool === "rotate"} label={rotateToolReason ? `Rotate unavailable: ${rotateToolReason}` : "Rotate (E) · Java 1.21.4 angles"}
+             disabled={!!rotateToolReason} onClick={() => switchTool("rotate")}><Rotate3D size={18}/></IconButton>
+          <IconButton active={tool === "resize"} label={rotatedSelection ?
+             "Resize gizmo unavailable for rotated elements; use local Size fields" : "Resize (R)"}
+             disabled={rotatedSelection}
+             onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton><div className="rail-divider"/>
           <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
         </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/></div>}
-        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : "Drag a gizmo axis to resize · R"}</div>
+        <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : tool === "rotate" ? (rotateToolReason ?? "Drag the colored rotation ring · snaps to five Java angles · E · Esc cancels") : rotatedSelection ? "Resize gizmo unavailable for rotated elements · use local Size fields" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
@@ -1108,8 +1127,9 @@ export function App() {
               <AxisRow title="Position · corner" selected={selected} property="position" commitDocument={commitDocument}/><AxisRow title="Size" selected={selected} property="size" commitDocument={commitDocument}/>
               <div className="form-group"><MoveSnapControl value={snap} onChange={setSnap}/></div>
               {selected.locked && <div className="inline-note"><Lock size={14}/>Unlock this element to edit geometry.</div>}
-              <div className="inline-note"><Info size={14}/>Rotation requires a verified Java target capability profile.</div>
-            </div>
+               {selected.rotation && <div className="inline-note"><Info size={14}/>Size edits use local cuboid axes; rotated elements cannot use world-axis Resize gizmos (which would shear the model).</div>}
+             </div>
+             {mode === "model" && <RotationInspector document={doc} ids={[selected.id]} apply={commitDocument}/>}
             <div className="inspector-group"><SectionHeading title="Appearance"/><div className="form-group"><div className="form-caption">Surface type</div>
               <div className="material-switch" role="group" aria-label="Element material"><button type="button" aria-pressed={selected.material === "solid"} disabled={selected.locked} onClick={() => commitDocument(current => setCuboidMaterial(current, selected.id, "solid"))}>Solid color</button>
                 <button type="button" aria-pressed={selected.material === "texture"} disabled={selected.locked} onClick={() => commitDocument(current => setCuboidMaterial(current, selected.id, "texture"))}>Painted</button></div></div>

@@ -1,6 +1,7 @@
 import { FACE_DIRECTIONS, MAX_TEXTURE_SLOTS, copyFaces, parseDocument } from "../domain";
 import type { Cuboid, EditorDocument, PixelTexture, Vec3 } from "../domain";
 import { selectionBounds } from "../selection";
+import { transformedBounds } from "../elementRotation";
 import { APOTHECARY_ID, createApothecaryCabinet } from "./apothecaryCabinet";
 
 export type PrefabId = typeof APOTHECARY_ID;
@@ -59,10 +60,12 @@ function chooseOrigin(document: EditorDocument, parts: readonly Cuboid[]): Vec3 
     const fromX = x + from[0], toX = x + to[0];
     const fromZ = z + from[2], toZ = z + to[2];
     if (fromX < -256 || toX > 256 || fromZ < -256 || toZ > 256) continue;
-    const overlaps = document.cuboids.some(node =>
-      fromX < node.to[0] && toX > node.from[0] &&
-      from[1] < node.to[1] && to[1] > node.from[1] &&
-      fromZ < node.to[2] && toZ > node.from[2]);
+    const overlaps = document.cuboids.some(node => {
+      const bounds = transformedBounds(node);
+      return fromX < bounds.to[0] && toX > bounds.from[0] &&
+        from[1] < bounds.to[1] && to[1] > bounds.from[1] &&
+        fromZ < bounds.to[2] && toZ > bounds.from[2];
+    });
     if (!overlaps) return [x, 0, z];
   }
   throw new PrefabInsertError(

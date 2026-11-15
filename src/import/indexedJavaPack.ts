@@ -8,6 +8,7 @@ import { gameFilePath, parsePackDocument, verifyPackSources } from "../pack/pack
 import type { PackDocument, PackItemAsset, PackModelAsset, PackTextureAsset, ResourceLocation } from "../pack/packDocument";
 import { JAVA_1214_REPLACEMENTS, makeIndexedJava1214Pack, MAX_INDEXED_EXPORT_BYTES } from "../pack/javaPackBuilder";
 import { JAVA_1214_ITEM_TARGETS, parseItemDisplay } from "../pack/itemProfile";
+import { parseJavaElementRotation } from "../editor/elementRotation";
 
 export type IndexedJavaImportReport =
   | { status: "editable"; project: NativePackProject; paths: string[]; notices: string[] }
@@ -163,7 +164,7 @@ function parseModel(files: Map<string, Uint8Array>, record: ModelRecord,
   const solidRefs = new Map<number, string>();
   for (let i = 0; i < raw.elements.length; i++) {
     const path = label + ":element " + i;
-    const element = object(raw.elements[i], path, ["from", "to", "faces"]);
+    const element = object(raw.elements[i], path, ["from", "to", "faces", "rotation"], ["from", "to", "faces"]);
     const from = vector(element.from, path + ":from"), to = vector(element.to, path + ":to");
     const faceData = object(element.faces, path + ":faces", FACE_DIRECTIONS);
     const faces: Partial<CuboidFaces> = {};
@@ -206,7 +207,9 @@ function parseModel(files: Map<string, Uint8Array>, record: ModelRecord,
     }
     nodes.push({ id: "element-" + i,
       name: "Imported cuboid " + String(i + 1).padStart(2, "0"),
-      from, to, material: isSolid ? "solid" : "texture",
+      from, to,
+      ...(element.rotation === undefined ? {} : { rotation: parseJavaElementRotation(element.rotation, path + ":rotation") }),
+      material: isSolid ? "solid" : "texture",
       color, visible: true, locked: false, faces: faces as CuboidFaces });
   }
   const aliasNames = new Set(["particle", ...paintedKeys,
@@ -238,7 +241,8 @@ function parseModel(files: Map<string, Uint8Array>, record: ModelRecord,
 function sourceSignature(parts: SourceParts): string {
   return stable({
     cuboids: parts.document.cuboids.map(node => ({
-      from: node.from, to: node.to, faces: node.faces, color: node.color, material: node.material
+      from: node.from, to: node.to, rotation: node.rotation, faces: node.faces,
+      color: node.color, material: node.material
     })),
     textures: parts.document.textures.map(texture => ({
       width: texture.width, height: texture.height, pixels: texture.pixels
