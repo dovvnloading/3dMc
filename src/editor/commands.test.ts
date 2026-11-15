@@ -3,7 +3,7 @@ import { createSampleDocument } from "./domain";
 import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
 import { groupEditorShortcuts, SHORTCUT_AREAS } from "./shortcuts";
-import { keyToShortcut } from "./useEditorKeyboardShortcuts";
+import { keyToShortcut, resolveEditorShortcut } from "./useEditorKeyboardShortcuts";
 
 function fixture() {
   const state: EditorCommandContext = {
@@ -211,6 +211,28 @@ describe("shortcut reference", () => {
     expect(entries.find(entry => entry.id === "view.frame")?.shortcuts).toEqual(["F"]);
     expect(modelCommands.find(command => command.id === "view.iso")?.shortcut).toBeUndefined();
     expect(entries.find(entry => entry.id === "dialog.shortcuts")?.shortcuts).toEqual(["?"]);
+  });
+
+  it("dispatches shared E to Rotate in Model and Eraser in Paint, not a disabled command", () => {
+    const { commands, actions } = fixture();
+    const model = resolveEditorShortcut(commands({ mode: "model" }), "E");
+    expect(model.registered).toBe(true);
+    expect(model.command?.id).toBe("tool.rotate");
+    model.command?.run();
+    expect(actions.switchTool).toHaveBeenCalledWith("rotate");
+
+    const paint = resolveEditorShortcut(commands({ mode: "paint" }), "E");
+    expect(paint.registered).toBe(true);
+    expect(paint.command?.id).toBe("tool.eraser");
+    paint.command?.run();
+    expect(actions.switchTool).toHaveBeenCalledWith("eraser");
+
+    const blocked = resolveEditorShortcut(commands({ mode: "paint" }), "Ctrl/Cmd+D");
+    expect(blocked.registered).toBe(true);
+    expect(blocked.command).toBeUndefined();
+    expect(resolveEditorShortcut(commands({ mode: "paint" }), "Ctrl/Cmd+Y").registered).toBe(true);
+    expect(resolveEditorShortcut(commands({ mode: "paint" }), "F").command?.id).toBe("view.frame");
+    expect(resolveEditorShortcut(commands({ mode: "paint" }), "x").registered).toBe(false);
   });
 
   it("avoids same-mode collisions and invokes the existing handlers", () => {

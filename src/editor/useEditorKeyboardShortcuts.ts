@@ -17,6 +17,17 @@ export function keyToShortcut(event: Pick<KeyboardEvent,
   return /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : null;
 }
 
+/** Prefer the enabled command when a key is shared across mutually exclusive modes.
+ * Still suppress browser behavior for known but currently unavailable shortcuts. */
+export function resolveEditorShortcut(commands: readonly EditorCommand[], shortcut: string): {
+  registered: boolean;
+  command?: EditorCommand;
+} {
+  const matches = commands.filter(command =>
+    command.shortcut === shortcut || command.alternateShortcuts?.includes(shortcut));
+  return { registered: matches.length > 0, command: matches.find(command => command.enabled) };
+}
+
 /** Never hijack editing fields, IME composition or an already open native modal. */
 export function useEditorKeyboardShortcuts(commands: readonly EditorCommand[],
   beforeEscape: () => boolean): void {
@@ -29,13 +40,12 @@ export function useEditorKeyboardShortcuts(commands: readonly EditorCommand[],
       const shortcut = keyToShortcut(event);
       if (!shortcut) return;
       if (shortcut === "Esc" && beforeEscape()) { event.preventDefault(); return; }
-      const command = commands.find(command =>
-        command.shortcut === shortcut || command.alternateShortcuts?.includes(shortcut));
-      if (!command) return;
+      const { registered, command } = resolveEditorShortcut(commands, shortcut);
+      if (!registered) return;
       // Disabled editor commands must not fall through to a browser shortcut
       // (e.g. Ctrl+N opening another tab while project editing is blocked).
       event.preventDefault();
-      if (!command.enabled || (event.repeat && ["M", "F", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
+      if (!command || (event.repeat && ["M", "F", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
       command.run();
     };
     window.addEventListener("keydown", listener);
