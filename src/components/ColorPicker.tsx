@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { hexToHsv, hsvToHex, normalizeHex, parseHex, parseRgbChannel, rgbToHex } from "../editor/color";
+import { hexToHsv, hsvToHex, normalizeHex, parseFullHex, parseHex, parseRgbChannel, rgbToHex } from "../editor/color";
 import type { HSV } from "../editor/color";
 import "./color-picker.css";
 
