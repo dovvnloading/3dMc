@@ -923,7 +923,9 @@ export function App() {
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
-  const openCommandPalette = () => { clearStroke(); setShapeMenuOpen(false); setCommandPaletteOpen(true); };
+  const openCommandPalette = useCallback(() => {
+    clearStroke(); setShapeMenuOpen(false); setCommandPaletteOpen(true);
+  }, [clearStroke]);
   const commands = createEditorCommands({
     document: doc, mode, selectedIds, selectedId, sceneSearch: search,
     editDisabledReason: writerStatus !== "owned" ? "This tab does not own local recovery."
