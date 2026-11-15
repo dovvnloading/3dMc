@@ -44,6 +44,13 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   await expect(square).toHaveAttribute("aria-valuetext", "Saturation 60%, brightness 34%");
   await red.fill("18");
   await expect(hex).toHaveValue("#123456");
+  const squareBounds = await square.boundingBox();
+  if (!squareBounds) throw new Error("Missing saturation/brightness square");
+  await page.mouse.click(squareBounds.x + squareBounds.width / 2,
+    squareBounds.y + squareBounds.height / 2);
+  await expect(square).toHaveAttribute("aria-valuetext", "Saturation 50%, brightness 50%");
+  await expect(trigger).toContainText("#406080");
+  await hex.fill("#123456");
 
   await hex.fill("invalid");
   await expect(hex).toHaveAttribute("aria-invalid", "true");
