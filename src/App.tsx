@@ -1072,7 +1072,7 @@ export function App() {
       </div>
         {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
           brushSize={brushSize} brushShape={brushShape}
-          paintMask={constrainPaint && selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) ?? undefined : undefined}
+          paintMask={constrainPaint ? (selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) : null) : undefined}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
           uvEditable={!!selected && selected.visible && !selected.locked && selected.material === "texture"}

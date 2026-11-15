@@ -20,6 +20,11 @@ test("texture zoom remains cursor-anchored; pan never paints; fit/reset and grid
   expect((await page.locator(".texture-footer").innerText()).split("Alpha")[0])
     .toBe(previousTexel.split("Alpha")[0]);
 
+  const pixels = () => canvas.evaluate(node => {
+    const bitmap = node as HTMLCanvasElement;
+    return Array.from(bitmap.getContext("2d")!.getImageData(0, 0, bitmap.width, bitmap.height).data);
+  });
+  const beforePixels = await pixels();
   const beforePan = await canvas.boundingBox();
   await page.keyboard.down("Space");
   await page.mouse.move(x, y);
@@ -30,6 +35,7 @@ test("texture zoom remains cursor-anchored; pan never paints; fit/reset and grid
   const afterPan = await canvas.boundingBox();
   if (!beforePan || !afterPan) throw new Error("Sheet lost during pan");
   expect(afterPan.x - beforePan.x).toBeGreaterThan(1);
+  expect(await pixels()).toEqual(beforePixels);
   await page.getByRole("checkbox", { name: "Show pixel grid" }).check();
   await expect(page.locator(".sheet-pixel-grid")).toBeVisible();
   await page.getByRole("button", { name: "Fit texture sheet" }).click();
@@ -41,6 +47,23 @@ test("texture zoom remains cursor-anchored; pan never paints; fit/reset and grid
   await page.mouse.move(refreshed.x + 40, refreshed.y + 40);
   await expect(page.locator(".sheet-brush-outline")).toBeVisible();
   await page.screenshot({ path: "test-results/paint-sheet-zoom-grid-footprint.png" });
+  // Hit-test the actual transformed sheet with pointer input, not just the pure mapping.
+  await page.getByRole("button", { name: "Choose color #c76d68" }).click();
+  const stage = await page.locator(".texture-scroll").boundingBox();
+  const sheet = await canvas.boundingBox();
+  if (!stage || !sheet) throw new Error("Canvas changed unexpectedly");
+  const clickX = stage.x + stage.width / 2, clickY = stage.y + stage.height / 2;
+  const texelX = Math.floor((clickX - sheet.x) / sheet.width * 32);
+  const texelY = Math.floor((clickY - sheet.y) / sheet.height * 32);
+  expect(texelX).toBeGreaterThanOrEqual(0); expect(texelX).toBeLessThan(32);
+  expect(texelY).toBeGreaterThanOrEqual(0); expect(texelY).toBeLessThan(32);
+  const beforePaint = await pixels();
+  await page.mouse.click(clickX, clickY);
+  const changed = (texelY * 32 + texelX) * 4;
+  await expect.poll(async () => (await pixels()).slice(changed, changed + 4))
+    .toEqual([199, 109, 104, 255]);
+  await page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)", exact: true }).click();
+  expect(await pixels()).toEqual(beforePaint);
   expect(errors).toEqual([]);
 });
 

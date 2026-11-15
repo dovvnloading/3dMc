@@ -23,7 +23,7 @@ interface Props {
   color: string;
   brushSize: number;
   brushShape: BrushShape;
-  paintMask?: PixelMask;
+  paintMask?: PixelMask | null;
   painting: boolean;
   face: FaceUV | null;
   faceName: FaceDirection | null;
@@ -56,6 +56,7 @@ export function TextureSurface(props: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const strokePointer = useRef<number | null>(null);
   const pan = useRef<PanGesture | null>(null);
+  const pointerOver = useRef(false);
   const space = useRef(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [cursor, setCursor] = useState<Texel>([0, 0]);
@@ -129,8 +130,9 @@ export function TextureSurface(props: Props) {
     const down = (event: globalThis.KeyboardEvent) => {
       if (event.key !== " " || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, button, [contenteditable], [role=dialog]") ||
-          document.querySelector("[role=dialog]")) return;
+      if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]") ||
+          document.querySelector("[role=dialog]") ||
+          (target?.closest("button") && !pointerOver.current)) return;
       space.current = true; setSpaceHeld(true);
       if (target && viewportRef.current?.contains(target)) event.preventDefault();
     };
@@ -287,7 +289,7 @@ export function TextureSurface(props: Props) {
       event.preventDefault(); event.stopPropagation(); props.onCancel();
     }
   };
-  const focusTexels = useMemo(() => brushTexels(cursor,
+  const focusTexels = useMemo(() => props.paintMask === null ? [] : brushTexels(cursor,
     ["pencil", "eraser", "line", "rectangle"].includes(props.tool) ? props.brushSize : 1,
     ["pencil", "eraser", "line", "rectangle"].includes(props.tool) ? props.brushShape : "square",
     props.width, props.height, props.paintMask),
@@ -327,6 +329,8 @@ export function TextureSurface(props: Props) {
     </div>
     <div className={"texture-scroll" + (pan.current || spaceHeld ? " sheet-pan-cursor" : "")}
       ref={viewportRef} aria-label="Texture canvas navigation"
+      onPointerEnter={() => { pointerOver.current = true; }}
+      onPointerLeave={() => { pointerOver.current = false; }}
       onPointerDownCapture={beginPan} onPointerMoveCapture={movePan}
       onPointerUpCapture={endPan} onPointerCancelCapture={cancelPan}
       onLostPointerCapture={cancelPan}
