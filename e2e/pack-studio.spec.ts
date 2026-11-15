@@ -376,7 +376,7 @@ test("Java item settings import restores authored display values without replaci
   await studio.getByRole("button", { name: "Redo pack operation" }).click();
   await expect(guiAngle).toHaveValue("67");
 
-  await studio.locator('input[type="file"][accept=".zip,application/zip"]')
+  await studio.locator('.pack-item-header-actions input[type="file"][accept=".zip,application/zip"]')
     .setInputFiles({ name: "unsupported.zip", mimeType: "application/zip",
       buffer: Buffer.from("not a zip") });
   await expect(studio.getByRole("group", { name: "Review imported item settings" }))
