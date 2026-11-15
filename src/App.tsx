@@ -62,6 +62,9 @@ import { decodeBrowserPng, importTextureIntoDocument, resampleNearest } from "./
 import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport";
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { PaletteControls } from "./components/PaletteControls";
+import { PaintBrushControls } from "./components/PaintBrushControls";
+import type { BrushShape } from "./editor/brush";
+import { usePaintBrushShortcuts } from "./editor/usePaintBrushShortcuts";
 import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
@@ -196,7 +199,8 @@ export function App() {
   const [mode, setMode] = useState<Mode>("model"), [tool, setTool] = useState<Tool>("select");
   const [snap, setSnap] = useState(1);
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
-  const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState<1 | 2 | 4>(1);
+  const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState(1);
+  const [brushShape, setBrushShape] = useState<BrushShape>("square");
   const [constrainPaint, setConstrainPaint] = useState(false);
   const [search, setSearch] = useState("");
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
@@ -277,6 +281,7 @@ export function App() {
   const clearStroke = useCallback(() => {
     drag.current = null; setDraftPixels(null); setDraftTextureId(null); setCancelToken(current => current + 1);
   }, []);
+  usePaintBrushShortcuts(mode === "paint", setBrushSize, clearStroke);
   const showTexture = (id: string) => {
     clearStroke();
     // Texture navigation is view state and does not create an undo step.
@@ -391,12 +396,12 @@ export function App() {
     const mask = paintMask(source, textureId, face);
     if (mask === null) { setNotice("Choose a visible, unlocked painted face using this texture, or disable UV-constrained painting."); return; }
     try {
-      const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask);
+      const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask, brushShape);
       drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Cannot paint the active texture layer.");
     }
-  }, [color, brushSize, tool, paintMask]);
+  }, [color, brushSize, brushShape, tool, paintMask]);
   const continuePaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
     const current = drag.current; if (!current || current.textureId !== textureId) return;
     const next = continuePaintGesture(current, texel, face); drag.current = next; setDraftPixels(next.pixels);
@@ -1065,7 +1070,9 @@ export function App() {
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
-        {mode === "paint" && <TextureSurface pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
+        {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
+          brushSize={brushSize} brushShape={brushShape}
+          paintMask={constrainPaint ? (selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) : null) : undefined}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
           uvEditable={!!selected && selected.visible && !selected.locked && selected.material === "texture"}
@@ -1129,7 +1136,10 @@ export function App() {
             onEdit={change => commitDocument(change)}/>
           <div className="color-control"><input type="color" aria-label="Custom paint color" value={color} onChange={event => setColor(event.target.value)}/><span>{color.toUpperCase()}</span></div>
           <div className="paint-tool-note" role="status">{tool === "fill" ? "Bucket fills only connected pixels with exactly matching RGBA values." : tool === "eraser" ? "Eraser makes pixels fully transparent (alpha 0). Java export requires an opaque texture." : tool === "line" ? "Line previews from its original starting pixel and commits one edit on release." : tool === "rectangle" ? "Rectangle draws an outline from its original corners. Drag again to change its preview before releasing." : "Pencil paints opaque pixels. Click the eyedropper to sample an RGB color."}</div>
-          <div className="form-caption">Brush size</div><div className="segmented">{([1, 2, 4] as const).map(size => <button key={size} aria-pressed={brushSize === size} disabled={tool === "fill" || tool === "eyedropper"} onClick={() => setBrushSize(size)}>{size} px</button>)}</div>
+          <PaintBrushControls size={brushSize} shape={brushShape}
+            disabled={tool === "fill" || tool === "eyedropper"}
+            onSize={size => { clearStroke(); setBrushSize(size); }}
+            onShape={shape => { clearStroke(); setBrushShape(shape); }}/>
           <label className="face-paint-constrain">
             <input type="checkbox" aria-label="Constrain paint to selected face UV"
               checked={constrainPaint} onChange={event => { clearStroke(); setConstrainPaint(event.currentTarget.checked); }}/>

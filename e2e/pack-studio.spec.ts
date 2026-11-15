@@ -346,7 +346,8 @@ test("Java item settings import restores authored display values without replaci
   const sourceBytes = beforeFiles["models/0/document.json"]!;
   const textureBytes = beforeFiles["models/0/textures/main.png"]!;
 
-  await studio.locator('input[type="file"][accept=".zip,application/zip"]')
+  // Target the item-settings import input, not the separate Java-pack importer.
+  await studio.locator('.pack-item-header-actions input[type="file"][accept=".zip,application/zip"]')
     .setInputFiles(exported);
   await expect(studio.getByRole("group", { name: "Review imported item settings" })).toBeVisible();
   await expect(guiAngle).toHaveValue("22");
@@ -375,7 +376,7 @@ test("Java item settings import restores authored display values without replaci
   await studio.getByRole("button", { name: "Redo pack operation" }).click();
   await expect(guiAngle).toHaveValue("67");
 
-  await studio.locator('input[type="file"][accept=".zip,application/zip"]')
+  await studio.locator('.pack-item-header-actions input[type="file"][accept=".zip,application/zip"]')
     .setInputFiles({ name: "unsupported.zip", mimeType: "application/zip",
       buffer: Buffer.from("not a zip") });
   await expect(studio.getByRole("group", { name: "Review imported item settings" }))

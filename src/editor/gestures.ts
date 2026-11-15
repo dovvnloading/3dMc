@@ -2,9 +2,10 @@ import type { EditorDocument, Vec3 } from "./domain";
 import { activeTexture, setTexturePixels, textureById, updateCuboid } from "./domain";
 import type { Texel, PixelMask } from "./pixels";
 import { drawRectangle, drawStroke } from "./pixels";
+import type { BrushShape } from "./brush";
 import { activeRasterLayer, previewRasterLayer, setRasterLayerPixels } from "./layers";
 
-export type BrushSize = 1 | 2 | 4;
+export type BrushSize = number;
 export type BrushMode = "pencil" | "eraser" | "line" | "rectangle";
 export interface PaintGesture {
   /** One immutable source document, captured before any preview pixels. */
@@ -22,6 +23,7 @@ export interface PaintGesture {
   readonly mask?: PixelMask;
   readonly color: string;
   readonly size: BrushSize;
+  readonly shape: BrushShape;
   readonly alpha: 0 | 255;
 }
 
@@ -29,7 +31,7 @@ export interface PaintGesture {
 export function beginPaintGesture(
   source: EditorDocument, texel: Texel, face: string,
   color: string, size: BrushSize, brush: BrushMode = "pencil",
-  textureId = source.activeTextureId, mask?: PixelMask
+  textureId = source.activeTextureId, mask?: PixelMask, shape: BrushShape = "square"
 ): PaintGesture {
   const texture = textureById(source, textureId) ?? activeTexture(source);
   const alpha: 0 | 255 = brush === "eraser" ? 0 : 255;
@@ -40,12 +42,12 @@ export function beginPaintGesture(
     throw new Error("Show the active layer and increase its opacity before painting.");
   const raw = layer?.pixels ?? texture.pixels;
   const pixels = drawStroke(raw, texture.width, texture.height,
-    texel, texel, color, size, alpha, mask);
+    texel, texel, color, size, alpha, mask, shape);
   return {
     source, textureId: texture.id,
     pixels: layer ? previewRasterLayer(texture, layer.id, pixels) : pixels,
     ...(layer ? { layerId: layer.id, layerPixels: pixels } : {}),
-    previous: texel, start: texel, brush, mask, face, color, size, alpha
+    previous: texel, start: texel, brush, mask, face, color, size, alpha, shape
   };
 }
 
@@ -65,7 +67,7 @@ export function continuePaintGesture(
     if (face !== gesture.face) return gesture;
     const shape = gesture.brush === "line" ? drawStroke : drawRectangle;
     return { ...gesture, ...compose(shape(original, source.width, source.height,
-      gesture.start, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask)),
+      gesture.start, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask, gesture.shape)),
       previous: texel
     };
   }
@@ -73,7 +75,7 @@ export function continuePaintGesture(
   const from = face === gesture.face ? gesture.previous : texel;
   return { ...gesture,
     ...compose(drawStroke(gesture.layerPixels ?? gesture.pixels, source.width, source.height,
-      from, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask)),
+      from, texel, gesture.color, gesture.size, gesture.alpha, gesture.mask, gesture.shape)),
     previous: texel, face
   };
 }
