@@ -30,17 +30,17 @@ export function isElementRotation(value: unknown): value is ElementRotation {
     validOrigin(value.origin) && typeof value.rescale === "boolean";
 }
 
-/** Java permits omitted origin (8,8,8) and rescale (false); native source is always explicit. */
+/** The target requires an explicit pivot; omitted rescale alone defaults to false. */
 export function parseJavaElementRotation(value: unknown, context: string): ElementRotation {
   if (!isRecord(value) || Object.keys(value).some(key =>
     !["axis", "angle", "origin", "rescale"].includes(key)) ||
     !validAxis(value.axis) || !isJavaElementAngle(value.angle) ||
-    (value.origin !== undefined && !validOrigin(value.origin)) ||
+    !validOrigin(value.origin) ||
     (value.rescale !== undefined && typeof value.rescale !== "boolean"))
     throw new Error(`${context}: Unsupported element rotation. Java 1.21.4 accepts only one x/y/z axis, angles -45, -22.5, 0, 22.5 or 45°, a finite origin and boolean rescale.`);
   return {
     axis: value.axis, angle: value.angle,
-    origin: value.origin === undefined ? [8, 8, 8] : [...value.origin] as [number, number, number],
+    origin: [...value.origin] as [number, number, number],
     rescale: value.rescale ?? false
   };
 }

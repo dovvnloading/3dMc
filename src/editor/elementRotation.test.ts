@@ -49,7 +49,8 @@ describe("Java 1.21.4 single-axis element rotation", () => {
     expect(() => parseDocument({ ...original, schemaVersion: 2, cuboids: [
       { ...original.cuboids[0]!, rotation }, ...original.cuboids.slice(1)
     ] })).toThrow(/Legacy project contains unsupported element rotation/);
-    expect(parseJavaElementRotation({ axis: "z", angle: -22.5 }, "element")).toEqual({
+    expect(() => parseJavaElementRotation({ axis: "z", angle: -22.5 }, "element")).toThrow(/Unsupported/);
+    expect(parseJavaElementRotation({ axis: "z", angle: -22.5, origin: [8, 8, 8] }, "element")).toEqual({
       axis: "z", angle: -22.5, origin: [8, 8, 8], rescale: false
     });
     expect(defaultElementRotation(original.cuboids[0]!)).toEqual({
