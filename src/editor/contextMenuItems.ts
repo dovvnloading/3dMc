@@ -18,10 +18,11 @@ const compactLabels: Record<string, string> = {
 
 /** Only choose registry entries: no menu-local action or duplicate enabled logic. */
 export function buildContextMenuItems(commands: readonly EditorCommand[],
-  surface: ContextMenuSurface): ContextMenuItem[] {
+  surface: ContextMenuSurface, selectionIsGroup = false): ContextMenuItem[] {
   const byId = new Map(commands.map(command => [command.id, command]));
-  const groupAction = surface === "group" || byId.get("edit.ungroup")?.enabled
-    ? "edit.ungroup" : "edit.group";
+  // Applicability is independent of enabled state: a read-only group still
+  // needs to show a disabled Ungroup action, not a misleading Group action.
+  const groupAction = surface === "group" || selectionIsGroup ? "edit.ungroup" : "edit.group";
   const ids = surface === "empty"
     ? ["edit.select-all", "view.frame-all", "view.iso", "view.front", "view.right", "view.top"]
     : [surface === "group" ? "edit.rename-group" : "edit.rename",

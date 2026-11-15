@@ -1,6 +1,14 @@
 import type { EditorDocument } from "./domain";
 import { editableSelection, SelectionEditError } from "./selection";
 
+/** The selected source members must constitute one entire group. */
+export function findSelectedGroup(document: EditorDocument, ids: readonly string[]) {
+  const selection = new Set(ids);
+  if (!selection.size) return undefined;
+  return document.groups?.find(group => group.memberIds.length === selection.size &&
+    group.memberIds.every(id => selection.has(id)));
+}
+
 /** Grouping only organizes source parts. It never transforms geometry or game output. */
 export function groupSelection(document: EditorDocument, ids: readonly string[],
                                groupId: string, name: string): EditorDocument {

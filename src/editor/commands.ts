@@ -2,6 +2,7 @@ import type { Mode, Tool, ViewKind } from "../components/EditorViewport";
 import type { EditorDocument } from "./domain";
 import type { SymmetryMode } from "./paintGeometry";
 import { PRIMITIVE_PRESETS } from "./primitives";
+import { findSelectedGroup } from "./groups";
 import type { PrimitiveId } from "./primitives";
 
 export type CreatorPanelName = "region" | "face" | "import" | "library" | "workspace";
@@ -118,9 +119,7 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     ? "Duplicating this selection exceeds the 2,000-element limit." : null;
   const validSelectionReason = !selection.length ? "Select an element first."
     : selection.some(node => !node) ? "The selection changed. Select the elements again." : null;
-  const selectedGroup = state.document.groups?.find(group =>
-    group.memberIds.length > 0 && group.memberIds.length === state.selectedIds.length &&
-    group.memberIds.every(id => state.selectedIds.includes(id)));
+  const selectedGroup = findSelectedGroup(state.document, state.selectedIds);
   const retainedGroupCount = (state.document.groups ?? []).filter(group =>
     group.memberIds.some(id => !state.selectedIds.includes(id))).length;
   const groupReason = state.mode !== "model" ? "Switch to Model mode to group elements."

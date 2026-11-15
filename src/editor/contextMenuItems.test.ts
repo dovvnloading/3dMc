@@ -3,6 +3,7 @@ import { createSampleDocument } from "./domain";
 import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
 import { buildContextMenuItems } from "./contextMenuItems";
+import { findSelectedGroup } from "./groups";
 import type { ContextMenuSurface } from "./contextMenuItems";
 
 function fixture(changes: Partial<EditorCommandContext> = {}) {
@@ -19,7 +20,8 @@ function fixture(changes: Partial<EditorCommandContext> = {}) {
     get: (_target, prop) => (...args: unknown[]) => calls(String(prop), ...args)
   });
   const commands = createEditorCommands(state, actions);
-  const menu = (surface: ContextMenuSurface) => buildContextMenuItems(commands, surface);
+  const menu = (surface: ContextMenuSurface) =>
+    buildContextMenuItems(commands, surface, !!findSelectedGroup(state.document, state.selectedIds));
   const item = (surface: ContextMenuSurface, id: string) => {
     const found = menu(surface).find(entry => entry.command.id === id);
     if (!found) throw new Error("Missing menu item " + id);
@@ -120,6 +122,17 @@ describe("registry-backed context menus", () => {
     item("empty", "view.frame-all").command.run();
     expect(calls).toHaveBeenCalledWith("frameAll");
     expect(item("empty", "edit.select-all").command.shortcut).toBe("Ctrl/Cmd+A");
+  });
+
+  it("shows disabled Ungroup rather than Group for a protected whole group", () => {
+    const document = { ...createSampleDocument(),
+      groups: [{ id: "g", name: "Assembly", memberIds: ["body", "base"] }] };
+    const { menu, item } = fixture({
+      document, selectedIds: ["body", "base"], selectedId: "base",
+      editDisabledReason: "Read-only tab."
+    });
+    expect(menu("element").map(entry => entry.command.id)).toContain("edit.ungroup");
+    expect(item("element", "edit.ungroup").command.disabledReason).toBe("Read-only tab.");
   });
 
   it("keeps disabled reasons and guards from the registry when editing is blocked", () => {

@@ -23,7 +23,7 @@ import { setElementAngle } from "./editor/rotationCommands";
 import type { ElementAngle } from "./editor/elementRotation";
 import { SelectionArrayTools } from "./components/SelectionArrayTools";
 import { MoveSnapControl } from "./components/MoveSnapControl";
-import { groupSelection, renameGroup, ungroup } from "./editor/groups";
+import { findSelectedGroup, groupSelection, renameGroup, ungroup } from "./editor/groups";
 import { ExportIssueList } from "./components/ExportIssueList";
 import { PackStudioDialog } from "./components/PackStudioDialog";
 import { CreatorTools } from "./components/CreatorTools";
@@ -1268,7 +1268,8 @@ export function App() {
       onClose={() => setCommandPaletteOpen(false)} commands={commands}/>}
     {bootChecked && contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y}
       label={contextMenu.surface === "empty" ? "Viewport context menu" : "Element context menu"}
-      items={buildContextMenuItems(commands, contextMenu.surface)}
+      items={buildContextMenuItems(commands, contextMenu.surface,
+        !!findSelectedGroup(doc, selectedIds))}
       onClose={restore => {
         setContextMenu(null);
         if (restore && contextMenu.origin.isConnected) contextMenu.origin.focus();
