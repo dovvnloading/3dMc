@@ -923,6 +923,7 @@ export function App() {
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
+  const openCommandPalette = () => { clearStroke(); setShapeMenuOpen(false); setCommandPaletteOpen(true); };
   const commands = createEditorCommands({
     document: doc, mode, selectedIds, selectedId, sceneSearch: search,
     editDisabledReason: writerStatus !== "owned" ? "This tab does not own local recovery."
@@ -961,7 +962,7 @@ export function App() {
         <IconButton label="Undo (Ctrl/Cmd+Z)" disabled={!history.past.length} onClick={runUndo}><Undo2 size={17}/></IconButton>
         <IconButton label="Redo (Ctrl/Cmd+Shift+Z)" disabled={!history.future.length} onClick={runRedo}><Redo2 size={17}/></IconButton>
       </div>
-        <IconButton label="Command palette (Ctrl/Cmd+K)" onClick={() => setCommandPaletteOpen(true)}><Search size={17}/></IconButton>
+        <IconButton label="Command palette (Ctrl/Cmd+K)" onClick={openCommandPalette}><Search size={17}/></IconButton>
         <button className="text-button quiet new-project-trigger" aria-label="New project" title="Create a new project" onClick={() => setNewProjectOpen(true)}><FilePlus2 size={16}/>New</button>
         <input type="file" ref={fileRef} accept=".3dmc,.json,application/json,application/zip" hidden onChange={chooseProject}/>
         <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc native project or legacy JSON"><FolderOpen size={16}/>Open</button>
@@ -1202,7 +1203,7 @@ export function App() {
       <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
     </>}
-    {bootChecked && <CommandPalette open={commandPaletteOpen} onOpen={() => setCommandPaletteOpen(true)}
+    {bootChecked && <CommandPalette open={commandPaletteOpen} onOpen={openCommandPalette}
       onClose={() => setCommandPaletteOpen(false)} commands={commands}/>}
     {recoveryDetailsOpen && <RecoveryDetailsDialog
       writer={writerStatus} status={recoveryStatus} session={openSession} revision={history.revision}
