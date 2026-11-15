@@ -24,7 +24,11 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   const red = picker.getByRole("textbox", { name: "R channel" });
   const green = picker.getByRole("textbox", { name: "G channel" });
   const blue = picker.getByRole("textbox", { name: "B channel" });
-  await hex.fill("#123456");
+  await hex.fill("");
+  await hex.pressSequentially("#123");
+  await expect(hex).toHaveValue("#123");
+  await expect(trigger).toContainText("#C76D68");
+  await hex.pressSequentially("456");
   await expect(trigger).toContainText("#123456");
   await expect(red).toHaveValue("18");
   await expect(green).toHaveValue("52");
