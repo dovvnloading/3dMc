@@ -103,7 +103,7 @@ describe("rotation-aware selection operations", () => {
         const corners = transformedCorners(after);
         for (const corner of transformedCorners(before)) {
           const reflected = corner.map((value, i) => i === axis ? sum - value : value);
-          // Java source coordinates are stored to four decimal places.
+          // Small floating-point differences are allowed at the rendered corners.
           const error = Math.min(...corners.map(value =>
             Math.hypot(...value.map((part, i) => part - reflected[i]!))));
           expect(error).toBeLessThan(0.0005);
@@ -128,6 +128,17 @@ describe("rotation-aware selection operations", () => {
       expect(undo(commit(createHistory(source), mirrored)).present).toBe(source);
     }
     expect(JSON.stringify(source)).toBe(original);
+  });
+
+  it("round-trips fractional source coordinates and off-center pivots without four-decimal truncation", () => {
+    const source = createSampleDocument();
+    source.cuboids[0] = { ...source.cuboids[0]!,
+      from: [3.123456789, 3, 3], to: [13.123456789, 12, 13],
+      rotation: { axis: "y", angle: 22.5, origin: [4.987654321, 7.5, 8], rescale: true } };
+    for (const axis of axes) {
+      const mirror = mirrorSelection(source, ["body", "base"], axis);
+      expect(mirrorSelection(mirror, ["body", "base"], axis).cuboids).toEqual(source.cuboids);
+    }
   });
 
   it("publishes mirrored rotation-only changes rather than treating symmetric bounds as a no-op", () => {
