@@ -115,7 +115,14 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
     <button type="button" className="color-picker-trigger" ref={trigger}
       aria-label={label} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? id : undefined} disabled={disabled}
-      onClick={() => setOpen(previous => !previous)}>
+      onClick={() => {
+        // A dismissed invalid draft must not survive when the picker reopens.
+        if (!open) {
+          setHexDraft((normalizeHex(value) ?? "#000000").toUpperCase());
+          setRgbDraft(channelDrafts(value));
+        }
+        setOpen(previous => !previous);
+      }}>
       <span className="color-picker-preview" style={{ backgroundColor: value }} aria-hidden="true"/>
       <span className="color-picker-value">{value.toUpperCase()}</span>
       <span aria-hidden="true" className="color-picker-chevron">{open ? "▴" : "▾"}</span>
