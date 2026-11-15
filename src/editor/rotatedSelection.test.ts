@@ -143,6 +143,18 @@ describe("rotation-aware selection operations", () => {
     }
   });
 
+  it("restores an already aligned and distributed selection exactly after two reflections", () => {
+    const source = createSampleDocument();
+    source.cuboids[0] = { ...source.cuboids[0]!,
+      rotation: { axis: "z", angle: -22.5, origin: [5.25, 7.5, 8], rescale: true } };
+    const aligned = alignSelection(source, ["body", "base"], 0, "minimum");
+    const distributed = distributeSelection(aligned, ["body", "base", "roof"], 1);
+    for (const axis of axes) {
+      const mirrored = mirrorSelection(distributed, ["body", "base", "roof"], axis);
+      expect(mirrorSelection(mirrored, ["body", "base", "roof"], axis).cuboids).toEqual(distributed.cuboids);
+    }
+  });
+
   it("publishes mirrored rotation-only changes rather than treating symmetric bounds as a no-op", () => {
     const source = createSampleDocument();
     source.cuboids[0] = { ...source.cuboids[0]!,
