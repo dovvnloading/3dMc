@@ -77,7 +77,10 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   };
   const editReason = state.editDisabledReason;
   const editOr = (reason: string | null) => editReason ?? reason;
-  const selection = state.selectedIds.map(id => state.document.cuboids.find(node => node.id === id));
+  // A large multi-selection can contain every cuboid. Avoid a quadratic scan
+  // of the entire scene every time the command palette/editor re-renders.
+  const byId = new Map(state.document.cuboids.map(node => [node.id, node] as const));
+  const selection = state.selectedIds.map(id => byId.get(id));
   const protectedNode = selection.find(node => node && (!node.visible || node.locked));
   const selectionReason = state.mode !== "model" ? "Switch to Model mode to edit the selection."
     : !selection.length ? "Select at least one element first."
@@ -85,8 +88,9 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     : protectedNode ? "“" + protectedNode.name + "” is " +
       (protectedNode.locked ? "locked" : "hidden") + ". Unlock or show it first."
     : null;
+  const sceneQuery = state.sceneSearch.toLowerCase();
   const matchingEditable = state.document.cuboids.filter(node => node.visible && !node.locked &&
-    node.name.toLowerCase().includes(state.sceneSearch.toLowerCase())).length;
+    node.name.toLowerCase().includes(sceneQuery)).length;
   const duplicateLimitReason = state.document.cuboids.length + selection.length > 2000
     ? "Duplicating this selection exceeds the 2,000-element limit." : null;
   const selectAllReason = state.mode !== "model" ? "Switch to Model mode to select elements."
@@ -169,7 +173,7 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     null, undefined, ["help", "layouts"]);
   add("dialog.region", "Open pixel region tools", "Dialog", () => actions.openCreatorPanel("region"),
     editOr(paintToolReason), undefined, ["select copy paste mirror pixels"]);
-  const selected = state.document.cuboids.find(node => node.id === state.selectedId);
+  const selected = byId.get(state.selectedId ?? "");
   add("dialog.face", "Open face tools", "Dialog", () => actions.openCreatorPanel("face"),
     editOr(paintToolReason ?? (!selected || selected.material !== "texture" ?
       "Select a textured element to edit its faces." : null)), undefined, ["uv", "texture"]);
