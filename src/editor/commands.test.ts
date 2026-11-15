@@ -187,6 +187,31 @@ describe("editor command registry", () => {
     const unsupported = { ...state.document, target: { ...state.document.target, candidateRelease: "26.3" as const } };
     expect(get("dialog.pack-studio", { document: unsupported }).disabledReason).toContain("1.21.4");
   });
+  it("exposes session projection and overlays with non-colliding view shortcuts", () => {
+    const { commands, actions, get } = fixture();
+    const projection = get("view.projection");
+    expect(projection.shortcut).toBe("Numpad5");
+    expect(projection.title).toContain("Orthographic");
+    projection.run();
+    get("view.grid").run();
+    get("view.axes").run();
+    get("view.outline").run();
+    expect(actions.toggleProjection).toHaveBeenCalledOnce();
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("grid");
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("axes");
+    expect(actions.toggleViewportDisplay).toHaveBeenCalledWith("outline");
+    const toggled = commands({ viewportDisplay: {
+      projection: "orthographic", grid: false, axes: true, outline: false
+    } });
+    expect(toggled.find(command => command.id === "view.projection")?.title).toContain("Perspective");
+    expect(toggled.find(command => command.id === "view.grid")?.title).toBe("Show grid");
+    expect(toggled.find(command => command.id === "view.axes")?.title).toBe("Hide XYZ axes");
+    for (const [id, shortcut] of [["view.grid", "Shift+1"], ["view.axes", "Shift+2"],
+      ["view.outline", "Shift+3"]] as const) {
+      expect(toggled.find(command => command.id === id)?.shortcut).toBe(shortcut);
+      expect(resolveEditorShortcut(toggled, shortcut).command?.id).toBe(id);
+    }
+  });
 });
 
 describe("shortcut reference", () => {
@@ -283,6 +308,12 @@ describe("shortcut reference", () => {
     expect(key({ key: "Delete", shiftKey: true })).toBe("Delete");
     expect(key({ key: "Escape", shiftKey: true })).toBe("Esc");
     expect(key({ key: "{", shiftKey: true })).toBeNull();
+    expect(key({ key: "5", code: "Numpad5" })).toBe("Numpad5");
+    expect(key({ key: "Clear", code: "Numpad5" })).toBe("Numpad5");
+    expect(key({ key: "5", code: "Numpad5", ctrlKey: true })).toBeNull();
+    expect(key({ key: "!", code: "Digit1", shiftKey: true })).toBe("Shift+1");
+    expect(key({ key: "@", code: "Digit2", shiftKey: true })).toBe("Shift+2");
+    expect(key({ key: "#", code: "Digit3", shiftKey: true })).toBe("Shift+3");
     expect(key({ isComposing: true })).toBeNull();
   });
 });

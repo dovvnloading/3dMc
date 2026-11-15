@@ -11,7 +11,7 @@ export function ViewportAxes({ bounds }: { bounds: FrameBounds }) {
   ];
   return <group>
     <axesHelper args={[length]} raycast={() => {}}/>
-    {axes.map(axis => <Html key={axis.label} position={axis.point} center pointerEvents="none">
+    {axes.map(axis => <Html key={axis.label} position={[axis.point[0], axis.point[1], axis.point[2]]} center pointerEvents="none">
       <span aria-label={axis.label + " axis"} style={{ color: axis.color, fontWeight: 800,
         fontSize: 13, textShadow: "0 1px 3px #111", pointerEvents: "none" }}>{axis.label}</span>
     </Html>)}
