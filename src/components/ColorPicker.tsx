@@ -63,14 +63,17 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
     };
   }, [open]);
 
-  const emit = (next: string) => {
+  const emit = (next: string, fromHsv = false) => {
     if (next === normalizeHex(value)) return;
+    // Text fields must update the SV cursor/hue too. HSV interactions already
+    // carry more precise values (including a hue invisible at S=0 or V=0).
+    if (!fromHsv) setHsv(hexToHsv(next)!);
     lastEmitted.current = next;
     onChange(next);
   };
   const chooseHsv = (next: HSV) => {
     setHsv(next);
-    emit(hsvToHex(next));
+    emit(hsvToHex(next), true);
   };
   const choosePointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
