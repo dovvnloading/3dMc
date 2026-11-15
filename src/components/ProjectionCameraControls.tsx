@@ -162,12 +162,14 @@ export function ProjectionCameraControls({ view, projection, document, selectedI
     invalidate();
   }, [projection, camera, aspect, diagnostics, invalidate, set, sceneBounds, showGrid]);
 
-  // R3F updates the perspective camera aspect automatically on resize; an
-  // orthographic camera's horizontal frustum needs an equivalent update.
+  // R3F updates perspective aspect automatically on resize, but orthographic
+  // horizontal span needs an explicit update. Either projection must also
+  // refresh clipping after a model edit or grid toggle without moving the view.
   useEffect(() => {
-    if (!(camera instanceof THREE.OrthographicCamera)) return;
-    const span = Math.abs(camera.top - camera.bottom) / 2;
-    setOrthographicSpan(camera, span, aspect);
+    if (camera instanceof THREE.OrthographicCamera) {
+      const span = Math.abs(camera.top - camera.bottom) / 2;
+      setOrthographicSpan(camera, span, aspect);
+    }
     sync(false);
   }, [camera, aspect, sync]);
 
