@@ -156,6 +156,9 @@ export function ProjectionCameraControls({ view, projection, document, selectedI
         perspectiveDistanceForHalfHeight(halfHeight, next.fov));
     }
     next.lookAt(orbitTarget);
+    // Zoom and aspect can change even when near/far happen to match the
+    // cached camera (e.g. toggling after entering the narrower Paint layout).
+    next.updateProjectionMatrix();
     updateDepth(next, orbitTarget, focusRadius.current ?? 1, aspect, sceneBounds, showGrid);
     next.updateMatrixWorld(true);
     cameraRef.current = next;
@@ -214,6 +217,7 @@ export function ProjectionCameraControls({ view, projection, document, selectedI
       } else {
         active.zoom = 1;
         active.aspect = aspect;
+        active.updateProjectionMatrix();
       }
       active.position.copy(position);
       orbit.target.copy(home);
