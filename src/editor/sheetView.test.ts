@@ -9,9 +9,9 @@ const hit = (x: number, y: number, view: ReturnType<typeof sheetFitView>, w: num
 
 describe("texture sheet coordinate transform", () => {
   it("maps every texel center precisely after arbitrary anchored zoom and pan", () => {
-    for (const [width, height] of [[1, 1], [16, 16], [64, 64], [13, 31], [64, 1]]) {
+    for (const [width, height] of [[1, 1], [16, 16], [64, 64], [13, 31], [64, 1]] as const) {
       let view = sheetResetView(width, height, frame.width, frame.height);
-      for (const [x, y, zoom] of [[56, 75, 2.5], [160, 110, 11.75], [220, 180, 48.5]]) {
+      for (const [x, y, zoom] of [[56, 75, 2.5], [160, 110, 11.75], [220, 180, 48.5]] as const) {
         view = sheetZoomAt(view, zoom, x, y, width, height, frame.width, frame.height);
         view = sheetPan(view, 17, -21, width, height, frame.width, frame.height);
         for (const px of [0, Math.floor(width / 2), width - 1])
@@ -30,7 +30,7 @@ describe("texture sheet coordinate transform", () => {
     expect((at.y - next.y) / next.zoom).toBeCloseTo(originalY, 10);
   });
   it("clamps zoom without losing the image and fits rectangular sizes", () => {
-    for (const [w, h] of [[1, 1], [64, 64], [64, 16], [9, 31]]) {
+    for (const [w, h] of [[1, 1], [64, 64], [64, 16], [9, 31]] as const) {
       const fit = sheetFitView(w, h, 260, 180);
       expect(fit.zoom).toBeGreaterThanOrEqual(1);
       expect(fit.zoom).toBeLessThanOrEqual(64);
