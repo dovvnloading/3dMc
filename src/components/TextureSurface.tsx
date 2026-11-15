@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
+import { insideMask } from "../editor/pixels";
 import type { Texel, PixelMask } from "../editor/pixels";
+import { mirroredTexels } from "../editor/paintGeometry";
+import type { PaintModifiers, SymmetryMode } from "../editor/paintGeometry";
 import type { BrushShape } from "../editor/brush";
 import { brushTexels, footprintOutline } from "../editor/brush";
 import type { FaceDirection, FaceUV, FaceUVRect } from "../editor/domain";
@@ -9,6 +12,7 @@ import { clampSheetView, sheetContainsPoint, sheetFitView, sheetPan,
   sheetPointToTexel, sheetResetView, sheetZoomAt } from "../editor/sheetView";
 import type { SheetView } from "../editor/sheetView";
 import { UVRegionOverlay } from "./UVRegionOverlay";
+import { SymmetryGuides } from "./SymmetryGuides";
 import type { Tool } from "./EditorViewport";
 import { Minus, Plus } from "lucide-react";
 import "./texture-sheet.css";
@@ -23,14 +27,15 @@ interface Props {
   color: string;
   brushSize: number;
   brushShape: BrushShape;
+  symmetry: SymmetryMode;
   paintMask?: PixelMask | null;
   painting: boolean;
   face: FaceUV | null;
   faceName: FaceDirection | null;
   uvEditable: boolean;
   onCommitUV: (source: FaceUV, rect: FaceUVRect) => void;
-  onBegin: (texel: Texel, face: string) => void;
-  onMove: (texel: Texel, face: string) => void;
+  onBegin: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
+  onMove: (texel: Texel, face: string, textureId: string, modifiers?: PaintModifiers) => void;
   onEnd: () => void;
   onCancel: () => void;
   onSample: (texel: Texel) => void;
@@ -55,6 +60,7 @@ export function TextureSurface(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const strokePointer = useRef<number | null>(null);
+  const lastStrokeTexel = useRef<Texel>([0, 0]);
   const pan = useRef<PanGesture | null>(null);
   const pointerOver = useRef(false);
   const space = useRef(false);
@@ -159,6 +165,24 @@ export function TextureSurface(props: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    // Shift and Alt must refresh a held shape even if the pointer stops moving.
+    const updateModifiers = (event: globalThis.KeyboardEvent) => {
+      if (strokePointer.current === null ||
+          (props.tool !== "rectangle" && props.tool !== "ellipse") ||
+          (event.key !== "Shift" && event.key !== "Alt")) return;
+      event.preventDefault();
+      props.onMove(lastStrokeTexel.current, FACE, props.textureId,
+        { shiftKey: event.shiftKey, altKey: event.altKey });
+    };
+    window.addEventListener("keydown", updateModifiers);
+    window.addEventListener("keyup", updateModifiers);
+    return () => {
+      window.removeEventListener("keydown", updateModifiers);
+      window.removeEventListener("keyup", updateModifiers);
+    };
+  }, [props.tool, props.textureId, props.onMove]);
+
   useEffect(() => { setEditUV(false); }, [props.tool]);
   useEffect(() => { if (!props.face || !props.uvEditable) setEditUV(false); },
     [props.face, props.uvEditable]);
@@ -214,10 +238,12 @@ export function TextureSurface(props: Props) {
     event.currentTarget.focus();
     if (props.tool === "eyedropper") { props.onSample(point); return; }
     if (props.tool === "fill") { props.onFill(point); return; }
-    if (!["pencil", "eraser", "line", "rectangle"].includes(props.tool)) return;
+    if (!["pencil", "eraser", "line", "rectangle", "ellipse"].includes(props.tool)) return;
     strokePointer.current = event.pointerId;
+    lastStrokeTexel.current = point;
     event.currentTarget.setPointerCapture(event.pointerId);
-    props.onBegin(point, FACE);
+    props.onBegin(point, FACE, props.textureId,
+      { shiftKey: event.shiftKey, altKey: event.altKey });
   };
   const pointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
     const bounds = viewportRef.current!.getBoundingClientRect();
@@ -225,12 +251,17 @@ export function TextureSurface(props: Props) {
       viewRef.current, props.width, props.height));
     const point = pointAt(event);
     setCursor(point);
-    if (strokePointer.current === event.pointerId) props.onMove(point, FACE);
+    if (strokePointer.current === event.pointerId) {
+      lastStrokeTexel.current = point;
+      props.onMove(point, FACE, props.textureId,
+        { shiftKey: event.shiftKey, altKey: event.altKey });
+    }
   };
   const pointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
     if (strokePointer.current !== event.pointerId) return;
     strokePointer.current = null;
-    props.onMove(pointAt(event), FACE);
+    props.onMove(pointAt(event), FACE, props.textureId,
+      { shiftKey: event.shiftKey, altKey: event.altKey });
     props.onEnd();
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -291,18 +322,27 @@ export function TextureSurface(props: Props) {
       event.preventDefault();
       if (props.tool === "fill") props.onFill(cursor);
       else if (props.tool === "eyedropper") props.onSample(cursor);
-      else if (["pencil", "eraser", "line", "rectangle"].includes(props.tool)) {
-        props.onBegin(cursor, FACE); props.onEnd();
+      else if (["pencil", "eraser", "line", "rectangle", "ellipse"].includes(props.tool)) {
+        props.onBegin(cursor, FACE, props.textureId); props.onEnd();
       }
     } else if (event.key === "Escape") {
       event.preventDefault(); event.stopPropagation(); props.onCancel();
     }
   };
-  const focusTexels = useMemo(() => props.paintMask === null ? [] : brushTexels(cursor,
-    ["pencil", "eraser", "line", "rectangle"].includes(props.tool) ? props.brushSize : 1,
-    ["pencil", "eraser", "line", "rectangle"].includes(props.tool) ? props.brushShape : "square",
-    props.width, props.height, props.paintMask),
-  [cursor, props.tool, props.brushSize, props.brushShape, props.width, props.height, props.paintMask]);
+  const focusTexels = useMemo(() => {
+    if (props.paintMask === null) return [];
+    const paintTool = ["pencil", "eraser", "line", "rectangle", "ellipse"].includes(props.tool);
+    const source = brushTexels(cursor, paintTool ? props.brushSize : 1,
+      paintTool ? props.brushShape : "square", props.width, props.height);
+    const visited = new Set<string>();
+    return source.flatMap(point => mirroredTexels(point, props.width, props.height, props.symmetry))
+      .filter(([x, y]) => {
+        const key = x + "," + y;
+        if (visited.has(key) || !insideMask(props.paintMask ?? undefined, x, y)) return false;
+        visited.add(key); return true;
+      });
+  }, [cursor, props.tool, props.brushSize, props.brushShape,
+    props.width, props.height, props.paintMask, props.symmetry]);
   const outline = useMemo(() => footprintOutline(focusTexels), [focusTexels]);
   const zoomLabel = (Math.round(view.zoom * 10) / 10).toString() + "×";
 
@@ -359,6 +399,7 @@ export function TextureSurface(props: Props) {
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}/>
         {showGrid && view.zoom >= 6 && <div aria-hidden="true" className="sheet-pixel-grid"
           style={{ backgroundSize: `${view.zoom}px ${view.zoom}px` }}/>}
+        <SymmetryGuides mode={props.symmetry} width={props.width} height={props.height} zoom={view.zoom}/>
         {props.face && props.faceName && <UVRegionOverlay
           face={props.face} name={props.faceName}
           width={props.width} height={props.height} zoom={view.zoom}
