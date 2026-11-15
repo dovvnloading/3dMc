@@ -24,6 +24,7 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   const red = picker.getByRole("textbox", { name: "R channel" });
   const green = picker.getByRole("textbox", { name: "G channel" });
   const blue = picker.getByRole("textbox", { name: "B channel" });
+  await expect(hex).toHaveValue("#C76D68");
   await hex.fill("");
   await hex.pressSequentially("#123");
   await expect(hex).toHaveValue("#123");
@@ -35,6 +36,7 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   await expect(blue).toHaveValue("86");
   const hue = picker.getByRole("slider", { name: "Hue" });
   await expect(hue).toHaveValue("210");
+  await expect(hue).toHaveCSS("background-image", /linear-gradient/);
   await expect(square).toHaveAttribute("aria-valuetext", "Saturation 79%, brightness 34%");
   await red.fill("34");
   await expect(hex).toHaveValue("#223456");
