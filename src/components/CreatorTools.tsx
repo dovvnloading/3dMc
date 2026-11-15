@@ -91,7 +91,9 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
         <dt>W / R / V</dt><dd>Move, resize and select. Numeric inspector fields provide exact alternatives.</dd>
         <dt>Ctrl/Cmd + D</dt><dd>Duplicate the complete editable selection as one undo step.</dd>
         <dt>B / E / G / I</dt><dd>Pencil, eraser, connected RGBA fill and eyedropper in Paint mode.</dd>
-        <dt>L / U</dt><dd>Line and rectangle outline in Paint mode.</dd>
+        <dt>L / U / O</dt><dd>Line, rectangle and ellipse in Paint mode. Fill rectangles and ellipses from the Paint inspector.</dd>
+        <dt>M</dt><dd>Cycle texture symmetry: Off → Mirror X → Mirror Y → Both axes.</dd>
+        <dt>Shift / Alt while dragging</dt><dd>Constrain shapes to square/circle; draw from the centre. Combine both modifiers as needed.</dd>
         <dt>[ / ]</dt><dd>Decrease or increase brush size by one texel, 1–16.</dd>
         <dt>+ / - / 0</dt><dd>Zoom in, zoom out or reset the 2D texture sheet when focused.</dd>
         <dt>Wheel / Space+drag / middle-drag</dt><dd>Zoom under the cursor or pan the texture sheet. Fit and Reset are also visible buttons.</dd>
