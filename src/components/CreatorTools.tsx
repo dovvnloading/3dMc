@@ -4,6 +4,7 @@ import type { EditorDocument, FaceDirection } from "../editor/domain";
 import { activeTexture } from "../editor/domain";
 import type { PixelClipboard } from "../editor/regions";
 import type { Mode } from "./EditorViewport";
+import type { CreatorPanelName } from "../editor/commands";
 import type { PackSnapshot } from "../pack/packSession";
 import type { NativePackProject } from "../editor/nativePackArchive";
 import { CreatorDialog } from "./CreatorDialog";
@@ -13,9 +14,9 @@ import { ExternalModelDialog } from "./ExternalModelDialog";
 import { ProjectLibraryDialog } from "./ProjectLibraryDialog";
 import "./creator-tools.css";
 
-type Panel = "region" | "face" | "import" | "library" | "workspace" | null;
+type Panel = CreatorPanelName | null;
 export function CreatorTools({ document, revision, pack, mode, selectedId, face, onApply, onOpen, onOpenPack,
-  onBackup, onLayout, onCancelGesture, onNewProject, onModeChange, onExport, libraryRequest = 0 }: {
+  onBackup, onLayout, onCancelGesture, onNewProject, onModeChange, onExport, libraryRequest = 0, paletteRequest }: {
   document: EditorDocument; revision: number; pack?: PackSnapshot | null; mode: Mode; selectedId: string | null; face: FaceDirection;
   onApply: (operation: (document: EditorDocument) => EditorDocument) => boolean;
   onOpen: (document: EditorDocument) => Promise<boolean>;
@@ -23,6 +24,7 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
   onLayout: (layout: "balanced" | "canvas" | "paint") => void; onCancelGesture: () => void;
   onNewProject: () => void; onModeChange: (mode: Mode) => void; onExport: () => void;
   libraryRequest?: number;
+  paletteRequest?: { panel: CreatorPanelName; nonce: number } | null;
 }) {
   const [panel, setPanel] = useState<Panel>(null), [source, setSource] = useState<EditorDocument | null>(null);
   const [clipboard, setClipboard] = useState<PixelClipboard | null>(null);
@@ -44,6 +46,13 @@ export function CreatorTools({ document, revision, pack, mode, selectedId, face,
       open("library");
     }
   }, [libraryRequest]);
+  const lastPaletteNonce = useRef(paletteRequest?.nonce);
+  useEffect(() => {
+    if (paletteRequest && paletteRequest.nonce !== lastPaletteNonce.current) {
+      lastPaletteNonce.current = paletteRequest.nonce;
+      open(paletteRequest.panel);
+    }
+  }, [paletteRequest]);
   const startTask = (task: "new" | "model" | "paint" | "save" | "export") => {
     close();
     if (task === "new") onNewProject();
