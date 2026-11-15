@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { hexToHsv, hsvToHex, normalizeHex, parseHex, parseRgbChannel, rgbToHex } from "../editor/color";
 import type { HSV } from "../editor/color";
 import "./color-picker.css";
@@ -45,10 +45,10 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
   useEffect(() => {
     if (!open) return;
     square.current?.focus();
-    const onOutsidePointer = (event: globalThis.PointerEvent) => {
+    const onOutsidePointer = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
-    const onEscape = (event: globalThis.KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
@@ -72,7 +72,7 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
     setHsv(next);
     emit(hsvToHex(next));
   };
-  const choosePointer = (event: PointerEvent<HTMLDivElement>) => {
+  const choosePointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     chooseHsv({
@@ -81,7 +81,7 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
       v: clamp(1 - (event.clientY - rect.top) / rect.height)
     });
   };
-  const onSquareKey = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onSquareKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? .1 : .01;
     let next: HSV | null = null;
     switch (event.key) {
