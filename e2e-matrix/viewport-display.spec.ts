@@ -65,6 +65,32 @@ test("projection can switch via button, keypad and palette without changing the 
   for (const shortcut of ["Numpad5", "Shift+1", "Shift+2", "Shift+3"])
     await expect(reference).toContainText(shortcut);
   await page.keyboard.press("Escape");
+
+  // Exercise orthographic zoom, orbit and pan on the real rendered canvas.
+  const beforeZoom = await cameraSnapshot(page);
+  const center = { x: box.x + box.width * .7, y: box.y + box.height * .5 };
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.wheel(0, -220);
+  await expect.poll(async () => (await cameraSnapshot(page)).halfHeight)
+    .toBeLessThan(beforeZoom.halfHeight);
+  const beforeOrbit = await cameraSnapshot(page);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 75, center.y + 30, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => {
+    const next = await cameraSnapshot(page);
+    return Math.hypot(...next.direction.map((value, axis) =>
+      value - beforeOrbit.direction[axis]!));
+  }).toBeGreaterThan(0.01);
+  const beforePan = await cameraSnapshot(page);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(center.x + 130, center.y + 70, { steps: 5 });
+  await page.mouse.up({ button: "right" });
+  await expect.poll(async () => {
+    const next = await cameraSnapshot(page);
+    return Math.hypot(...next.target.map((value, axis) =>
+      value - beforePan.target[axis]!));
+  }).toBeGreaterThan(0.005);
   expect(errors).toEqual([]);
 });
 
@@ -79,6 +105,8 @@ test("display settings persist across modes; frames, picks, gizmos and model pai
   await page.getByRole("button", { name: "Toggle grid (Shift+1)" }).click();
   await page.keyboard.press("Shift+2");
   await page.getByRole("button", { name: "Toggle selection outlines (Shift+3)" }).click();
+  for (const axis of ["X", "Y", "Z"])
+    await expect(page.getByLabel(axis + " axis")).toBeVisible();
   const grid = page.getByRole("button", { name: "Toggle grid (Shift+1)" });
   const axes = page.getByRole("button", { name: "Toggle axes (Shift+2)" });
   const outline = page.getByRole("button", { name: "Toggle selection outlines (Shift+3)" });
@@ -148,6 +176,8 @@ test("display settings persist across modes; frames, picks, gizmos and model pai
     await page.mouse.up();
   }
   expect(acquired).toBe(true);
+  // Front view's central ray lands on the textured body, not the solid canopy.
+  await page.getByRole("button", { name: "View front" }).click();
   await page.getByRole("tab", { name: "Paint" }).click();
   await page.getByRole("button", { name: "Pixel pencil (B)" }).click();
   await page.getByRole("button", { name: "Choose color #c76d68" }).click();
