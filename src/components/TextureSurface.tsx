@@ -264,7 +264,10 @@ export function TextureSurface(props: Props) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (editUV) {
-      if (event.key === "Escape") { event.preventDefault(); setEditUV(false); }
+      // Escape from the UV overlay cancels its active drag; do not also close edit mode.
+      if (event.key === "Escape" && event.target === canvasRef.current) {
+        event.preventDefault(); setEditUV(false);
+      }
       return;
     }
     if (event.key === "+" || event.key === "=") {

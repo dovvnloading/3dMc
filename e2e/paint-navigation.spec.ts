@@ -11,7 +11,9 @@ test("texture zoom remains cursor-anchored; pan never paints; fit/reset and grid
   await expect(zoom).toHaveText("8×");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("Texture bitmap is missing");
-  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  // Anchor inside a texel, not precisely on an ambiguous pixel boundary.
+  const x = box.x + (12.5 / 32) * box.width;
+  const y = box.y + (12.5 / 32) * box.height;
   await page.mouse.move(x, y);
   const previousTexel = await page.locator(".texture-footer").innerText();
   await page.mouse.wheel(0, -240);
