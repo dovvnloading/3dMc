@@ -360,7 +360,7 @@ function Scene(props: ViewportProps) {
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}
-    <CameraControls view={props.view} projection={props.display.projection} document={props.document} selectedIds={ids}/>
+    <CameraControls view={props.view} projection={props.display.projection} document={props.document} selectedIds={ids} showGrid={props.display.grid}/>
   </>;
 }
 

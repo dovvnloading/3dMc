@@ -52,10 +52,10 @@ export function orthographicVisibleHalfHeight(top: number, bottom: number, zoom:
  * The near/far planes scale with the framed subject, not hard-coded 0.01/100
  * coordinates. The camera must be outside the subject for a complete fit.
  */
-export function projectionClipping(distance: number, depthRadius: number): { near: number; far: number } {
+export function projectionClipping(distance: number, depthRadius: number, requiredFar = 0): { near: number; far: number } {
   const d = positive(distance, MIN_CAMERA_SCALE), radius = positive(depthRadius, MIN_CAMERA_SCALE);
   const near = Math.max(MIN_CAMERA_SCALE, Math.min(d / 1000,
     Math.max(d - radius * 1.5, MIN_CAMERA_SCALE) / 2));
-  const far = Math.max(near * 2, d + radius * 2.5);
+  const far = Math.max(near * 2, d + radius * 2.5, Number.isFinite(requiredFar) ? requiredFar : 0);
   return { near, far };
 }

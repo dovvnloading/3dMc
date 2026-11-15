@@ -52,6 +52,8 @@ describe("projection and framing", () => {
   });
 
   it("never produces collapsed frusta or a clipped far plane for tiny or huge subjects", () => {
+    expect(projectionClipping(4, 1, 50).far).toBe(50);
+    expect(projectionClipping(4, 1, 1).far).toBeGreaterThan(4);
     for (const radius of [0, 1e-10, 1e-6, 1, 3e7]) {
       for (const aspect of [0.3, 1, 3.5]) {
         const half = orthographicFrameHalfHeight(radius, aspect);
