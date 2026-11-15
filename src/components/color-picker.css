@@ -1,0 +1,26 @@
+.color-picker { width:100%; min-width:0; margin-bottom:14px; }
+.color-picker-trigger { width:100%; display:flex; align-items:center; gap:10px; min-height:36px; padding:3px 8px 3px 3px;
+  border:1px solid var(--interactive-border); border-radius:6px; background:var(--control);
+  color:var(--secondary); text-align:left; font-size:12px; }
+.color-picker-trigger:hover:not(:disabled) { background:#363e49; }
+.color-picker-preview { width:34px; height:27px; border:1px solid #b8c0cd; border-radius:4px; flex:none; }
+.color-picker-value { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+.color-picker-chevron { margin-left:auto; color:var(--muted); }
+.color-picker-panel { width:100%; min-width:0; margin-top:6px; padding:11px;
+  border:1px solid var(--divider); border-radius:7px; background:var(--raised); display:grid; gap:8px; }
+.color-picker-square { position:relative; width:min(100%,225px); aspect-ratio:1; margin-inline:auto;
+  border:1px solid #8290a4; border-radius:4px; cursor:crosshair; touch-action:none; }
+.color-picker-cursor { position:absolute; width:14px; height:14px; border:2px solid #fff; border-radius:50%;
+  box-shadow:0 0 0 1px #111,0 1px 4px #000a; transform:translate(-50%,-50%); pointer-events:none; }
+.color-picker-help { font-size:10px; color:var(--muted); text-align:center; }
+.color-picker-hue-label { display:flex; justify-content:space-between; align-items:center; font-size:11px;
+  color:var(--secondary); }
+.color-picker-hue { width:100%; height:16px; margin:0; accent-color:var(--accent);
+  cursor:pointer; background:transparent; }
+.color-picker-fields { display:grid; grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr)); gap:6px; }
+.color-picker-fields label { min-width:0; display:grid; gap:4px; color:var(--secondary); font-size:10px; }
+.color-picker-fields input { width:100%; min-width:0; height:29px; border:1px solid var(--interactive-border);
+  border-radius:4px; background:var(--control); color:var(--text); padding:4px 5px; font-size:11px; }
+.color-picker-fields input[aria-invalid="true"] { border-color:var(--error); }
+.color-picker-square:focus-visible,.color-picker-trigger:focus-visible,.color-picker-hue:focus-visible,
+.color-picker-fields input:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
