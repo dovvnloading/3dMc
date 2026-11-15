@@ -8,9 +8,11 @@ export function useTextureSymmetry(session: number, textureId: string) {
   const [modes, setModes] = useState<Record<string, SymmetryMode>>({});
   const key = session + ":" + textureId;
   const symmetry: SymmetryMode = modes[key] ?? "off";
+  const symmetryFor = useCallback((id: string): SymmetryMode =>
+    modes[session + ":" + id] ?? "off", [modes, session]);
   const setSymmetry = useCallback((mode: SymmetryMode) =>
     setModes(current => ({ ...current, [key]: mode })), [key]);
   const cycleSymmetry = useCallback(() =>
     setModes(current => ({ ...current, [key]: nextSymmetry(current[key] ?? "off") })), [key]);
-  return { symmetry, setSymmetry, cycleSymmetry };
+  return { symmetry, symmetryFor, setSymmetry, cycleSymmetry };
 }
