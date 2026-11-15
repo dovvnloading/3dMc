@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { hexToHsv, hsvToHex, hsvToRgb, normalizeHex, parseHex, parseRgbChannel, rgbToHex, rgbToHsv } from "./color";
+import { hexToHsv, hsvToHex, hsvToRgb, normalizeHex, parseFullHex, parseHex, parseRgbChannel, rgbToHex, rgbToHsv } from "./color";
 
 describe("colour conversion", () => {
   it("parses/canonicalizes long and short hex at channel edges", () => {
     expect(normalizeHex(" #AbC ")).toBe("#aabbcc");
     expect(normalizeHex("FFFFFF")).toBe("#ffffff");
+    expect(parseFullHex("#abc")).toBeNull();
+    expect(parseFullHex("#abcdef")).toBe("#abcdef");
+    expect(parseFullHex("ABCDEF")).toBe("#abcdef");
     expect(parseHex("#000000")).toEqual({ r: 0, g: 0, b: 0 });
     expect(parseHex("#ffffff")).toEqual({ r: 255, g: 255, b: 255 });
     expect(rgbToHex({ r: 255, g: 0, b: 16 })).toBe("#ff0010");
