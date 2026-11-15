@@ -133,6 +133,19 @@ describe("editor command registry", () => {
     expect(get("dialog.region", { mode: "paint" }).enabled).toBe(true);
   });
 
+  it("does not offer duplication when the selection would exceed the source limit", () => {
+    const { state, get, actions } = fixture();
+    const source = state.document.cuboids[0]!;
+    const fullDocument = { ...state.document,
+      cuboids: Array.from({ length: 1999 }, (_, index) => ({ ...source, id: "node-" + index })) };
+    const duplicate = get("edit.duplicate", {
+      document: fullDocument, selectedIds: ["node-0", "node-1"], selectedId: "node-1"
+    });
+    expect(duplicate.disabledReason).toContain("2,000-element limit");
+    duplicate.run();
+    expect(actions.duplicate).not.toHaveBeenCalled();
+  });
+
   it("blocks concurrent save/pack imports and unsupported Pack Studio", () => {
     const { state, get } = fixture();
     expect(get("project.save", { savingProject: true }).enabled).toBe(false);
