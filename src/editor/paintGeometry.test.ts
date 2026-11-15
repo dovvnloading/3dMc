@@ -117,7 +117,7 @@ describe("pixel shape geometry", () => {
     expect(thick).toHaveLength(16);
   });
   it("does not break on 1×1, 1×N, N×1 or small even ellipses", () => {
-    for (const [w, h] of [[1, 1], [1, 7], [7, 1], [2, 2], [2, 4], [4, 2]]) {
+    for (const [w, h] of [[1, 1], [1, 7], [7, 1], [2, 2], [2, 4], [4, 2]] as const) {
       const stencil = shapeStencil(w, h, "ellipse",
         { left: 0, top: 0, right: w - 1, bottom: h - 1 }, true, 1, "square");
       expect(stencil.length).toBe(w * h);
