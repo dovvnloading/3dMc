@@ -14,13 +14,13 @@ export function CommandPalette({ open, onOpen, onClose, commands }: {
 }) {
   useEffect(() => {
     const shortcut = (event: globalThis.KeyboardEvent) => {
-      if (event.isComposing || event.repeat || event.altKey || event.shiftKey ||
+      if (event.isComposing || event.altKey || event.shiftKey ||
           !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
       // Never stack another native modal over an editor confirmation.
       if (!open && document.querySelector('[role="dialog"]')) return;
       event.preventDefault();
       event.stopPropagation();
-      if (!open) onOpen();
+      if (!open && !event.repeat) onOpen();
     };
     window.addEventListener("keydown", shortcut, true);
     return () => window.removeEventListener("keydown", shortcut, true);
@@ -51,6 +51,7 @@ function CommandPaletteDialog({ commands, onClose }: {
   };
 
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     if (event.key === "Escape") {
       event.preventDefault(); event.stopPropagation(); onClose(); return;
     }
@@ -61,7 +62,7 @@ function CommandPaletteDialog({ commands, onClose }: {
       const delta = event.key === "ArrowDown" ? 1 : -1;
       const next = (current + delta + enabledResults.length) % enabledResults.length;
       setActiveId(enabledResults[next]!.id);
-    } else if (event.key === "Enter") {
+    } else if (event.key === "Enter" && !(event.metaKey || event.ctrlKey || event.altKey)) {
       event.preventDefault();
       if (active) run(active);
     }
