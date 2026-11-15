@@ -41,6 +41,15 @@ test("Firefox/WebKit symmetry and filled ellipse survive history and expose guid
     .getByRole("button", { name: "Open project" }).click();
   await page.getByRole("tab", { name: "Paint" }).click();
   await expect.poll(() => pixel(26, 11)).toEqual([199, 109, 104, 255]);
+  // The newer command palette must discover the Paint additions as well.
+  await page.getByRole("button", { name: "Command palette (Ctrl/Cmd+K)" }).click();
+  const search = page.getByRole("combobox", { name: "Search commands" });
+  await search.fill("ellipse");
+  await expect(page.getByRole("option").filter({ hasText: "Tool: Ellipse" })).toBeVisible();
+  await search.fill("cycle symmetry");
+  await expect(page.getByRole("option").filter({ hasText: "Cycle texture symmetry" })).toBeVisible();
+  await page.getByRole("option").filter({ hasText: "Cycle texture symmetry" }).click();
+  await expect(page.getByRole("button", { name: "Mirror X symmetry" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: `test-results/matrix-${browserName}-symmetry-ellipse.png` });
   expect(errors).toEqual([]);
 });
