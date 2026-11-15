@@ -6,12 +6,15 @@ import type { PrimitiveId } from "./primitives";
 
 export type CreatorPanelName = "region" | "face" | "import" | "library" | "workspace";
 export type CommandCategory = "Project" | "Edit" | "Create" | "Mode" | "Tool" | "View" | "Dialog";
+export type ShortcutArea = "Project" | "Edit" | "Model tools" | "Paint tools" | "View";
 
 export interface EditorCommand {
   id: string;
   title: string;
   category: CommandCategory;
   shortcut?: string;
+  alternateShortcuts?: readonly string[];
+  shortcutArea?: ShortcutArea;
   keywords?: readonly string[];
   enabled: boolean;
   disabledReason?: string;
@@ -46,6 +49,12 @@ export interface EditorCommandActions {
   saveLegacyJson: () => void;
   undo: () => void;
   redo: () => void;
+  cancelCurrentTool: () => void;
+  decreaseBrushSize: () => void;
+  increaseBrushSize: () => void;
+  frameSelection: () => void;
+  openShortcuts: () => void;
+  openCommandPalette: () => void;
   addCuboid: () => void;
   addShape: (primitive: PrimitiveId) => void;
   duplicate: () => void;
@@ -71,9 +80,12 @@ export interface EditorCommandActions {
 export function createEditorCommands(state: EditorCommandContext, actions: EditorCommandActions): EditorCommand[] {
   const commands: EditorCommand[] = [];
   const add = (id: string, title: string, category: CommandCategory, run: () => void,
-    disabledReason: string | null = null, shortcut?: string, keywords?: readonly string[]) => {
+    disabledReason: string | null = null, shortcut?: string, keywords?: readonly string[],
+    shortcutArea?: ShortcutArea, alternateShortcuts?: readonly string[]) => {
+    const area = shortcutArea ?? (category === "Project" || category === "Edit" || category === "View"
+      ? category : undefined);
     commands.push({
-      id, title, category, shortcut, keywords,
+      id, title, category, shortcut, alternateShortcuts, shortcutArea: area, keywords,
       enabled: disabledReason === null,
       ...(disabledReason === null ? {} : { disabledReason }),
       run: () => { if (disabledReason === null) run(); }
@@ -118,13 +130,15 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   add("edit.undo", "Undo", "Edit", actions.undo,
     editOr(state.canUndo ? null : "There is nothing to undo."), "Ctrl/Cmd+Z");
   add("edit.redo", "Redo", "Edit", actions.redo,
-    editOr(state.canRedo ? null : "There is nothing to redo."), "Ctrl/Cmd+Shift+Z", ["Ctrl/Cmd+Y"]);
+    editOr(state.canRedo ? null : "There is nothing to redo."), "Ctrl/Cmd+Shift+Z", undefined, undefined, ["Ctrl/Cmd+Y"]);
   add("edit.select-all", "Select all editable", "Edit", actions.selectAll,
     selectAllReason, "Ctrl/Cmd+A", ["selection", "visible matches"]);
   add("edit.duplicate", "Duplicate selection", "Edit", actions.duplicate,
     editOr(selectionReason ?? duplicateLimitReason), "Ctrl/Cmd+D", ["copy elements"]);
   add("edit.delete", "Delete selection", "Edit", actions.deleteSelection,
-    editOr(selectionReason), "Del / Backspace", ["remove elements"]);
+    editOr(selectionReason), "Delete", ["remove elements"], undefined, ["Backspace"]);
+  add("edit.cancel", "Cancel tool or paint stroke", "Edit", actions.cancelCurrentTool,
+    null, "Esc", ["escape", "return to select"]);
 
   add("create.cuboid", "Add cuboid", "Create", actions.addCuboid, editOr(maxElementsReason), undefined, ["shape box"]);
   for (const primitive of PRIMITIVE_PRESETS) {
@@ -147,7 +161,8 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
       ? "Resize gizmo is unavailable for rotated elements; use local Size fields."
       : next === "rotate" ? state.rotateToolReason : null;
     add("tool." + next, "Tool: " + title, "Tool", () => actions.switchTool(next),
-      modelToolReason ?? specificReason, shortcut, ["transform", "model"]);
+      next === "select" ? null : modelToolReason ?? specificReason,
+      shortcut, ["transform", "model"], "Model tools");
   }
   const paintTools: readonly [Tool, string, string][] = [
     ["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"],
@@ -156,10 +171,14 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   ];
   for (const [next, title, shortcut] of paintTools) {
     add("tool." + next, "Tool: " + title, "Tool", () => actions.switchTool(next),
-      paintToolReason, shortcut, ["paint", "brush", "texture"]);
+      paintToolReason, shortcut, ["paint", "brush", "texture"], "Paint tools");
   }
   add("paint.symmetry.cycle", "Cycle texture symmetry (" + state.symmetry.toUpperCase() + ")",
-    "Tool", actions.cycleSymmetry, paintToolReason, "M", ["mirror", "axis", "texture"]);
+    "Tool", actions.cycleSymmetry, paintToolReason, "M", ["mirror", "axis", "texture"], "Paint tools");
+  add("paint.brush.decrease", "Decrease brush size", "Tool", actions.decreaseBrushSize,
+    paintToolReason, "[", ["brush", "smaller"], "Paint tools");
+  add("paint.brush.increase", "Increase brush size", "Tool", actions.increaseBrushSize,
+    paintToolReason, "]", ["brush", "larger"], "Paint tools");
   for (const [mode, title] of [
     ["off", "Off"], ["x", "Mirror X"], ["y", "Mirror Y"], ["both", "Both axes"]
   ] as const) {
@@ -171,9 +190,16 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   for (const [kind, title] of [["iso", "Isometric"], ["front", "Front"], ["right", "Right"],
     ["top", "Top"]] as const) {
     add("view." + kind, "View: " + title, "View", () => actions.navigate(kind),
-      null, kind === "iso" ? "F" : undefined, ["camera", "preset", kind]);
+      null, undefined, ["camera", "preset", kind]);
   }
+  add("view.frame", "Frame selection", "View", actions.frameSelection,
+    null, "F", ["focus", "fit", "zoom", "model", "camera"]);
   add("view.reset", "Reset camera", "View", () => actions.navigate("iso"), null, undefined, ["view default"]);
+
+  add("dialog.shortcuts", "Keyboard shortcuts", "Dialog", actions.openShortcuts,
+    null, "?", ["help", "shortcut reference", "key bindings"], "View");
+  add("dialog.command-palette", "Command palette", "Dialog", actions.openCommandPalette,
+    null, "Ctrl/Cmd+K", ["search", "commands"], "View");
 
   add("dialog.pack-studio", "Open Pack Studio", "Dialog", actions.openPackStudio,
     editOr(state.document.target.candidateRelease !== "1.21.4" ?

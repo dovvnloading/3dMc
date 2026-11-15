@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eye, EyeOff,
-  FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
+  FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, CircleHelp, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
   MousePointer2, Move3D, Paintbrush, Plus, Redo2, RotateCcw, Rotate3D,
   Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
@@ -74,12 +74,14 @@ import { PaintGeometryControls } from "./components/PaintGeometryControls";
 import { PaintToolRail } from "./components/PaintToolRail";
 import { PaintToolHint } from "./components/PaintToolHint";
 import type { BrushShape } from "./editor/brush";
-import { usePaintBrushShortcuts } from "./editor/usePaintBrushShortcuts";
+import { MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from "./editor/brush";
+import { useEditorKeyboardShortcuts } from "./editor/useEditorKeyboardShortcuts";
 import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { ShortcutReferenceDialog } from "./components/ShortcutReferenceDialog";
 import { createEditorCommands } from "./editor/commands";
 import type { CreatorPanelName } from "./editor/commands";
 import { RecoveryDetailsDialog } from "./components/RecoveryDetailsDialog";
@@ -242,6 +244,7 @@ export function App() {
   const [recoveryDetailsOpen, setRecoveryDetailsOpen] = useState(false);
   const [libraryRequest, setLibraryRequest] = useState(0);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [creatorPaletteRequest, setCreatorPaletteRequest] = useState<{ panel: CreatorPanelName; nonce: number } | null>(null);
   const [candidate, setCandidate] = useState<AnyRecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
@@ -307,7 +310,6 @@ export function App() {
   const clearStroke = useCallback(() => {
     drag.current = null; setDraftPixels(null); setDraftTextureId(null); setCancelToken(current => current + 1);
   }, []);
-  usePaintBrushShortcuts(mode === "paint", setBrushSize, clearStroke);
   const showTexture = (id: string) => {
     clearStroke();
     // Texture navigation is view state and does not create an undo step.
@@ -569,6 +571,7 @@ export function App() {
   };
   const keepCurrentWorkspace = () => { awaitingRecoveryRef.current = false; setCandidate(null); setWriterEpoch(epoch => epoch + 1); };
   const navigate = (kind: ViewKind) => setView(current => ({ kind, count: current.count + 1 }));
+  const frameSelection = () => setView(current => ({ kind: "frame", count: current.count + 1 }));
   const runUndo = useCallback(() => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current) return;
     clearStroke();
@@ -581,42 +584,6 @@ export function App() {
     if (packRef.current) publishPackSession(redoPackSession);
     else publishHistory(redo);
   }, [clearStroke, publishHistory, publishPackSession]);
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && drag.current) { event.preventDefault(); clearStroke(); return; }
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]") || document.querySelector("[role=dialog]")) return;
-      const command = event.metaKey || event.ctrlKey, key = event.key.toLowerCase();
-      if (command && key === "n") { event.preventDefault(); setNewProjectOpen(true); return; }
-      if (command && key === "s") { event.preventDefault(); void saveProjectRef.current(); return; }
-      if (command && key === "a" && mode === "model") { event.preventDefault(); selectEditable(); return; }
-      if (command && key === "d" && mode === "model") { event.preventDefault(); duplicateCurrentSelection(); return; }
-      if (command && key === "z") { event.preventDefault(); if (event.shiftKey) runRedo(); else runUndo(); return; }
-      if (command && key === "y") { event.preventDefault(); runRedo(); return; }
-      if (command || event.altKey) return;
-      if (key === "escape" && document.querySelector('[data-uv-dragging="true"]')) return;
-      if (key === "escape") { clearStroke(); setShapeMenuOpen(false); switchTool("select"); }
-      if (key === "v") switchTool("select");
-      if (key === "w" && mode === "model") switchTool("move");
-      if (key === "r" && mode === "model" && !rotatedSelection) switchTool("resize");
-      if (key === "e" && mode === "model" && !rotateToolReason) switchTool("rotate");
-      if (key === "b" && mode === "paint") switchTool("pencil");
-      if (key === "e" && mode === "paint") switchTool("eraser");
-      if (key === "g" && mode === "paint") switchTool("fill");
-      if (key === "i" && mode === "paint") switchTool("eyedropper");
-      if (key === "l" && mode === "paint") switchTool("line");
-      if (key === "u" && mode === "paint") switchTool("rectangle");
-      if (key === "o" && mode === "paint") { event.preventDefault(); switchTool("ellipse"); }
-      if (key === "m" && mode === "paint" && !event.repeat) {
-        event.preventDefault(); clearStroke(); cycleSymmetry();
-      }
-      if (key === "f") navigate("iso");
-      if ((key === "delete" || key === "backspace") && mode === "model" && selectedIds.length) {
-        event.preventDefault(); deleteCurrentSelection();
-      }
-    };
-    window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
-  }, [mode, selectedIds, rotatedSelection, rotateToolReason, runUndo, runRedo, clearStroke, cycleSymmetry, selectEditable, duplicateCurrentSelection, deleteCurrentSelection]);
 
   const saveLegacyJson = () => {
     try {
@@ -950,6 +917,7 @@ export function App() {
   const openCommandPalette = useCallback(() => {
     clearStroke(); setShapeMenuOpen(false); setCommandPaletteOpen(true);
   }, [clearStroke]);
+  const openShortcuts = () => { clearStroke(); setShapeMenuOpen(false); setShortcutsOpen(true); };
   const commands = createEditorCommands({
     document: doc, mode, selectedIds, selectedId, sceneSearch: search,
     editDisabledReason: writerStatus !== "owned" ? "This tab does not own local recovery."
@@ -966,13 +934,21 @@ export function App() {
     importTexture: () => { setTextureImportMode("replace"); textureFileRef.current?.click(); },
     saveLegacyJson, undo: runUndo, redo: runRedo, addCuboid: addElement, addShape,
     duplicate: duplicateCurrentSelection, deleteSelection: deleteCurrentSelection, selectAll: selectEditable,
-    changeMode, switchTool, navigate, openPackStudio,
+    changeMode, switchTool, navigate, frameSelection, openPackStudio,
+    openShortcuts, openCommandPalette,
+    cancelCurrentTool: () => { clearStroke(); setShapeMenuOpen(false); switchTool("select"); },
+    decreaseBrushSize: () => { clearStroke(); setBrushSize(size => Math.max(MIN_BRUSH_SIZE, size - 1)); },
+    increaseBrushSize: () => { clearStroke(); setBrushSize(size => Math.min(MAX_BRUSH_SIZE, size + 1)); },
     cycleSymmetry: () => { clearStroke(); cycleSymmetry(); },
     setSymmetry: mode => { clearStroke(); setSymmetry(mode); },
     openCreatorPanel: panel => setCreatorPaletteRequest(current => ({
       panel, nonce: (current?.nonce ?? 0) + 1
     })),
     openRecoveryDetails: () => setRecoveryDetailsOpen(true)
+  });
+  useEditorKeyboardShortcuts(commands, () => {
+    if (drag.current) { clearStroke(); return true; }
+    return !!document.querySelector('[data-uv-dragging="true"]');
   });
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
@@ -994,6 +970,7 @@ export function App() {
         <IconButton label="Redo (Ctrl/Cmd+Shift+Z)" disabled={!history.future.length} onClick={runRedo}><Redo2 size={17}/></IconButton>
       </div>
         <IconButton label="Command palette (Ctrl/Cmd+K)" onClick={openCommandPalette}><Search size={17}/></IconButton>
+        <IconButton label="Keyboard shortcuts (?)" onClick={openShortcuts}><CircleHelp size={17}/></IconButton>
         <button className="text-button quiet new-project-trigger" aria-label="New project" title="Create a new project" onClick={() => setNewProjectOpen(true)}><FilePlus2 size={16}/>New</button>
         <input type="file" ref={fileRef} accept=".3dmc,.json,application/json,application/zip" hidden onChange={chooseProject}/>
         <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc native project or legacy JSON"><FolderOpen size={16}/>Open</button>
@@ -1230,8 +1207,10 @@ export function App() {
       <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
     </>}
-    {bootChecked && <CommandPalette open={commandPaletteOpen} onOpen={openCommandPalette}
+    {bootChecked && <CommandPalette open={commandPaletteOpen}
       onClose={() => setCommandPaletteOpen(false)} commands={commands}/>}
+    {bootChecked && shortcutsOpen && <ShortcutReferenceDialog commands={commands}
+      onClose={() => setShortcutsOpen(false)}/>}
     {recoveryDetailsOpen && <RecoveryDetailsDialog
       writer={writerStatus} status={recoveryStatus} session={openSession} revision={history.revision}
       acknowledgement={lastAcknowledgedRecovery} modelCount={packSession?.present.pack.models.length ?? 1}

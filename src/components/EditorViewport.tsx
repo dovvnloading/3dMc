@@ -2,7 +2,7 @@ import { Component, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Edges, OrbitControls, TransformControls } from "@react-three/drei";
+import { Edges, TransformControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { Cuboid, EditorDocument, FaceDirection, Vec3, PixelTexture } from "../editor/domain";
 import type { SelectionGesture, SelectionModifiers } from "../editor/selection";
@@ -14,11 +14,12 @@ import { applyFaceUvs, BOX_FACE_ORDER, faceFromTriangle } from "../editor/uv";
 import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 import type { PaintModifiers } from "../editor/paintGeometry";
+import { CameraControls } from "./CameraControls";
 
 export type Mode = "model" | "paint" | "preview";
 export type Tool = "select" | "move" | "resize" | "rotate" | "pencil" | "eraser" | "fill" | "eyedropper" | "line" | "rectangle" | "ellipse";
 export type ViewKind = "iso" | "front" | "right" | "top";
-export type ViewRequest = { kind: ViewKind; count: number };
+export type ViewRequest = { kind: ViewKind | "frame"; count: number };
 
 interface ViewportProps {
   document: EditorDocument;
@@ -58,19 +59,6 @@ const dimensions = (node: Cuboid): Vec3 => [
   (node.to[1] - node.from[1]) / WORLD,
   (node.to[2] - node.from[2]) / WORLD
 ];
-
-function CameraControls({ view }: { view: ViewRequest }) {
-  const { camera, invalidate } = useThree();
-  useEffect(() => {
-    const positions: Record<ViewKind, [number, number, number]> = {
-      iso: [2.9, 2.35, 3.2], front: [0, 0.65, 4], right: [4, 0.65, 0], top: [0, 4, 0.001]
-    };
-    camera.position.set(...positions[view.kind]);
-    camera.lookAt(0, 0.58, 0); camera.updateProjectionMatrix(); invalidate();
-  }, [camera, invalidate, view]);
-  return <OrbitControls makeDefault enableDamping dampingFactor={0.095}
-    target={[0, 0.58, 0]} minDistance={0.9} maxDistance={25} enablePan screenSpacePanning />;
-}
 
 function useTextureMaps(textures: PixelTexture[], draftPixels: number[],
   draftTextureId: string | null, activeTextureId: string): Record<string, THREE.CanvasTexture> {
@@ -363,7 +351,7 @@ function Scene(props: ViewportProps) {
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}
-    <CameraControls view={props.view}/>
+    <CameraControls view={props.view} document={props.document} selectedIds={ids}/>
   </>;
 }
 
