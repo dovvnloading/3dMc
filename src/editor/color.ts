@@ -35,6 +35,12 @@ export function normalizeHex(input: string): string | null {
   return rgb ? rgbToHex(rgb) : null;
 }
 
+/** A live hex text field commits only a complete six-digit value; #abc is a
+ * valid conversion shorthand but an ambiguous prefix while typing #abcdef. */
+export function parseFullHex(input: string): string | null {
+  return /^#?[0-9a-f]{6}$/i.test(input.trim()) ? normalizeHex(input) : null;
+}
+
 export function rgbToHsv({ r, g, b }: RGB): HSV {
   const red = r / 255, green = g / 255, blue = b / 255;
   const max = Math.max(red, green, blue);
