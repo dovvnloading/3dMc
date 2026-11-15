@@ -15,8 +15,15 @@
 .color-picker-help { font-size:10px; color:var(--muted); text-align:center; }
 .color-picker-hue-label { display:flex; justify-content:space-between; align-items:center; font-size:11px;
   color:var(--secondary); }
-.color-picker-hue { width:100%; height:16px; margin:0; accent-color:var(--accent);
-  cursor:pointer; background:transparent; }
+.color-picker-hue { width:100%; height:14px; margin:2px 0; cursor:pointer;
+  appearance:none; -webkit-appearance:none; border:1px solid var(--interactive-border); border-radius:8px;
+  background:linear-gradient(to right,#f00 0%,#ff0 16.67%,#0f0 33.33%,#0ff 50%,#00f 66.67%,#f0f 83.33%,#f00 100%); }
+.color-picker-hue::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:20px;
+  border:2px solid var(--text); border-radius:4px; background:var(--raised);
+  box-shadow:0 1px 4px #000a; }
+.color-picker-hue::-moz-range-track { background:transparent; border:0; }
+.color-picker-hue::-moz-range-thumb { width:10px; height:16px; border:2px solid var(--text);
+  border-radius:4px; background:var(--raised); box-shadow:0 1px 4px #000a; }
 .color-picker-fields { display:grid; grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr)); gap:6px; }
 .color-picker-fields label { min-width:0; display:grid; gap:4px; color:var(--secondary); font-size:10px; }
 .color-picker-fields input { width:100%; min-width:0; height:29px; border:1px solid var(--interactive-border);
