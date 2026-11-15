@@ -72,6 +72,9 @@ import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
 import type { FaceUVClipboard } from "./editor/uvEditing";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { ModalDialog } from "./components/ModalDialog";
+import { CommandPalette } from "./components/CommandPalette";
+import { createEditorCommands } from "./editor/commands";
+import type { CreatorPanelName } from "./editor/commands";
 import { RecoveryDetailsDialog } from "./components/RecoveryDetailsDialog";
 import { recoveryStatusText } from "./editor/recoveryPresentation";
 import type { RecoveryAcknowledgement, RecoveryStatus, WriterStatus } from "./editor/recoveryPresentation";
@@ -228,6 +231,8 @@ export function App() {
   const [lastAcknowledgedRecovery, setLastAcknowledgedRecovery] = useState<RecoveryAcknowledgement | null>(null);
   const [recoveryDetailsOpen, setRecoveryDetailsOpen] = useState(false);
   const [libraryRequest, setLibraryRequest] = useState(0);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [creatorPaletteRequest, setCreatorPaletteRequest] = useState<{ panel: CreatorPanelName; nonce: number } | null>(null);
   const [candidate, setCandidate] = useState<AnyRecoveryCandidate | null>(null), [bootChecked, setBootChecked] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<EditorDocument | null>(null);
   const [pendingPackOpen, setPendingPackOpen] = useState<NativePackProject | null>(null);
@@ -918,6 +923,25 @@ export function App() {
   const matching = sceneEntries.flatMap(entry => entry.kind === "part" ? [entry.node] : []);
   const focusableId = matching.some(node => node.id === selectedId) ? selectedId : matching[0]?.id;
   const statusText = recoveryStatusText(writerStatus, recoveryStatus);
+  const commands = createEditorCommands({
+    document: doc, mode, selectedIds, selectedId, sceneSearch: search,
+    editDisabledReason: writerStatus !== "owned" ? "This tab does not own local recovery."
+      : candidate ? "Resolve the pending recovery session before editing."
+      : openingProject.current ? "A project is opening." : null,
+    canUndo: history.past.length > 0, canRedo: history.future.length > 0,
+    rotatedSelection, rotateToolReason, savingProject, importingPack: packInspecting, importingTexture: textureReading
+  }, {
+    newProject: () => setNewProjectOpen(true), openProject: () => fileRef.current?.click(),
+    saveProject: () => { void saveProjectRef.current(); },
+    importPack: () => packFileRef.current?.click(),
+    exportMinecraft: () => setExportOpen(true), exportTexture: downloadTexturePng,
+    importTexture: () => { setTextureImportMode("replace"); textureFileRef.current?.click(); },
+    saveLegacyJson, undo: runUndo, redo: runRedo, addCuboid: addElement, addShape,
+    duplicate: duplicateCurrentSelection, deleteSelection: deleteCurrentSelection, selectAll: selectEditable,
+    changeMode, switchTool, navigate, openPackStudio,
+    openCreatorPanel: panel => setCreatorPaletteRequest(current => ({ panel, nonce: (current?.nonce ?? 0) + 1 })),
+    openRecoveryDetails: () => setRecoveryDetailsOpen(true)
+  });
 
   return <div className={"app-shell" + (!sceneOpen ? " scene-collapsed" : "") + (!inspectorOpen ? " inspector-collapsed" : "")}>
     {bootChecked && <>
@@ -937,6 +961,7 @@ export function App() {
         <IconButton label="Undo (Ctrl/Cmd+Z)" disabled={!history.past.length} onClick={runUndo}><Undo2 size={17}/></IconButton>
         <IconButton label="Redo (Ctrl/Cmd+Shift+Z)" disabled={!history.future.length} onClick={runRedo}><Redo2 size={17}/></IconButton>
       </div>
+        <IconButton label="Command palette (Ctrl/Cmd+K)" onClick={() => setCommandPaletteOpen(true)}><Search size={17}/></IconButton>
         <button className="text-button quiet new-project-trigger" aria-label="New project" title="Create a new project" onClick={() => setNewProjectOpen(true)}><FilePlus2 size={16}/>New</button>
         <input type="file" ref={fileRef} accept=".3dmc,.json,application/json,application/zip" hidden onChange={chooseProject}/>
         <button className="text-button subtle" onClick={() => fileRef.current?.click()} title="Open a .3dmc native project or legacy JSON"><FolderOpen size={16}/>Open</button>
@@ -958,7 +983,7 @@ export function App() {
       <div className="mode-options creator-options"><CreatorTools key={openSession} document={doc} revision={history.revision} pack={packSession?.present} mode={mode}
         selectedId={selectedId} face={selectedFace} onApply={applyBatch} onOpen={acceptOpen}
         onOpenPack={project => acceptPackOpen(createPackSession(project.pack, project.sources))}
-        onBackup={saveProject} onCancelGesture={clearStroke} libraryRequest={libraryRequest}
+        onBackup={saveProject} onCancelGesture={clearStroke} libraryRequest={libraryRequest} paletteRequest={creatorPaletteRequest}
         onNewProject={() => setNewProjectOpen(true)} onModeChange={changeMode}
         onExport={() => setExportOpen(true)}
         onLayout={layout => { clearStroke(); setSceneOpen(layout === "balanced"); setInspectorOpen(layout !== "canvas"); if (layout === "paint") changeMode("paint"); }}/></div>
@@ -1177,6 +1202,8 @@ export function App() {
       <div className="status-space"/><span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected ? "1 selected · " + selected.name : doc.cuboids.length + " elements"}</span><span className="status-divider"/><span>Grid {snap} unit</span><span className="status-divider"/><span className="status-profile">Java pack experiment</span>
     </footer>
     </>}
+    {bootChecked && <CommandPalette open={commandPaletteOpen} onOpen={() => setCommandPaletteOpen(true)}
+      onClose={() => setCommandPaletteOpen(false)} commands={commands}/>}
     {recoveryDetailsOpen && <RecoveryDetailsDialog
       writer={writerStatus} status={recoveryStatus} session={openSession} revision={history.revision}
       acknowledgement={lastAcknowledgedRecovery} modelCount={packSession?.present.pack.models.length ?? 1}
