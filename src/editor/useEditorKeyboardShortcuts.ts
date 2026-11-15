@@ -10,10 +10,10 @@ export function keyToShortcut(event: Pick<KeyboardEvent,
     return "Ctrl/Cmd+" + (event.shiftKey ? "Shift+" : "") + event.key.toUpperCase();
   }
   if (event.key === "?" || (event.shiftKey && event.key === "/")) return "?";
-  if (event.shiftKey) return null;
   if (event.key === "Escape") return "Esc";
   if (event.key === "Delete" || event.key === "Backspace" ||
       event.key === "[" || event.key === "]") return event.key;
+  // Existing unmodified letter and deletion shortcuts also worked with Shift.
   return /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : null;
 }
 
@@ -29,10 +29,13 @@ export function useEditorKeyboardShortcuts(commands: readonly EditorCommand[],
       const shortcut = keyToShortcut(event);
       if (!shortcut) return;
       if (shortcut === "Esc" && beforeEscape()) { event.preventDefault(); return; }
-      const command = commands.find(command => command.enabled &&
-        (command.shortcut === shortcut || command.alternateShortcuts?.includes(shortcut)));
-      if (!command || (event.repeat && ["M", "F", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
+      const command = commands.find(command =>
+        command.shortcut === shortcut || command.alternateShortcuts?.includes(shortcut));
+      if (!command) return;
+      // Disabled editor commands must not fall through to a browser shortcut
+      // (e.g. Ctrl+N opening another tab while project editing is blocked).
       event.preventDefault();
+      if (!command.enabled || (event.repeat && ["M", "F", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
       command.run();
     };
     window.addEventListener("keydown", listener);

@@ -251,7 +251,10 @@ describe("shortcut reference", () => {
     expect(key({ key: "Backspace" })).toBe("Backspace");
     expect(key({ key: "[" })).toBe("[");
     expect(key({ altKey: true })).toBeNull();
-    expect(key({ shiftKey: true })).toBeNull();
+    expect(key({ shiftKey: true })).toBe("F"); // Preserve existing Shift+letter behavior.
+    expect(key({ key: "Delete", shiftKey: true })).toBe("Delete");
+    expect(key({ key: "Escape", shiftKey: true })).toBe("Esc");
+    expect(key({ key: "{", shiftKey: true })).toBeNull();
     expect(key({ isComposing: true })).toBeNull();
   });
 });
