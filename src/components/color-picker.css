@@ -29,5 +29,5 @@
 .color-picker-fields input { width:100%; min-width:0; height:29px; border:1px solid var(--interactive-border);
   border-radius:4px; background:var(--control); color:var(--text); padding:4px 5px; font-size:11px; }
 .color-picker-fields input[aria-invalid="true"] { border-color:var(--error); }
-.color-picker-square:focus-visible,.color-picker-trigger:focus-visible,.color-picker-hue:focus-visible,
+.color-picker-square:focus,.color-picker-trigger:focus-visible,.color-picker-hue:focus-visible,
 .color-picker-fields input:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
