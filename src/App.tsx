@@ -1079,7 +1079,7 @@ export function App() {
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
       </div>
         {mode === "paint" && <TextureSurface projectId={doc.id} textureId={visibleTexture.id} pixels={viewPixels} width={visibleTexture.width} height={visibleTexture.height} tool={tool} color={color} painting={!!draftPixels}
-          brushSize={brushSize} brushShape={brushShape} symmetry={symmetry}
+          brushSize={brushSize} brushShape={brushShape} symmetry={symmetryFor(visibleTexture.id)}
           paintMask={constrainPaint ? (selectedId ? facePaintMask(doc, selectedId, selectedFace, visibleTexture.id) : null) : undefined}
           face={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selected.faces[selectedFace] : null}
           faceName={selected?.material === "texture" && selected.faces[selectedFace].textureId === visibleTexture.id ? selectedFace : null}
