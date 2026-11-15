@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
-  AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eraser, Eye, EyeOff,
+  AlertCircle, ArrowDown, ArrowUp, Box, ChevronDown, Copy, Download, Eye, EyeOff,
   FolderOpen, FilePlus2, FlaskConical, ImagePlus, PackageOpen, Info, Layers3, Lock, LockOpen, Maximize2, PanelLeftClose, PanelRightClose,
-  MousePointer2, Move3D, Paintbrush, PaintBucket, Pipette, Plus, Redo2, RotateCcw,
-  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2, Minus, Square
+  MousePointer2, Move3D, Paintbrush, Plus, Redo2, RotateCcw,
+  Save, Search, Settings2, SlidersHorizontal, Trash2, Undo2
 } from "lucide-react";
 import {
   activeTexture, addTexture, affectedFaces, textureById, removeTexture, renameTexture, selectTexture,
@@ -52,6 +52,8 @@ import { facePaintMask } from "./editor/paintMask";
 import { activeRasterLayer, setRasterLayerPixels } from "./editor/layers";
 import { beginPaintGesture, commitGizmoTransform, commitPaintGesture, continuePaintGesture } from "./editor/gestures";
 import type { PaintGesture } from "./editor/gestures";
+import type { PaintModifiers } from "./editor/paintGeometry";
+import { useTextureSymmetry } from "./editor/useTextureSymmetry";
 import type { Texel } from "./editor/pixels";
 import { EditorViewport } from "./components/EditorViewport";
 import type { Mode, Tool, ViewKind, ViewRequest } from "./components/EditorViewport";
@@ -63,6 +65,9 @@ import type { DecodedTexture, TextureImportPolicy } from "./editor/textureImport
 import { FaceUVInspector } from "./components/FaceUVInspector";
 import { PaletteControls } from "./components/PaletteControls";
 import { PaintBrushControls } from "./components/PaintBrushControls";
+import { PaintGeometryControls } from "./components/PaintGeometryControls";
+import { PaintToolRail } from "./components/PaintToolRail";
+import { PaintToolHint } from "./components/PaintToolHint";
 import type { BrushShape } from "./editor/brush";
 import { usePaintBrushShortcuts } from "./editor/usePaintBrushShortcuts";
 import { applyFaceUV, copyFaceUV } from "./editor/uvEditing";
@@ -201,6 +206,8 @@ export function App() {
   const [view, setView] = useState<ViewRequest>({ kind: "iso", count: 0 });
   const [color, setColor] = useState("#80dbbf"), [brushSize, setBrushSize] = useState(1);
   const [brushShape, setBrushShape] = useState<BrushShape>("square");
+  const [filledShapes, setFilledShapes] = useState(false);
+  const { symmetry, symmetryFor, setSymmetry, cycleSymmetry } = useTextureSymmetry(openSession, texture.id);
   const [constrainPaint, setConstrainPaint] = useState(false);
   const [search, setSearch] = useState("");
   const [sceneOpen, setSceneOpen] = useState(() => window.innerWidth > 1000);
@@ -389,22 +396,26 @@ export function App() {
     }
     return nodeId ? facePaintMask(source, nodeId, direction, textureId) : null;
   }, [constrainPaint, selectedId, selectedFace]);
-  const beginPaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
+  const beginPaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId, modifiers: PaintModifiers = {}) => {
     if (!writerRef.current || awaitingRecoveryRef.current || openingProject.current || drag.current ||
-        (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle")) return;
+        (tool !== "pencil" && tool !== "eraser" && tool !== "line" && tool !== "rectangle" && tool !== "ellipse")) return;
     const source = historyRef.current.present;
     const mask = paintMask(source, textureId, face);
     if (mask === null) { setNotice("Choose a visible, unlocked painted face using this texture, or disable UV-constrained painting."); return; }
     try {
-      const started = beginPaintGesture(source, texel, face, color, brushSize, tool, textureId, mask, brushShape);
+      const started = beginPaintGesture(source, texel, face, color, brushSize, tool,
+        textureId, mask, brushShape, symmetryFor(textureId), filledShapes, modifiers);
       drag.current = started; setDraftTextureId(started.textureId); setDraftPixels(started.pixels);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Cannot paint the active texture layer.");
     }
-  }, [color, brushSize, brushShape, tool, paintMask]);
-  const continuePaint = useCallback((texel: Texel, face: string, textureId = historyRef.current.present.activeTextureId) => {
+  }, [color, brushSize, brushShape, tool, paintMask, symmetryFor, filledShapes]);
+  const continuePaint = useCallback((texel: Texel, face: string,
+    textureId = historyRef.current.present.activeTextureId, modifiers: PaintModifiers = {}) => {
     const current = drag.current; if (!current || current.textureId !== textureId) return;
-    const next = continuePaintGesture(current, texel, face); drag.current = next; setDraftPixels(next.pixels);
+    const next = continuePaintGesture(current, texel, face, modifiers);
+    drag.current = next; setDraftPixels(next.pixels);
   }, []);
   const finishPaint = useCallback(() => {
     const current = drag.current; if (!current) return;
