@@ -209,12 +209,17 @@ export function distributeSelection(document: EditorDocument, ids: readonly stri
   return publish(document, spaced);
 }
 
-/** A rigid world translation must move the rotation pivot by the exact same amount. */
+/**
+ * Apply a world-axis translation to bounds and pivot on the same 10^-12 grid
+ * used by reflection. Trigonometric bounds have more floating-point digits
+ * than Java coordinates need; canonicalizing edited coordinates prevents a
+ * subsequent double reflection from truncating those calculation artifacts.
+ */
 function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
   // Rotated extents include trig roundoff: a second identical command is a no-op.
   if (Math.abs(offset) < 1e-10) return node;
   const shift = (values: Vec3): Vec3 => values.map((value, component) =>
-    component === axis ? value + offset : value) as unknown as Vec3;
+    component === axis ? Math.round((value + offset) * 1e12) / 1e12 : value) as unknown as Vec3;
   const from = shift(node.from);
   const to = [...shift(node.to)] as [number, number, number];
   // A translated 64-unit side can subtract to 64 + one ulp even though
