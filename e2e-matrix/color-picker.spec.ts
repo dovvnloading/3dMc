@@ -29,6 +29,15 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   await expect(red).toHaveValue("18");
   await expect(green).toHaveValue("52");
   await expect(blue).toHaveValue("86");
+  const hue = picker.getByRole("slider", { name: "Hue" });
+  await expect(hue).toHaveValue("210");
+  await expect(square).toHaveAttribute("aria-valuetext", "Saturation 79%, brightness 34%");
+  await red.fill("34");
+  await expect(hex).toHaveValue("#223456");
+  await expect(trigger).toContainText("#223456");
+  await expect(square).toHaveAttribute("aria-valuetext", "Saturation 60%, brightness 34%");
+  await red.fill("18");
+  await expect(hex).toHaveValue("#123456");
 
   await hex.fill("invalid");
   await expect(hex).toHaveAttribute("aria-invalid", "true");
@@ -44,7 +53,6 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
   await square.press("ArrowLeft");
   expect(await square.getAttribute("aria-valuenow")).not.toBe(before);
   await expect(square).toHaveCSS("outline-style", "solid");
-  const hue = picker.getByRole("slider", { name: "Hue" });
   await hue.focus();
   const hueBefore = await hue.inputValue();
   await hue.press("ArrowRight");
