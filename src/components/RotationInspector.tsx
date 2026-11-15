@@ -114,7 +114,7 @@ export function RotationInspector({ document, ids, apply }: Props) {
     <button className="rotation-reset" type="button" disabled={disabled || !hasRotation}
       title={disabledReason ?? (!hasRotation ? "Selected elements have no rotation to reset" : "Remove rotation and restore axis-aligned geometry")}
       onClick={() => apply(doc => resetElementRotations(doc, ids))}>Reset rotation</button>
-    {!hasRotation && !disabled && <p className="rotation-help">No element rotation yet. Choosing an axis, angle or pivot creates one.</p>}
+    {!hasRotation && !disabled && <p className="rotation-help">No element rotation yet. Choose a non-default axis, angle, pivot or rescale to add one.</p>}
     {nodes.length > 1 && <p className="rotation-help">Mixed values are shown individually. Each edit changes only that property for all selected elements in one undo step.</p>}
   </section>;
 }

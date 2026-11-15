@@ -29,6 +29,9 @@ describe("Java 1.21.4 single-axis element rotation", () => {
   it("validates the exact optional native object without rounding, unknown fields or later-version transforms", () => {
     const original = createSampleDocument();
     expect(parseDocument(original)).toEqual(original);
+    expect(setElementAngle(original, ["body"], 0)).toBe(original);
+    expect(setElementAxis(original, ["body"], "y")).toBe(original);
+    expect(centerElementPivots(original, ["body"])).toBe(original);
     expect(isElementRotation(rotation)).toBe(true);
     for (const value of [
       { ...rotation, angle: 17 }, { ...rotation, axis: ["x", "z"] },

@@ -35,13 +35,18 @@ const axisColor = (axis: ElementAxis) =>
 
 /** A constrained on-canvas ring: the document never sees intermediate/free angles. */
 export function RotationHandle(props: Props) {
-  const { invalidate } = useThree();
+  const { invalidate, controls } = useThree();
+  const allowCameraOrbit = (enabled: boolean) => {
+    if (controls && "enabled" in controls && typeof controls.enabled === "boolean")
+      controls.enabled = enabled;
+  };
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
   latest.current = props;
   const cancel = () => {
     if (!drag.current) return;
     drag.current = null;
+    allowCameraOrbit(true);
     latest.current.onPreview(null);
     invalidate();
   };
@@ -78,6 +83,7 @@ export function RotationHandle(props: Props) {
     event.stopPropagation();
     drag.current = { pointerId: event.pointerId, start, initial: latest.current.angle,
       candidate: latest.current.angle };
+    allowCameraOrbit(false);
     (event.target as EventTarget & { setPointerCapture?: (id: number) => void })
       .setPointerCapture?.(event.pointerId);
   };
@@ -88,6 +94,7 @@ export function RotationHandle(props: Props) {
     sample(event);
     const candidate = current.candidate;
     drag.current = null;
+    allowCameraOrbit(true);
     latest.current.onPreview(null);
     const target = event.target as EventTarget & {
       hasPointerCapture?: (id: number) => boolean;

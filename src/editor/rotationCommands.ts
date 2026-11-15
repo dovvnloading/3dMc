@@ -21,7 +21,13 @@ function updateRotation(document: EditorDocument, ids: readonly string[],
       node.rotation !== undefined && nextRotation.axis === node.rotation.axis &&
       nextRotation.angle === node.rotation.angle && nextRotation.rescale === node.rotation.rescale &&
       nextRotation.origin.every((value, i) => value === node.rotation!.origin[i]);
-    if (identical) continue;
+    // Choosing the already-displayed default on a previously unrotated part is
+    // a true no-op. Do not materialize metadata or consume an undo entry.
+    const defaultValue = !node.rotation ? defaultElementRotation(node) : null;
+    if (identical || (defaultValue && nextRotation &&
+        nextRotation.axis === defaultValue.axis && nextRotation.angle === defaultValue.angle &&
+        nextRotation.rescale === defaultValue.rescale &&
+        nextRotation.origin.every((value, i) => value === defaultValue.origin[i]))) continue;
     const { rotation: _previous, ...rest } = node;
     const next: Cuboid = { ...rest, ...(nextRotation ? { rotation: nextRotation } : {}) };
     if (!isValidCuboid(next))
