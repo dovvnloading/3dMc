@@ -1,6 +1,7 @@
 import type { Mode, Tool, ViewKind } from "../components/EditorViewport";
 import type { EditorDocument } from "./domain";
 import type { SymmetryMode } from "./paintGeometry";
+import type { ViewportDisplay, ViewportDisplayKey } from "./viewportProjection";
 import { PRIMITIVE_PRESETS } from "./primitives";
 import { findSelectedGroup } from "./groups";
 import type { PrimitiveId } from "./primitives";
@@ -37,6 +38,7 @@ export interface EditorCommandContext {
   importingPack: boolean;
   importingTexture: boolean;
   selectedId: string | null;
+  viewportDisplay: ViewportDisplay;
 }
 
 export interface EditorCommandActions {
@@ -55,6 +57,8 @@ export interface EditorCommandActions {
   increaseBrushSize: () => void;
   frameSelection: () => void;
   frameAll: () => void;
+  toggleProjection: () => void;
+  toggleViewportDisplay: (key: ViewportDisplayKey) => void;
   openShortcuts: () => void;
   openCommandPalette: () => void;
   addCuboid: () => void;
@@ -231,6 +235,17 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     ["top", "Top"]] as const) {
     add("view." + kind, "View: " + title, "View", () => actions.navigate(kind),
       null, undefined, ["camera", "preset", kind]);
+  }
+  add("view.projection", "View: " + (state.viewportDisplay.projection === "perspective"
+    ? "Orthographic" : "Perspective") + " projection", "View", actions.toggleProjection,
+    null, "Numpad5", ["camera", "perspective", "orthographic", "toggle", "projection"]);
+  for (const [key, title, shortcut] of [
+    ["grid", "grid", "Shift+1"], ["axes", "XYZ axes", "Shift+2"],
+    ["outline", "selection outlines", "Shift+3"]
+  ] as const) {
+    add("view." + key, (state.viewportDisplay[key] ? "Hide " : "Show ") + title,
+      "View", () => actions.toggleViewportDisplay(key), null, shortcut,
+      ["viewport", "display", "toggle", "overlay", title]);
   }
   add("view.frame", "Frame selection", "View", actions.frameSelection,
     null, "F", ["focus", "fit", "zoom", "model", "camera"]);

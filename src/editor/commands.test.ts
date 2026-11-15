@@ -4,6 +4,7 @@ import { createEditorCommands } from "./commands";
 import type { EditorCommandActions, EditorCommandContext } from "./commands";
 import { groupEditorShortcuts, SHORTCUT_AREAS } from "./shortcuts";
 import { keyToShortcut, resolveEditorShortcut } from "./useEditorKeyboardShortcuts";
+import { DEFAULT_VIEWPORT_DISPLAY } from "./viewportProjection";
 
 function fixture() {
   const state: EditorCommandContext = {
@@ -20,14 +21,16 @@ function fixture() {
     rotateToolReason: null,
     savingProject: false,
     importingPack: false,
-    importingTexture: false
+    importingTexture: false,
+    viewportDisplay: DEFAULT_VIEWPORT_DISPLAY
   };
   const actions: EditorCommandActions = {
     newProject: vi.fn(), openProject: vi.fn(), saveProject: vi.fn(),
     importPack: vi.fn(), exportMinecraft: vi.fn(), exportTexture: vi.fn(),
     importTexture: vi.fn(), saveLegacyJson: vi.fn(), undo: vi.fn(), redo: vi.fn(),
     cancelCurrentTool: vi.fn(), decreaseBrushSize: vi.fn(), increaseBrushSize: vi.fn(),
-    frameSelection: vi.fn(), frameAll: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
+    frameSelection: vi.fn(), frameAll: vi.fn(), toggleProjection: vi.fn(),
+    toggleViewportDisplay: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
     addCuboid: vi.fn(), addShape: vi.fn(), duplicate: vi.fn(), deleteSelection: vi.fn(),
     rename: vi.fn(), renameGroup: vi.fn(), setSelectionVisibility: vi.fn(),
     setSelectionLocked: vi.fn(), groupSelection: vi.fn(), ungroup: vi.fn(),
@@ -57,7 +60,8 @@ describe("editor command registry", () => {
       "tool.select", "tool.move", "tool.resize", "tool.rotate", "tool.pencil", "tool.eraser",
       "tool.fill", "tool.eyedropper", "tool.line", "tool.rectangle", "tool.ellipse",
       "paint.symmetry.cycle", "paint.symmetry.off", "paint.symmetry.x", "paint.symmetry.y", "paint.symmetry.both",
-      "view.iso", "view.top", "view.frame", "dialog.shortcuts", "dialog.command-palette",
+      "view.iso", "view.top", "view.frame", "view.projection", "view.grid", "view.axes", "view.outline",
+      "dialog.shortcuts", "dialog.command-palette",
       "paint.brush.decrease", "paint.brush.increase", "edit.cancel",
       "dialog.pack-studio", "dialog.import-model", "dialog.library", "dialog.region", "dialog.face"]) {
       expect(all.some(command => command.id === id), id).toBe(true);

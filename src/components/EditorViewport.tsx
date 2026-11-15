@@ -15,6 +15,9 @@ import { uvToTexel } from "../editor/pixels";
 import type { Texel } from "../editor/pixels";
 import type { PaintModifiers } from "../editor/paintGeometry";
 import { CameraControls } from "./CameraControls";
+import { ViewportAxes } from "./ViewportAxes";
+import { calculateFrameBounds } from "../editor/frameSelection";
+import type { ViewportDisplay } from "../editor/viewportProjection";
 import { ViewportContextTarget } from "./ViewportContextTarget";
 
 export type Mode = "model" | "paint" | "preview";
@@ -32,6 +35,7 @@ interface ViewportProps {
   mode: Mode;
   tool: Tool;
   view: ViewRequest;
+  display: ViewportDisplay;
   snap: number;
   painting: boolean;
   cancelToken: number;
@@ -137,7 +141,7 @@ function DevPerformanceProbe() {
 
 type MeshProps = Pick<ViewportProps, "selectedId" | "selectedIds" | "selectedFace" | "mode" | "tool" | "snap" | "painting" |
   "onSelect" | "onSelectFace" | "onBeginPaint" | "onContinuePaint" | "onFinishPaint" |
-  "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "onRotate" | "cancelToken"> & {
+  "onCancelPaint" | "onSample" | "onFill" | "onTransform" | "onRotate" | "cancelToken" | "display"> & {
     node: Cuboid; textureMaps: Record<string, THREE.Texture>; textures: PixelTexture[];
     opaqueTextureIds: ReadonlySet<string>;
     rotationEnabled: boolean;
@@ -282,7 +286,7 @@ function AssetMesh(props: MeshProps) {
           transparent={!props.opaqueTextureIds.has(node.faces[direction].textureId)}
           depthWrite={props.opaqueTextureIds.has(node.faces[direction].textureId)}
           roughness={0.95} metalness={0}/> )}
-      {isSelected && !props.groupOutline && mode !== "preview" && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
+      {isSelected && props.display.outline && !props.groupOutline && <Edges color="#80dbbf" threshold={15} scale={1.004} />}
     </mesh>
     {selectedId === node.id && !props.groupOutline && mode !== "preview" && <FaceHighlight node={node} face={props.selectedFace}/>}
     </group></group></group>
@@ -315,6 +319,7 @@ function AssetMesh(props: MeshProps) {
 }
 
 function Scene(props: ViewportProps) {
+  const axesBounds = useMemo(() => calculateFrameBounds(props.document, []), [props.document.cuboids]);
   const textureMaps = useTextureMaps(props.document.textures, props.pixels, props.draftTextureId, props.document.activeTextureId);
   // Opaque painted sheets must write depth. The old transparent pass rendered
   // distant corks, bottle faces and drawer labels THROUGH nearer solid wood.
@@ -345,16 +350,17 @@ function Scene(props: ViewportProps) {
     <directionalLight position={[3, 6, 4]} intensity={2.3} castShadow shadow-mapSize={[1024, 1024]}
       shadow-camera-near={0.1} shadow-camera-far={20}/>
     <directionalLight position={[-3, 2, -4]} intensity={0.85} color="#a3c8be"/>
-    {props.mode !== "preview" && <gridHelper args={[10, 20, "#33483f", "#242c2b"]} position={[0, 0, 0]}/>}
+    {props.display.grid && <gridHelper args={[10, 20, "#33483f", "#242c2b"]} position={[0, 0, 0]} raycast={() => {}}/>}
+    {props.display.axes && <ViewportAxes bounds={axesBounds}/>}
     {props.document.cuboids.filter(node => node.visible && (!grouped || !selected.has(node.id))).map(node => renderNode(node))}
     {grouped && <SelectionTransform document={props.document} ids={ids} snap={props.snap} cancelToken={props.cancelToken}
-      outline={groupOutline}
+      outline={groupOutline && props.display.outline}
       active={props.mode === "model" && props.onBatchTransform &&
         (props.tool === "move" || (props.tool === "resize" && members.every(node => !node.rotation))) ? props.tool : null}
       onCommit={(gesture, delta, scale) => props.onBatchTransform?.(gesture, delta, scale)}>
       {origin => members.map(node => renderNode(node, origin))}
     </SelectionTransform>}
-    <CameraControls view={props.view} document={props.document} selectedIds={ids}/>
+    <CameraControls view={props.view} projection={props.display.projection} document={props.document} selectedIds={ids}/>
   </>;
 }
 

@@ -1,5 +1,6 @@
 import type { EditorDocument, Vec3 } from "./domain";
 import { transformedCorners } from "./elementRotation";
+import { MIN_CAMERA_SCALE } from "./viewportProjection";
 
 /** Bounds in the same 1/16-scale world coordinates used by EditorViewport. */
 export interface FrameBounds {
@@ -48,5 +49,5 @@ export function frameCameraDistance(radius: number, fovDegrees: number, aspect: 
   const vertical = Math.max(1, Math.min(179, fovDegrees)) * Math.PI / 180 / 2;
   const horizontal = Math.atan(Math.tan(vertical) *
     (Number.isFinite(aspect) && aspect > 0 ? aspect : 1));
-  return Math.max(0.002, radius * 1.3 / Math.sin(Math.min(vertical, horizontal)));
+  return Math.max(MIN_CAMERA_SCALE, radius * 1.3 / Math.sin(Math.min(vertical, horizontal)));
 }

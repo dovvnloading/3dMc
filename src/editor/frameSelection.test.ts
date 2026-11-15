@@ -63,7 +63,8 @@ describe("frame selection math", () => {
     const huge = calculateFrameBounds(doc(node("huge", [-256, -256, -256], [256, 256, 256])), []);
     const tinyDistance = frameCameraDistance(tiny.radius, 40, 16 / 9);
     const hugeDistance = frameCameraDistance(huge.radius, 40, 16 / 9);
-    expect(tinyDistance).toBeGreaterThanOrEqual(0.002);
+    expect(tinyDistance).toBeGreaterThan(tiny.radius * 1.3);
+    expect(tinyDistance).toBeLessThan(0.002); // Tiny selection really fills the view.
     expect(Number.isFinite(tinyDistance)).toBe(true);
     expect(hugeDistance).toBeGreaterThan(100);
     expect(Number.isFinite(hugeDistance)).toBe(true);
