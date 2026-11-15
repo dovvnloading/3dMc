@@ -27,8 +27,10 @@ function fixture() {
     importPack: vi.fn(), exportMinecraft: vi.fn(), exportTexture: vi.fn(),
     importTexture: vi.fn(), saveLegacyJson: vi.fn(), undo: vi.fn(), redo: vi.fn(),
     cancelCurrentTool: vi.fn(), decreaseBrushSize: vi.fn(), increaseBrushSize: vi.fn(),
-    frameSelection: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
+    frameSelection: vi.fn(), frameAll: vi.fn(), openShortcuts: vi.fn(), openCommandPalette: vi.fn(),
     addCuboid: vi.fn(), addShape: vi.fn(), duplicate: vi.fn(), deleteSelection: vi.fn(),
+    rename: vi.fn(), renameGroup: vi.fn(), setSelectionVisibility: vi.fn(),
+    setSelectionLocked: vi.fn(), groupSelection: vi.fn(), ungroup: vi.fn(),
     selectAll: vi.fn(), changeMode: vi.fn(), switchTool: vi.fn(),
     cycleSymmetry: vi.fn(), setSymmetry: vi.fn(), navigate: vi.fn(),
     openPackStudio: vi.fn(), openCreatorPanel: vi.fn(), openRecoveryDetails: vi.fn()

@@ -53,12 +53,19 @@ export interface EditorCommandActions {
   decreaseBrushSize: () => void;
   increaseBrushSize: () => void;
   frameSelection: () => void;
+  frameAll: () => void;
   openShortcuts: () => void;
   openCommandPalette: () => void;
   addCuboid: () => void;
   addShape: (primitive: PrimitiveId) => void;
   duplicate: () => void;
   deleteSelection: () => void;
+  rename: () => void;
+  renameGroup: (id: string) => void;
+  setSelectionVisibility: (visible: boolean) => void;
+  setSelectionLocked: (locked: boolean) => void;
+  groupSelection: () => void;
+  ungroup: (id: string) => void;
   selectAll: () => void;
   changeMode: (mode: Mode) => void;
   switchTool: (tool: Tool) => void;
@@ -109,6 +116,19 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     node.name.toLowerCase().includes(sceneQuery)).length;
   const duplicateLimitReason = state.document.cuboids.length + selection.length > 2000
     ? "Duplicating this selection exceeds the 2,000-element limit." : null;
+  const validSelectionReason = !selection.length ? "Select an element first."
+    : selection.some(node => !node) ? "The selection changed. Select the elements again." : null;
+  const selectedGroup = state.document.groups?.find(group =>
+    group.memberIds.length > 0 && group.memberIds.length === state.selectedIds.length &&
+    group.memberIds.every(id => state.selectedIds.includes(id)));
+  const retainedGroupCount = (state.document.groups ?? []).filter(group =>
+    group.memberIds.some(id => !state.selectedIds.includes(id))).length;
+  const groupReason = state.mode !== "model" ? "Switch to Model mode to group elements."
+    : validSelectionReason ?? (selection.length < 2 ? "Select at least two elements to group."
+    : protectedNode ? "Unlock and show the selected elements before grouping."
+    : selectedGroup ? "These elements already form a group. Choose Ungroup."
+    : retainedGroupCount >= 100 ? "The project supports at most 100 groups." : null);
+  const renameNode = selection.length === 1 ? selection[0] : null;
   const selectAllReason = state.mode !== "model" ? "Switch to Model mode to select elements."
     : matchingEditable === 0 ? "No visible, unlocked elements match the scene filter." : null;
   const modelToolReason = state.mode !== "model" ? "Switch to Model mode to use this tool." : null;
@@ -137,6 +157,27 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
     editOr(selectionReason ?? duplicateLimitReason), "Ctrl/Cmd+D", ["copy elements"]);
   add("edit.delete", "Delete selection", "Edit", actions.deleteSelection,
     editOr(selectionReason), "Delete", ["remove elements"], undefined, ["Backspace"]);
+  add("edit.rename", "Rename element", "Edit", actions.rename,
+    editOr(validSelectionReason ?? (selection.length !== 1
+      ? "Select one element to rename." : renameNode?.locked
+      ? "Unlock this element before renaming." : null)), undefined, ["name", "outliner"]);
+  add("edit.rename-group", "Rename group", "Edit",
+    () => { if (selectedGroup) actions.renameGroup(selectedGroup.id); },
+    editOr(selectedGroup ? null : "Select one whole group to rename."), undefined, ["group", "name"]);
+  const willHide = selection.some(node => node?.visible);
+  add("edit.visibility", willHide ? "Hide" : "Show", "Edit",
+    () => actions.setSelectionVisibility(!willHide), editOr(validSelectionReason),
+    undefined, ["visibility", "hide", "show", "scene"]);
+  const willLock = selection.some(node => node && !node.locked);
+  add("edit.lock", willLock ? "Lock" : "Unlock", "Edit",
+    () => actions.setSelectionLocked(willLock), editOr(validSelectionReason),
+    undefined, ["protect", "lock", "unlock"]);
+  add("edit.group", "Group", "Edit", actions.groupSelection, editOr(groupReason),
+    undefined, ["organize", "collection"]);
+  add("edit.ungroup", "Ungroup", "Edit",
+    () => { if (selectedGroup) actions.ungroup(selectedGroup.id); },
+    editOr(selectedGroup ? null : "Select one whole group to ungroup."),
+    undefined, ["dissolve", "group"]);
   add("edit.cancel", "Cancel tool or paint stroke", "Edit", actions.cancelCurrentTool,
     null, "Esc", ["escape", "return to select"]);
 
@@ -194,6 +235,8 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
   }
   add("view.frame", "Frame selection", "View", actions.frameSelection,
     null, "F", ["focus", "fit", "zoom", "model", "camera"]);
+  add("view.frame-all", "Frame all", "View", actions.frameAll,
+    null, undefined, ["fit", "whole model", "camera"]);
   add("view.reset", "Reset camera", "View", () => actions.navigate("iso"), null, undefined, ["view default"]);
 
   add("dialog.shortcuts", "Keyboard shortcuts", "Dialog", actions.openShortcuts,
