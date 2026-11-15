@@ -193,7 +193,11 @@ test("display settings persist across modes; frames, picks, gizmos and model pai
   await page.getByRole("tab", { name: "Paint" }).click();
   await page.getByRole("button", { name: "Pixel pencil (B)" }).click();
   await page.getByRole("button", { name: "Choose color #c76d68" }).click();
-  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  // Paint mode splits the stage with the texture sheet; the model-mode
+  // canvas box is wider and its old center would miss the painted mesh.
+  const paintBox = await canvas.boundingBox();
+  if (!paintBox) throw new Error("Missing Paint mode viewport");
+  await canvas.click({ position: { x: paintBox.width / 2, y: paintBox.height / 2 } });
   await expect(page.getByRole("button", { name: "Undo (Ctrl/Cmd+Z)" })).toBeEnabled();
   expect(errors).toEqual([]);
 });
