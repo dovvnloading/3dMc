@@ -1092,7 +1092,7 @@ export function App() {
              disabled={rotatedSelection}
              onClick={() => switchTool("resize")}><Maximize2 size={18}/></IconButton><div className="rail-divider"/>
           <IconButton label="Add cuboid" onClick={addElement}><Plus size={19}/></IconButton>
-        </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/>}</div>
+        </> : <PaintToolRail tool={tool} filled={filledShapes} onSelect={switchTool}/>}</div>}
         <div className="view-bottom"><div className="view-tool-caption">{mode === "paint" ? <PaintToolHint tool={tool} filled={filledShapes}/> : mode === "preview" ? "Preview only · No edits are applied in this mode" : tool === "select" ? "Select an element · Shift/Ctrl/Cmd to multi-select · V" : tool === "move" ? "Drag a gizmo axis to move · W" : tool === "rotate" ? (rotateToolReason ?? "Drag the colored rotation ring · snaps to five Java angles · E · Esc cancels") : rotatedSelection ? "Resize gizmo unavailable for rotated elements · use local Size fields" : "Drag a gizmo axis to resize · R"}</div>
           <div className="camera-views">{(["iso", "front", "right", "top"] as const).map(kind => <button key={kind} className={view.kind === kind ? "current" : ""} onClick={() => navigate(kind)} aria-label={"View " + kind}>{kind.toUpperCase()}</button>)}
             <IconButton label="Reset camera" onClick={() => navigate("iso")}><RotateCcw size={15}/></IconButton></div></div>
