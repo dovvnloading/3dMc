@@ -214,7 +214,15 @@ function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
   if (offset === 0) return node;
   const shift = (values: Vec3): Vec3 => values.map((value, component) =>
     component === axis ? value + offset : value) as unknown as Vec3;
-  return { ...node, from: shift(node.from), to: shift(node.to),
+  const from = shift(node.from);
+  const to = [...shift(node.to)] as [number, number, number];
+  // A translated 64-unit side can subtract to 64 + one ulp even though
+  // it has not actually been resized. Avoid rejecting a legal rigid move.
+  const excess = to[axis] - from[axis] - 64;
+  if (excess > 0 && excess < 1e-10) {
+    to[axis] -= 2 * Number.EPSILON * Math.max(1, Math.abs(from[axis]), Math.abs(to[axis]));
+  }
+  return { ...node, from, to,
     ...(node.rotation ? { rotation: { ...node.rotation, origin: shift(node.rotation.origin) } } : {}) };
 }
 
