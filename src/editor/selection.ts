@@ -167,8 +167,13 @@ export function mirrorSelection(document: EditorDocument, ids: readonly string[]
   const nodes = editableSelection(document, ids);
   const bounds = visibleSelectionBounds(nodes);
   if (!bounds) return document;
-  const sum = bounds.from[axis] + bounds.to[axis];
-  const reflected = (value: number) => rounded(sum - value);
+  // Quantize the shared reflection plane more coarsely than coordinates.
+  // This suppresses trig roundoff when computing the plane a second time,
+  // while retaining source detail well beyond the editor's usual 4 decimals.
+  // Valid Java coordinates/pivots keep both scaled integers safely below 2^53.
+  const scale = 1e12;
+  const sumScaled = Math.round((bounds.from[axis] + bounds.to[axis]) * 1e9) * 1e3;
+  const reflected = (value: number) => (sumScaled - Math.round(value * scale)) / scale;
   const axisName = (["x", "y", "z"] as const)[axis];
   return publish(document, nodes.map(node => {
     const from = [...node.from] as [number, number, number];
@@ -199,7 +204,8 @@ export function distributeSelection(document: EditorDocument, ids: readonly stri
   const first = center(ordered[0]!), last = center(ordered[ordered.length - 1]!);
   if (first === last) return document;
   const spaced = ordered.map((node, index) =>
-    shiftPart(node, axis, first + (last - first) * index / (ordered.length - 1) - center(node)));
+    index === 0 || index === ordered.length - 1 ? node :
+      shiftPart(node, axis, first + (last - first) * index / (ordered.length - 1) - center(node)));
   return publish(document, spaced);
 }
 
