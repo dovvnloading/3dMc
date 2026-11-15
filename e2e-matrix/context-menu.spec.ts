@@ -63,8 +63,10 @@ test("viewport opens empty-space view presets, ignores right drags, and targets 
   const element = page.getByRole("menu", { name: "Element context menu" });
   await expect(element).toBeVisible();
   await expect(element.getByRole("menuitem", { name: "Rename" })).toBeEnabled();
+  // The initial isometric center ray hits the front of the canopy, not
+  // the selected foundation or the body concealed behind the roof.
   await expect(page.getByRole("listbox", { name: "Scene elements" }).getByRole("option")
-    .filter({ hasText: "Lantern body" })).toHaveAttribute("aria-selected", "true");
+    .filter({ hasText: "Canopy" })).toHaveAttribute("aria-selected", "true");
   await element.getByRole("menuitem", { name: "Frame selection" }).click();
   await expect(element).toHaveCount(0);
 });
