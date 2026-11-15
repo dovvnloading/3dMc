@@ -93,10 +93,12 @@ export function ProjectionCameraControls({ view, projection, document, selectedI
   if (!cameras.current) {
     const perspective = camera instanceof THREE.PerspectiveCamera ? camera :
       new THREE.PerspectiveCamera(VIEWPORT_FOV, aspect, 0.01, 100);
-    cameras.current = {
-      perspective,
-      orthographic: new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.01, 100)
-    };
+    const orthographic = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.01, 100);
+    // R3F otherwise rewrites top/bottom to ±canvasHeight/2 every time a
+    // mode switch changes the canvas size, shrinking the whole model to a dot.
+    // We own the ortho frustum and update its aspect ourselves below.
+    (orthographic as THREE.OrthographicCamera & { manual?: boolean }).manual = true;
+    cameras.current = { perspective, orthographic };
   }
 
   const cameraRef = useRef(camera as ViewCamera);

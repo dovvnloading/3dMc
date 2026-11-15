@@ -125,6 +125,8 @@ test("display settings persist across modes; frames, picks, gizmos and model pai
     await expect(axes).toHaveAttribute("aria-pressed", "true");
     await expect(outline).toHaveAttribute("aria-pressed", "false");
     await expect(canvas).toHaveAttribute("data-camera-projection", "orthographic");
+    // R3F resize used to replace the view-sized frustum with canvas pixels.
+    expect((await cameraSnapshot(page)).halfHeight).toBeLessThan(5);
   };
   await verify();
   await page.getByRole("tab", { name: "Paint" }).click();
