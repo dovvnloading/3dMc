@@ -108,6 +108,14 @@ describe("pixel shape geometry", () => {
     expect(rgba(ellipse, 7, 5, 1)[3]).toBe(255);
     expect(rgba(ellipse, 7, 6, 2)[3]).toBe(0);
   });
+  it("clips a thick shape that extends beyond the sheet without losing visible outline edges", () => {
+    const large = { left: -1, top: 0, right: 4, bottom: 4 };
+    const thin = shapeStencil(4, 4, "rectangle", large, false, 1, "square");
+    const thick = shapeStencil(4, 4, "rectangle", large, false, 3, "square");
+    expect(thin[2 * 4]).toBe(0); // The outline itself is outside the sheet.
+    expect(thick[2 * 4]).toBe(1); // Its 3px brush still reaches x=0.
+    expect(thick).toHaveLength(16);
+  });
   it("does not break on 1×1, 1×N, N×1 or small even ellipses", () => {
     for (const [w, h] of [[1, 1], [1, 7], [7, 1], [2, 2], [2, 4], [4, 2]]) {
       const stencil = shapeStencil(w, h, "ellipse",
