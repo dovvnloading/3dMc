@@ -134,13 +134,16 @@ export function TextureSurface(props: Props) {
           document.querySelector("[role=dialog]") ||
           (target?.closest("button") && !pointerOver.current)) return;
       space.current = true; setSpaceHeld(true);
-      if (target && viewportRef.current?.contains(target)) event.preventDefault();
+      // A focused tool button must not activate on Space when the pointer is over the sheet.
+      if (pointerOver.current || (target && viewportRef.current?.contains(target))) event.preventDefault();
     };
     const up = (event: globalThis.KeyboardEvent) => {
       if (event.key === " ") { space.current = false; setSpaceHeld(false); }
     };
     const blur = () => {
       space.current = false; setSpaceHeld(false);
+      if (pan.current && viewportRef.current?.hasPointerCapture(pan.current.pointerId))
+        viewportRef.current.releasePointerCapture(pan.current.pointerId);
       pan.current = null;
     };
     window.addEventListener("keydown", down);
