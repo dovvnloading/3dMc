@@ -127,7 +127,9 @@ describe("Java 1.21.4 single-axis element rotation", () => {
     expect(repeated.cuboids.at(-1)?.rotation?.origin[0]).toBe(10);
     const shifted = transformSelection(source, ["body"], [2, 0, 0], [1, 1, 1]);
     expect(shifted.cuboids[0]?.rotation?.origin[0]).toBe(10);
-    expect(() => mirrorSelection(source, ["body"], 0)).toThrow(/Mirror is unavailable/);
+    const mirrored = mirrorSelection(source, ["body"], 0);
+    expect(mirrored.cuboids[0]?.rotation?.angle).toBe(-22.5);
+    expect(mirrorSelection(mirrored, ["body"], 0).cuboids[0]).toEqual(original);
     expect(() => transformSelection(source, ["body"], [0, 0, 0], [1.2, 1, 1])).toThrow(/not representable/);
   });
 

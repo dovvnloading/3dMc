@@ -67,7 +67,7 @@ export function SelectionInspector(props: Props) {
         <h3>Selection bounds</h3>
         <p className="batch-help">Moving the corner preserves spacing. Resizing scales every selected part around the minimum corner.</p>
         {disabled && <p className="batch-warning" role="status">The selection contains locked or hidden parts. Unlock/show them or deselect them. No partial edits are applied.</p>}
-        {rotated && <p className="batch-warning" role="status">Rotated parts use local Size fields. Selection bounds, group Resize, Align, Distribute and Mirror are unavailable: their world-axis result would not match Java cuboid geometry. Group Move, Duplicate and Array preserve rotation and pivot.</p>}
+        {rotated && <p className="batch-warning" role="status">Rotated parts use local Size fields. Group corner/size editing and Resize remain unavailable; Align and Distribute use visible extents, and Mirror reflects rotation and pivot. Group Move, Duplicate and Array also preserve rotation.</p>}
         {(["position", "size"] as const).map(property => <div key={property} className="batch-field-row">
           <h4>{property === "position" ? "Corner position" : "Overall size"}</h4>
           <div className="batch-fields">{axes.map(axis => <BatchNumber key={property + axis}
@@ -104,7 +104,7 @@ export function SelectionInspector(props: Props) {
           {axes.map(axis => <div key={axis} className="batch-align-axis">
             <span>{label(axis)} axis</span>
             {(["minimum", "center", "maximum"] as const).map(edge =>
-              <button type="button" key={edge} disabled={disabled || rotated}
+              <button type="button" key={edge} disabled={disabled}
                 aria-label={"Align " + label(axis) + " " + edge}
                 onClick={() => props.apply(doc => alignSelection(doc, props.ids, axis, edge))}>
                 {edge === "minimum" ? "Min" : edge === "maximum" ? "Max" : "Center"}
@@ -112,7 +112,7 @@ export function SelectionInspector(props: Props) {
           </div>)}
         </div>
         <div className="batch-distribute" role="group" aria-label="Distribute selected parts">
-          {axes.map(axis => <button type="button" key={axis} disabled={disabled || rotated || nodes.length < 3}
+          {axes.map(axis => <button type="button" key={axis} disabled={disabled || nodes.length < 3}
             aria-label={"Distribute " + label(axis) + " centers"}
             onClick={() => props.apply(doc => distributeSelection(doc, props.ids, axis))}>
             Spread {label(axis)}
@@ -122,7 +122,7 @@ export function SelectionInspector(props: Props) {
         <h4>Mirror geometry</h4>
         <p className="batch-help">Reflect selected parts across the selection center on one axis. Their dimensions and painted face UVs stay unchanged; texture pixels are not flipped.</p>
         <div className="batch-distribute" role="group" aria-label="Mirror selected parts">
-          {axes.map(axis => <button type="button" key={axis} disabled={disabled || rotated}
+          {axes.map(axis => <button type="button" key={axis} disabled={disabled}
             aria-label={"Mirror selected parts on " + label(axis)}
             onClick={() => props.apply(doc => mirrorSelection(doc, props.ids, axis))}>
             Mirror {label(axis)}

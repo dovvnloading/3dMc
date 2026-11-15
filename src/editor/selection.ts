@@ -1,6 +1,7 @@
 import type { Axis, Cuboid, EditorDocument, Vec3 } from "./domain";
 import { copyFaces, isValidCuboid, pruneGroupMembers } from "./domain";
-import { mapRotationToBounds } from "./elementRotation";
+import { mapRotationToBounds, transformedBounds } from "./elementRotation";
+import type { ElementAngle } from "./elementRotation";
 
 /** Selection belongs to the session, never the native document or undo history. */
 export interface Selection {
@@ -49,7 +50,7 @@ export class SelectionEditError extends Error {
 }
 
 export interface SelectionBounds { readonly from: Vec3; readonly to: Vec3; readonly center: Vec3; readonly size: Vec3; }
-export function selectionBounds(nodes: readonly Cuboid[]): SelectionBounds | null {
+export function selectionBounds(nodes: readonly Pick<Cuboid, "from" | "to">[]): SelectionBounds | null {
   if (!nodes.length) return null;
   const from: [number, number, number] = [Infinity, Infinity, Infinity];
   const to: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -59,6 +60,11 @@ export function selectionBounds(nodes: readonly Cuboid[]): SelectionBounds | nul
   }
   return { from, to, center: from.map((v, a) => (v + to[a]!) / 2) as unknown as Vec3,
     size: from.map((v, a) => to[a]! - v) as unknown as Vec3 };
+}
+
+/** Extents of the actually rendered geometry, including rotation, rescale and off-center pivots. */
+function visibleSelectionBounds(nodes: readonly Cuboid[]): SelectionBounds | null {
+  return selectionBounds(nodes.map(node => transformedBounds(node)));
 }
 
 /** No partial edit: missing, hidden or locked members reject the complete batch. */
@@ -73,16 +79,21 @@ export function editableSelection(document: EditorDocument, ids: readonly string
   return nodes;
 }
 
+function sameRotation(a: Cuboid["rotation"], b: Cuboid["rotation"]): boolean {
+  return a === b || !!(a && b && a.axis === b.axis && a.angle === b.angle &&
+    a.rescale === b.rescale && a.origin.every((value, axis) => value === b.origin[axis]));
+}
+
 function publish(document: EditorDocument, replacements: readonly Cuboid[]): EditorDocument {
   if (replacements.some(node => !isValidCuboid(node))) throw new SelectionEditError(
-    "The complete edit was rejected: every part must have positive size up to 64 units and coordinates within −256…256. No parts were changed."
+    "The complete edit was rejected: Java single-axis cuboids need legal rotation angles, pivots and coordinates within −256…256, and positive sizes up to 64 units. No parts were changed."
   );
   const byId = new Map(replacements.map(node => [node.id, node]));
   let changed = false;
   const cuboids = document.cuboids.map(node => {
     const next = byId.get(node.id);
     if (!next || (node.from.every((n, a) => n === next.from[a]) &&
-        node.to.every((n, a) => n === next.to[a]))) return node;
+        node.to.every((n, a) => n === next.to[a]) && sameRotation(node.rotation, next.rotation))) return node;
     changed = true;
     return next;
   });
@@ -126,67 +137,99 @@ export function setSelectionBounds(document: EditorDocument, ids: readonly strin
 }
 
 
-/** Align bounding box edges or centers without resizing any part or changing UVs. */
+/** Align the visible, transformed bounding-box edges or centers without resizing. */
 export function alignSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis, edge: "minimum" | "center" | "maximum"): EditorDocument {
   const nodes = editableSelection(document, ids);
-  if (nodes.some(node => node.rotation))
-    throw new SelectionEditError("Align is unavailable for rotated elements: unrotated box edges would not match the visible edges. No parts changed.");
-  const bounds = selectionBounds(nodes);
+  const bounds = visibleSelectionBounds(nodes);
   if (!bounds || nodes.length < 2) return document;
   const target = edge === "minimum" ? bounds.from[axis] :
     edge === "maximum" ? bounds.to[axis] : bounds.center[axis];
-  const edgeOf = (node: Cuboid) => edge === "minimum" ? node.from[axis] :
-    edge === "maximum" ? node.to[axis] : (node.from[axis] + node.to[axis]) / 2;
-  const moved = nodes.map(node => shiftPart(node, axis, target - edgeOf(node)));
-  return publish(document, moved);
+  const edgeOf = (node: Cuboid) => {
+    const visible = transformedBounds(node);
+    return edge === "minimum" ? visible.from[axis] :
+      edge === "maximum" ? visible.to[axis] : (visible.from[axis] + visible.to[axis]) / 2;
+  };
+  return publish(document, nodes.map(node => shiftPart(node, axis, target - edgeOf(node))));
 }
 
 /**
- * Reflect selected cuboid geometry around the shared selection center.
- * Size, face bindings, UV rotations, textures and scene order remain intact:
- * this mirrors part placement, not the pixels painted on each face.
+ * Reflect every visible corner about the selection's visible center. Conjugating
+ * a Java single-axis rotation with a reflection negates the angle if the
+ * reflected axis is perpendicular to the rotation axis. The pivot itself must
+ * be reflected as well; rescale commutes with the reflection.
+ *
+ * Face bindings/UVs stay on their original local faces (texture pixels are not
+ * independently flipped). Unsupported out-of-range geometry/pivots reject all.
  */
 export function mirrorSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis): EditorDocument {
   const nodes = editableSelection(document, ids);
-  if (nodes.some(node => node.rotation))
-    throw new SelectionEditError("Mirror is unavailable for rotated elements: reflecting an angled cuboid also changes its face orientation. No parts changed.");
-  const bounds = selectionBounds(nodes);
+  const bounds = visibleSelectionBounds(nodes);
   if (!bounds) return document;
-  const sum = bounds.from[axis] + bounds.to[axis];
+  // Quantize the shared reflection plane more coarsely than coordinates.
+  // This suppresses trig roundoff when computing the plane a second time,
+  // while retaining source detail well beyond the editor's usual 4 decimals.
+  // Valid Java coordinates/pivots keep both scaled integers safely below 2^53.
+  const scale = 1e12;
+  const sumScaled = Math.round((bounds.from[axis] + bounds.to[axis]) * 1e9) * 1e3;
+  const reflected = (value: number) => (sumScaled - Math.round(value * scale)) / scale;
+  const axisName = (["x", "y", "z"] as const)[axis];
   return publish(document, nodes.map(node => {
     const from = [...node.from] as [number, number, number];
     const to = [...node.to] as [number, number, number];
-    from[axis] = rounded(sum - node.to[axis]);
-    to[axis] = rounded(sum - node.from[axis]);
-    return { ...node, from, to };
+    from[axis] = reflected(node.to[axis]);
+    to[axis] = reflected(node.from[axis]);
+    const rotation = node.rotation && {
+      ...node.rotation,
+      angle: (node.rotation.axis === axisName ? node.rotation.angle : -node.rotation.angle) as ElementAngle,
+      origin: node.rotation.origin.map((value, component) =>
+        component === axis ? reflected(value) : value) as unknown as Vec3
+    };
+    return { ...node, from, to, ...(rotation ? { rotation } : {}) };
   }));
 }
 
-/** Keep the outermost centers fixed and space intermediate centers evenly. */
+/** Keep the outermost visible centers fixed and evenly space intermediate centers. */
 export function distributeSelection(document: EditorDocument, ids: readonly string[],
   axis: Axis): EditorDocument {
   const nodes = editableSelection(document, ids);
-  if (nodes.some(node => node.rotation))
-    throw new SelectionEditError("Distribute is unavailable for rotated elements because the visible centres and unrotated centres differ. No parts changed.");
   if (nodes.length < 3) return document;
-  const center = (node: Cuboid) => (node.from[axis] + node.to[axis]) / 2;
+  const center = (node: Cuboid) => {
+    const bounds = transformedBounds(node);
+    return (bounds.from[axis] + bounds.to[axis]) / 2;
+  };
   // ES stable sort retains scene order as the tie breaker.
   const ordered = [...nodes].sort((a, b) => center(a) - center(b));
   const first = center(ordered[0]!), last = center(ordered[ordered.length - 1]!);
   if (first === last) return document;
   const spaced = ordered.map((node, index) =>
-    shiftPart(node, axis, first + (last - first) * index / (ordered.length - 1) - center(node)));
+    index === 0 || index === ordered.length - 1 ? node :
+      shiftPart(node, axis, first + (last - first) * index / (ordered.length - 1) - center(node)));
   return publish(document, spaced);
 }
 
+/**
+ * Apply a world-axis translation to bounds and pivot on the same 10^-12 grid
+ * used by reflection. Trigonometric bounds have more floating-point digits
+ * than Java coordinates need; canonicalizing edited coordinates prevents a
+ * subsequent double reflection from truncating those calculation artifacts.
+ */
 function shiftPart(node: Cuboid, axis: Axis, offset: number): Cuboid {
-  if (offset === 0) return node;
-  const shift = (values: Vec3): Vec3 => values.map((value, a) =>
-    a === axis ? rounded(value + offset) : value) as unknown as Vec3;
-  const from = shift(node.from), to = shift(node.to);
-  return { ...node, from, to, ...(node.rotation ? { rotation: mapRotationToBounds(node, from, to) } : {}) };
+  // Rotated extents include trig roundoff: a second identical command is a no-op.
+  if (Math.abs(offset) < 1e-10) return node;
+  const shift = (values: Vec3): Vec3 => values.map((value, component) =>
+    component === axis ? Math.round((value + offset) * 1e12) / 1e12 : value) as unknown as Vec3;
+  const from = shift(node.from);
+  const to = [...shift(node.to)] as [number, number, number];
+  // A translated 64-unit side can subtract to 64 + one ulp even though
+  // it has not actually been resized. Avoid rejecting a legal rigid move.
+  const excess = to[axis] - from[axis] - 64;
+  if (excess > 0 && excess < 1e-10) {
+    to[axis] -= 2 * Number.EPSILON * Math.max(1, Math.abs(from[axis]), Math.abs(to[axis]));
+  }
+  return { ...node, from, to,
+    ...(node.rotation ? { rotation: { ...node.rotation, origin: shift(node.rotation.origin) } } : {}) };
 }
 
 export function setEachSize(document: EditorDocument, ids: readonly string[], axis: Axis,
