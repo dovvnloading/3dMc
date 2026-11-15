@@ -124,7 +124,7 @@ describe("editor command registry", () => {
     expect(get("tool.move", { mode: "paint" }).disabledReason).toContain("Model mode");
     expect(get("tool.eraser", { mode: "paint" }).enabled).toBe(true);
     expect(get("tool.ellipse", { mode: "paint" }).enabled).toBe(true);
-    expect(get("tool.select", { mode: "preview" }).enabled).toBe(false);
+    expect(get("tool.select", { mode: "preview" }).enabled).toBe(true); // V worked in every mode.
   });
 
   it("exposes symmetry modes, ellipse and collision-free Paint shortcuts", () => {

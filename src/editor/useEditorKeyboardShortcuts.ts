@@ -31,7 +31,7 @@ export function useEditorKeyboardShortcuts(commands: readonly EditorCommand[],
       if (shortcut === "Esc" && beforeEscape()) { event.preventDefault(); return; }
       const command = commands.find(command => command.enabled &&
         (command.shortcut === shortcut || command.alternateShortcuts?.includes(shortcut)));
-      if (!command || (event.repeat && ["M", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
+      if (!command || (event.repeat && ["M", "F", "?", "Ctrl/Cmd+K"].includes(shortcut))) return;
       event.preventDefault();
       command.run();
     };

@@ -63,7 +63,7 @@ describe("frame selection math", () => {
     const huge = calculateFrameBounds(doc(node("huge", [-256, -256, -256], [256, 256, 256])), []);
     const tinyDistance = frameCameraDistance(tiny.radius, 40, 16 / 9);
     const hugeDistance = frameCameraDistance(huge.radius, 40, 16 / 9);
-    expect(tinyDistance).toBeGreaterThanOrEqual(0.05);
+    expect(tinyDistance).toBeGreaterThanOrEqual(0.002);
     expect(Number.isFinite(tinyDistance)).toBe(true);
     expect(hugeDistance).toBeGreaterThan(100);
     expect(Number.isFinite(hugeDistance)).toBe(true);

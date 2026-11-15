@@ -17,7 +17,10 @@ test("shortcut reference opens by ?, toolbar and palette, traps focus and restor
   await expect(dialog).toContainText("Ctrl/Cmd+Y");
   await expect(dialog).toContainText("Decrease brush size");
   await close.press("Tab");
-  await expect(close).toBeFocused(); // Focus wraps when the close button is the only control.
+  const region = dialog.getByRole("region", { name: "Shortcuts by area" });
+  await expect(region).toBeFocused();
+  await region.press("Tab");
+  await expect(close).toBeFocused(); // Focus wraps from the last tabbable element.
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(help).toBeFocused();

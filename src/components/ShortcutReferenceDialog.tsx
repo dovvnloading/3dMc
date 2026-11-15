@@ -19,7 +19,7 @@ export function ShortcutReferenceDialog({ commands, onClose }: {
         aria-label="Close keyboard shortcuts" onClick={onClose}><X size={18}/></button>
     </div>
     <p className="shortcut-reference-description">Shortcuts for the current workspace. Tool keys apply in their respective modes.</p>
-    <div className="shortcut-reference-groups" aria-label="Shortcuts by area">
+    <div className="shortcut-reference-groups" role="region" tabIndex={0} aria-label="Shortcuts by area">
       {groups.map((group, index) => <section key={group.area}
         aria-labelledby={"shortcut-reference-area-" + index}>
         <h3 id={"shortcut-reference-area-" + index}>{group.area}</h3>

@@ -48,5 +48,5 @@ export function frameCameraDistance(radius: number, fovDegrees: number, aspect: 
   const vertical = Math.max(1, Math.min(179, fovDegrees)) * Math.PI / 180 / 2;
   const horizontal = Math.atan(Math.tan(vertical) *
     (Number.isFinite(aspect) && aspect > 0 ? aspect : 1));
-  return Math.max(0.05, radius * 1.3 / Math.sin(Math.min(vertical, horizontal)));
+  return Math.max(0.002, radius * 1.3 / Math.sin(Math.min(vertical, horizontal)));
 }

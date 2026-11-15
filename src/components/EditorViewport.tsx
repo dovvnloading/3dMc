@@ -98,6 +98,9 @@ function CameraControls({ view, document, selectedIds }: {
       };
       camera.position.set(...positions[view.kind]);
       orbit.target.set(0, 0.58, 0);
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.near = 0.01; camera.far = 100; camera.updateProjectionMatrix();
+      }
       orbit.update(); invalidate();
       return;
     }
@@ -110,7 +113,7 @@ function CameraControls({ view, document, selectedIds }: {
     direction.normalize();
     const target = new THREE.Vector3(...bounds.center);
     if (perspective) {
-      perspective.near = Math.max(0.001, Math.min(0.1, distance / 1000));
+      perspective.near = Math.max(0.000001, Math.min(0.1, distance / 1000));
       perspective.far = Math.max(100, distance + bounds.radius * 4);
       perspective.updateProjectionMatrix();
     }
@@ -125,7 +128,7 @@ function CameraControls({ view, document, selectedIds }: {
     // mutations or selection changes: an ordinary edit must not move the camera.
   }, [camera, invalidate, view]);
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.095}
-    minDistance={0.02} maxDistance={2000} enablePan screenSpacePanning
+    minDistance={0.001} maxDistance={2000} enablePan screenSpacePanning
     onStart={() => { movement.current = null; }}/>;
 }
 

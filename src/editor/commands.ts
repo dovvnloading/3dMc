@@ -161,7 +161,8 @@ export function createEditorCommands(state: EditorCommandContext, actions: Edito
       ? "Resize gizmo is unavailable for rotated elements; use local Size fields."
       : next === "rotate" ? state.rotateToolReason : null;
     add("tool." + next, "Tool: " + title, "Tool", () => actions.switchTool(next),
-      modelToolReason ?? specificReason, shortcut, ["transform", "model"], "Model tools");
+      next === "select" ? null : modelToolReason ?? specificReason,
+      shortcut, ["transform", "model"], "Model tools");
   }
   const paintTools: readonly [Tool, string, string][] = [
     ["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"],
