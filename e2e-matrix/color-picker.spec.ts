@@ -90,6 +90,13 @@ test("picker, palette, recent paint and eyedropper work in Firefox/WebKit", asyn
 
   await trigger.click();
   await expect(hex).toHaveValue("#123456");
+  await hex.fill("not-a-color");
+  await red.fill("500");
+  await red.press("Escape");
+  await expect(picker).toBeHidden();
+  await trigger.click();
+  await expect(hex).toHaveValue("#123456");
+  await expect(red).toHaveValue("18");
   await page.getByRole("button", { name: "Pixel pencil (B)" }).click();
   await expect(picker).toBeHidden();
   expect(errors).toEqual([]);
