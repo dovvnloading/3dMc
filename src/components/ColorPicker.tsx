@@ -158,7 +158,7 @@ export function ColorPicker({ label, value, onChange, disabled = false }: Props)
             onChange={event => {
               const text = event.currentTarget.value;
               setHexDraft(text);
-              const normalized = normalizeHex(text);
+              const normalized = parseFullHex(text);
               if (normalized) emit(normalized);
             }}
             onBlur={() => setHexDraft((normalizeHex(value) ?? "#000000").toUpperCase())}/>
